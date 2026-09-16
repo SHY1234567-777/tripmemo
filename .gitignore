@@ -1,0 +1,22 @@
+# 环境变量与密钥 —— 绝对不上传
+.env
+.env.local
+.env.*.local
+
+# 密钥类文件
+*.pem
+*.key
+
+# 依赖包（体积大，随时能重装）
+node_modules/
+
+# 日志文件
+*.log
+
+# 系统 / 编辑器产生的垃圾
+.DS_Store
+Thumbs.db
+.vscode/
+
+# 工具目录（不是项目代码）
+.workbuddy/
