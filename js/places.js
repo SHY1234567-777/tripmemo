@@ -8,6 +8,8 @@
      · 点击城市名时，地图上对应城市的点高亮
 
    Day 7 · 步骤 2c-②
+   Day 8 · 美化改版：从"一长条折叠列表"改成「城市卡片网格」
+          —— 每个城市一张卡，卡头有地点数 + 总停留时长 + 时长占比条
    ============================================================ */
 
 (function (global) {
@@ -18,6 +20,17 @@
 
   var elList = null;
   var elEmpty = null;
+
+  /* 时长占比条的换算上限：停留满 10 年（120 个月）= 满格
+     ⚠️ 别借 Model.LINE_MAX —— 那是「线宽像素上限（8px）」，不是月数，
+        借过来算比例会把所有城市都撑成满格。 */
+  var BAR_MONTHS_FULL = 120;
+
+  /* 入场动画：每张卡片比前一张晚 55ms 落进来，形成"翻页"的节奏
+     ⚠️ 上限 8 步 —— 城市多的时候（比如 30 个）不能一路加到 1.6 秒，
+        那样最后几张要等太久，用户会觉得卡。超过 8 张之后统一用同一个延迟。 */
+  var FLIP_STEP_MS = 55;
+  var FLIP_STEP_MAX = 8;
 
   /* ------------------------------------------------------------
      一、把地点按城市分组
@@ -58,7 +71,73 @@
   }
 
   /* ------------------------------------------------------------
-     二、渲染
+     二、小工具（Day 8 新增）
+     ------------------------------------------------------------ */
+
+  /**
+   * 画地点条目的图片位
+   * ⚠️ 为什么在 timeline.js 里也有一份类似的代码，不抽成公共函数？
+   *    因为两处的尺寸和样式完全不同（时间轴是 88×88 大方块，
+   *    这里是 56×56 小方块），强行抽公共函数反而要多传一堆参数。
+   *    只有几行代码，各自持有更清楚。等以后图片功能真做了，
+   *    再统一抽成 thumbnail.js 也不迟。
+   * @param {Object} place
+   * @returns {HTMLElement}
+   */
+  function makeThumb(place) {
+    var thumb = document.createElement('div');
+    thumb.className = 'place-thumb';
+
+    var first = (place.images && place.images.length) ? place.images[0] : '';
+    if (first) {
+      var img = document.createElement('img');
+      img.className = 'place-thumb-img';
+      img.src = first;
+      img.alt = place.name;
+      thumb.appendChild(img);
+      return thumb;
+    }
+
+    var hint = document.createElement('span');
+    hint.className = 'place-thumb-hint';
+    hint.textContent = '暂无';
+    thumb.appendChild(hint);
+    return thumb;
+  }
+
+  /**
+   * 把总月数说成人话：'4 年 2 个月'
+   * 为什么不用 stayLabel 那套 '2019-09 ~ 2021-06'：
+   * 卡片头部要给的是"这座城市我一共待了多久"，是汇总，不是起止。
+   * @param {number} months
+   * @returns {string} 没有时长时返回空串（调用方据此决定要不要显示这一行）
+   */
+  function monthsLabel(months) {
+    if (!months || months <= 0) {
+      return '';
+    }
+    var y = Math.floor(months / 12);
+    var m = months % 12;
+    if (y === 0) {
+      return m + ' 个月';
+    }
+    return m === 0 ? (y + ' 年') : (y + ' 年 ' + m + ' 个月');
+  }
+
+  /**
+   * 时长占比条该填多宽（0~1）
+   * 用平方根映射，和地图点大小 / 线宽同一套算法 —— 视觉语言统一
+   */
+  function barRatio(months) {
+    if (!months || months <= 0) {
+      return 0;
+    }
+    var capped = Math.min(months, BAR_MONTHS_FULL);
+    return Math.sqrt(capped / BAR_MONTHS_FULL);
+  }
+
+  /* ------------------------------------------------------------
+     三、渲染
      ------------------------------------------------------------ */
   function render() {
     if (!elList) {
@@ -78,12 +157,16 @@
 
     elList.innerHTML = '';
 
-    groupByCity(places).forEach(function (group) {
+    groupByCity(places).forEach(function (group, index) {
       /* 用浏览器原生的 details/summary 实现"展开 / 收起"，
          不用自己写状态管理 —— 少写代码，少出 bug */
       var box = document.createElement('details');
       box.className = 'city-group';
       box.open = true;   /* 默认展开：一眼能看到全部 */
+
+      /* 入场动画的延迟：第 N 张卡晚 N×55ms 落进来（上限 8 步，见常量说明）
+         ⚠️ 用 Math.min 卡上限，不要让第 30 张卡等 1.6 秒 */
+      box.style.animationDelay = (Math.min(index, FLIP_STEP_MAX) * FLIP_STEP_MS) + 'ms';
 
       var head = document.createElement('summary');
       head.className = 'city-head';
@@ -98,6 +181,41 @@
 
       head.appendChild(name);
       head.appendChild(count);
+
+      /* 第二行：总停留时长 + 时长占比条
+         —— 把「点大小 / 线宽表示时长」这条主线在列表里也讲一遍，
+            用的是同一套平方根映射，所以条的长短和地图上的线粗细是同源的 */
+      var totalMonths = group.places.reduce(function (sum, place) {
+        return sum + Model.monthsOfStay(place);
+      }, 0);
+
+      var sub = document.createElement('span');
+      sub.className = 'city-sub';
+
+      var bar = document.createElement('span');
+      bar.className = 'city-bar';
+
+      var fill = document.createElement('i');
+      fill.className = 'city-bar-fill';
+      fill.style.width = Math.round(barRatio(totalMonths) * 100) + '%';
+      bar.appendChild(fill);
+
+      var timeText = monthsLabel(totalMonths);
+      if (timeText) {
+        var timeLabel = document.createElement('span');
+        timeLabel.className = 'city-months';
+        timeLabel.textContent = timeText;
+        sub.appendChild(timeLabel);
+      } else {
+        /* 一个时长都没填（整座城市都是"想去"之类）→ 不显示"0 个月"这种废话 */
+        var blank = document.createElement('span');
+        blank.className = 'city-months';
+        blank.textContent = '未填时长';
+        sub.appendChild(blank);
+      }
+      sub.appendChild(bar);
+
+      head.appendChild(sub);
       box.appendChild(head);
 
       /* 点击城市名 → 让地图上该城市的点高亮（PRD 验收标准 10） */
@@ -112,16 +230,35 @@
         var row = document.createElement('div');
         row.className = 'place-row';
 
+        /* ---- 甲方案：图片位挂在【地点】上（不是城市上）----
+           因为 PRD 第六章的 images 字段是挂在 place 上的，
+           照片本来就是"某个地方的回忆"，不是"整座城市的封面"。
+           现在 images 都是空数组 → 画占位框；以后有值了自动变真图。 */
+        row.appendChild(makeThumb(place));
+
+        var body = document.createElement('div');
+        body.className = 'place-body';
+
         var title = document.createElement('span');
         title.className = 'place-name';
         title.textContent = place.name;
 
         var meta = document.createElement('span');
         meta.className = 'place-meta';
-        meta.textContent = Model.typeLabel(place.type) + ' ｜ ' + Model.stayLabel(place);
 
-        row.appendChild(title);
-        row.appendChild(meta);
+        /* 类型色点：和地图上的点同色，一眼对上 */
+        var dot = document.createElement('i');
+        dot.className = 'type-dot';
+        dot.style.backgroundColor = Model.TYPE_COLORS[place.type] || Model.TYPE_COLORS.long;
+
+        meta.appendChild(dot);
+        meta.appendChild(document.createTextNode(
+          Model.typeLabel(place.type) + ' ｜ ' + Model.stayLabel(place)
+        ));
+
+        body.appendChild(title);
+        body.appendChild(meta);
+        row.appendChild(body);
 
         /* 点条目 → 打开「查看态」弹窗 */
         row.addEventListener('click', function () {
@@ -138,7 +275,7 @@
   }
 
   /* ------------------------------------------------------------
-     三、初始化
+     四、初始化
      ------------------------------------------------------------ */
   function init() {
     elList = document.getElementById('places-list');
@@ -152,6 +289,6 @@
     render();
   }
 
-  global.TripMemoPlaces = { init: init, render: render };
+  global.TripMemoPlaces = { init: init, render: render, monthsLabel: monthsLabel };
 
 }(window));

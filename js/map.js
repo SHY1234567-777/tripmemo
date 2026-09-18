@@ -46,6 +46,43 @@
   var CHINA_CENTER = [104.2, 35.9];
   var CHINA_ZOOM = 5;
 
+  /* 官方内置的底图样式（兜底用）。
+     ⭐ 完整清单 = 官方 11 种（Day 8 查官方文档核实）：
+       标准      amap://styles/normal
+       幻影黑    amap://styles/dark
+       月光银    amap://styles/light
+       远山黛    amap://styles/whitesmoke   ← 当前默认
+       草色青    amap://styles/fresh
+       雅士灰    amap://styles/grey
+       涂鸦      amap://styles/graffiti
+       马卡龙    amap://styles/macaron
+       靛青蓝    amap://styles/blue
+       极夜蓝    amap://styles/darkblue
+       酱籽      amap://styles/wine
+     ⚠️ 想换样式不用改这里 —— 改 config.js 里的 mapStyle 字段即可，
+        改完刷新页面就生效（控制台会打印当前用的是哪个）。
+     当前选 whitesmoke（远山黛）：极浅米白，跟奶油暖色 UI 同调性，
+     也符合"简洁大气、线条少"的目标。
+     （此前试过 dark / darkblue 深色方案，因高德自定义样式需注册调色而放弃） */
+  var DEFAULT_MAP_STYLE = 'amap://styles/whitesmoke';
+
+  /* ------------------------------------------------------------
+     关于"能不能只改底图里的某一种元素"（如边界线颜色）
+     ------------------------------------------------------------
+     ⚠️ 结论：**不能**（Day 8 实测确认）
+     · 高德官方只提供两种改底图配色的方式：
+       ① 整体换预设样式（mapStyle: 'amap://styles/xxx'）
+       ② 去控制台创建自定义样式，拿到 ID 后用
+       【没有】提供"在代码里微调官方预设里某个元素"的 API
+     · 曾试过第三方博客的写法：
+         styles: [{ featureType: 'boundary', elementType: 'geometry',
+                    stylers: { color: '#8A6A45' } }]
+       以及把 featureType 换成中文 '行政边界' 的版本 ——
+       **两种写法实测均无效**（控制台无报错，但边界线颜色毫无变化），
+       已整体删除，不再保留死代码。
+     · 所以想改底图配色只有两条路：换整体预设，或走控制台自定义样式。 */
+
+
   /* ------------------------------------------------------------
      一、加载高德 SDK
      ------------------------------------------------------------ */
@@ -103,11 +140,28 @@
      二、初始化地图
      ------------------------------------------------------------ */
   function initMap() {
+    /* 底图样式：优先用 config.js 里配置的（高德控制台自定义样式），
+       没配就退回官方内置样式（见 DEFAULT_MAP_STYLE）。
+       改样式不用动代码 —— 只改 config.js 的 mapStyle 字段即可 */
+    var cfg = readConfig() || {};
+    var style = cfg.mapStyle || DEFAULT_MAP_STYLE;
+
     map = new AMap.Map(elCanvas, {
       zoom: CHINA_ZOOM,
       center: CHINA_CENTER,
-      viewMode: '2D'
+      viewMode: '2D',
+      mapStyle: style,
+      /* ⚠️ Day 8 美化改版：只保留「背景 / 道路 / 建筑」三类要素，
+         不显示 point（兴趣点，即"武汉市第六中学"这类密密麻麻的地名）。
+         原因：这些 POI 文字非常"吵"，会跟我们的点抢注意力，
+               而本项目的视觉主角是"点的大小"，别的都得让路。
+         官方支持的可选值（见高德 JSAPI 2.0 文档 setFeatures）：
+           bg（地图背景）/ point（兴趣点）/ road（道路）
+           / building（建筑物） */
+      features: ['bg', 'road', 'building']
     });
+
+    console.log('[TripMemo] 地图底图样式：', style, '｜只保留背景/道路/建筑，已隐藏兴趣点');
 
     /* 点击地图空白处 → 新增地点（PRD 4.1 #1） */
     map.on('click', function (e) {
@@ -338,19 +392,25 @@
         return;
       }
       var diameter = Model.dotDiameter(place);
-      var color = Model.TYPE_COLORS[place.type] || '#185FA5';
+      var color = Model.TYPE_COLORS[place.type] || Model.TYPE_COLORS.long;
 
-      /* 被选中的城市：描边加粗、颜色变深，在一堆点里一眼能认出来
+      /* 被选中的城市：描边加粗、颜色变亮，在一堆点里一眼能认出来
          （比较用规范化城市名，免得"武汉市"和"武汉"对不上） */
       var highlighted = !!highlightedCity && Model.isSameCity(place.city, highlightedCity);
 
+      /* ⚠️ Day 8 美化改版（最终）：描边用白色。
+         现在是【奶油浅色地图底】，点的填充色是深色系（藏蓝/松绿/橙/暖灰），
+         深色块在浅底上本来就清楚，加一圈白边是为了：
+         ① 让相邻的点在重叠时能分开边界
+         ② 让点在米色底图上显得"干净、像贴上去的"
+         高亮态（点城市列表里的城市名）用更粗的暖棕边把它框出来。 */
       var marker = new AMap.CircleMarker({
         center: [place.lng, place.lat],
         radius: diameter / 2,           /* 高德这里要的是半径 */
         fillColor: color,
-        fillOpacity: 0.9,
-        strokeColor: highlighted ? '#2c2c2a' : '#ffffff',
-        strokeWeight: highlighted ? 3.5 : 1.5,
+        fillOpacity: 0.92,
+        strokeColor: highlighted ? '#3A332B' : '#FFFFFF',
+        strokeWeight: highlighted ? 3 : 1.5,
         zIndex: highlighted ? 9999 : diameter,  /* 高亮的点压在最上层 */
         extData: { placeId: place.id }
       });
@@ -463,9 +523,15 @@
           [mainCity.lng, mainCity.lat],
           [item.lng, item.lat]
         ],
-        strokeColor: '#185FA5',
+        /* ⚠️ Day 8 美化改版：连线用深棕褐。
+           之前用主题色 #B5762E（暖棕琥珀），但在米白底图上，
+           周围没有别的暖色时它容易被看成"砖红"，跟暖色 UI 不协调。
+           改成 #8A6A45：同属暖色系，但更偏"褐"不偏"橙"，
+           像泛黄旧地图上的墨线，贴合"回忆与记录"的调性，也不抢眼。
+           透明度 0.55：粗线（最大 8px）不做半透明会像一根管道压住地图。 */
+        strokeColor: '#8A6A45',
         strokeWeight: Model.lineWidthByMonths(item.totalMonths),  /* 线宽 ∝ 累计停留时长（验收标准 18） */
-        strokeOpacity: 0.7,
+        strokeOpacity: 0.55,
         lineJoin: 'round',
         zIndex: 100
       }));

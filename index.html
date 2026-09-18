@@ -4,22 +4,40 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>TripMemo · 人生记忆地图</title>
-  <link rel="stylesheet" href="css/style.css">
+  <!-- 给样式表加版本号，防止浏览器拿旧的缓存（改了 CSS 后把 v 的数字 +1 即可） -->
+  <link rel="stylesheet" href="css/style.css?v=11">
 </head>
 <body>
 
-  <!-- ===== 顶部导航栏：切换视图 + 导出 ===== -->
-  <header class="app-header">
+  <!-- ===== 左侧导航栏：切换视图 + 导出 =====
+       宽屏（≥768px）时是贴着左边的竖条，窄屏时自动变回顶部横条。
+       两种形态共用同一份 HTML，靠 CSS 媒体查询切换方向。 -->
+  <nav class="app-nav">
     <h1 class="app-title">TripMemo</h1>
-    <nav class="app-nav">
-      <button type="button" class="nav-btn is-active" data-view="map">地图</button>
-      <button type="button" class="nav-btn" data-view="timeline">时间轴</button>
-      <button type="button" class="nav-btn" data-view="places">地点列表</button>
-      <button type="button" class="nav-btn nav-btn--action" id="btn-export">导出 JSON</button>
-    </nav>
-  </header>
 
-  <!-- ===== 视图区 ===== -->
+    <div class="nav-items">
+      <button type="button" class="nav-btn is-active" data-view="map">
+        <span class="nav-icon" aria-hidden="true">🗺</span>
+        <span class="nav-label">地图</span>
+      </button>
+      <button type="button" class="nav-btn" data-view="timeline">
+        <span class="nav-icon" aria-hidden="true">📅</span>
+        <span class="nav-label">时间轴</span>
+      </button>
+      <button type="button" class="nav-btn" data-view="places">
+        <span class="nav-icon" aria-hidden="true">📍</span>
+        <span class="nav-label">地点列表</span>
+      </button>
+    </div>
+
+    <button type="button" class="nav-btn nav-btn--action" id="btn-export">
+      <span class="nav-icon" aria-hidden="true">⬇</span>
+      <span class="nav-label">导出 JSON</span>
+    </button>
+  </nav>
+
+  <!-- ===== 主区：视图 + 弹窗 ===== -->
+  <div class="app-body">
   <main class="app-main">
 
     <!-- 视图 1：地图（默认首屏） -->
@@ -82,6 +100,7 @@
     </section>
 
   </main>
+  </div>
 
   <!-- ===== 地点详情弹窗：三种形态 =====
          查看态（默认，只读）

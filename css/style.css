@@ -1,20 +1,34 @@
 /* ============================================================
    TripMemo 全站样式
    Day 7 · 步骤 2a：骨架（导航栏 + 视图切换 + 空状态）
-   后续步骤会在此基础上补地图、卡片、弹窗等样式
+   Day 8 · 美化改版：奶油暖色主题 + 左侧导航
    ============================================================ */
 
 /* ---------- 设计变量：颜色与尺寸集中定义，方便统一修改 ---------- */
 :root {
-  --color-bg:         #ffffff;   /* 页面底色 */
-  --color-surface:    #f7f7f5;   /* 次级背景 */
-  --color-text:       #2c2c2a;   /* 主文字 */
-  --color-text-weak:  #5f5e5a;   /* 次要文字 */
-  --color-border:     #d3d1c7;   /* 边框 */
-  --color-accent:     #185fa5;   /* 主色（蓝） */
-  --color-accent-bg:  #e6f1fb;   /* 主色浅底 */
+  /* 告诉浏览器这是浅色页面：原生滚动条、日期选择器、下拉浮层
+     会自动跟着变浅色 */
+  color-scheme: light;
 
-  --header-height: 56px;
+  /* 暖色主题色板：奶油米白 + 深棕灰文字，像纸张/日记本的质感。
+     分「背景 / 面板 / 浮起」三层，靠明度拉开层次。
+     ⚠️ 这套色是 Day 8 定下的最终主题（此前试过深色，已弃用） */
+  --color-bg:         #faf7f2;   /* 页面底色（奶油米白） */
+  --color-surface:    #f4efe6;   /* 侧栏 / 面板（略深一点的米） */
+  --color-elevated:   #ffffff;   /* 浮起层：弹窗 / 下拉（最亮） */
+  --color-hover:      #ffffff;   /* 有底色的元素上的悬停高亮 */
+  --color-input:      #fdfcfa;   /* 输入框 / 按钮底（在白弹窗里要能看出边界） */
+  --color-text:       #3a332b;   /* 主文字（深棕灰，不用纯黑） */
+  --color-text-weak:  #8a7f72;   /* 次要文字（暖灰） */
+  --color-border:     rgba(58, 51, 43, 0.12);  /* 分隔线（半透明深棕） */
+  --color-accent:     #b5762e;   /* 主色（暖棕/琥珀 —— 呼应"旧照片"） */
+  --color-accent-bg:  rgba(181, 118, 46, 0.12);   /* 主色浅底 */
+  --color-nav-active: #ece2d2;   /* 侧栏选中项底色 */
+  --color-on-accent:  #fffaf3;   /* 主色底上的文字色（浅色） */
+  --color-glass:      rgba(255, 255, 255, 0.6);   /* 玻璃卡片底 */
+
+  --nav-width: 189px;   /* 参考图实测：1260px 视口下侧栏占 189px */
+  --nav-height: 56px;
   --radius: 8px;
 }
 
@@ -32,7 +46,9 @@ body {
 
 body {
   display: flex;
-  flex-direction: column;
+  /* ⚠️ 宽屏是「侧栏 + 主区」左右布局，所以用 row；
+     窄屏时由媒体查询改回 column（见文件末尾） */
+  flex-direction: row;
   background: var(--color-bg);
   color: var(--color-text);
   font-family: system-ui, -apple-system, "Microsoft YaHei", "PingFang SC", sans-serif;
@@ -40,59 +56,129 @@ body {
   line-height: 1.6;
 }
 
-/* ---------- 顶部导航栏 ---------- */
-.app-header {
-  flex: 0 0 auto;
-  display: flex;
-  align-items: center;
-  gap: 24px;
-  height: var(--header-height);
-  padding: 0 20px;
-  border-bottom: 1px solid var(--color-border);
-  background: var(--color-bg);
+/* 滚动条暖色化（WebKit 内核浏览器）—— 跟米白底协调，不用默认的灰 */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
 }
 
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: rgba(58, 51, 43, 0.18);
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(58, 51, 43, 0.3);
+  background-clip: padding-box;
+}
+
+/* ---------- 左侧导航栏 ---------- */
+.app-nav {
+  flex: 0 0 var(--nav-width);
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  width: var(--nav-width);
+  padding: 18px 12px 16px;
+  border-right: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+/* 应用名：深色圆角方框 + 文字，方框把白色文字托住，
+   避免纯白文字直接压在深色地图边缘上"糊掉" */
 .app-title {
-  margin: 0;
-  font-size: 18px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 20px;
+  padding: 0 4px;
+  color: var(--color-text);
+  font-size: 15px;
   font-weight: 600;
   letter-spacing: 0.2px;
   white-space: nowrap;
 }
 
-.app-nav {
+/* 方框里的缩写标记（对应参考图的 M 方块） */
+.app-title::before {
+  content: 'TM';
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
-  gap: 8px;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid rgba(181, 118, 46, 0.45);
+  border-radius: 9px;
+  background: rgba(181, 118, 46, 0.14);
+  color: var(--color-accent);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  line-height: 1;
 }
 
-/* 导航按钮：默认低调，激活时高亮 */
+/* 三个视图按钮：竖着排 */
+.nav-items {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* 导航按钮：图标在左、文字在右，整行左对齐（参考图的做法） */
 .nav-btn {
-  padding: 6px 14px;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 11px;
+  width: 100%;
+  padding: 10px 12px;
   border: 1px solid transparent;
   border-radius: var(--radius);
   background: transparent;
   color: var(--color-text-weak);
   font-family: inherit;
   font-size: 14px;
+  line-height: 1.3;
+  text-align: left;
   cursor: pointer;
   transition: background 0.15s, color 0.15s;
 }
 
+.nav-icon {
+  flex: 0 0 auto;
+  width: 18px;
+  font-size: 16px;
+  line-height: 1;
+  text-align: center;
+}
+
+.nav-label {
+  white-space: nowrap;
+}
+
 .nav-btn:hover {
-  background: var(--color-surface);
+  background: var(--color-hover);
   color: var(--color-text);
 }
 
+/* 当前视图：整行圆角胶囊底 + 主色文字（参考图的选中样式） */
 .nav-btn.is-active {
-  background: var(--color-accent-bg);
+  background: var(--color-nav-active);
   color: var(--color-accent);
   font-weight: 500;
 }
 
-/* 「导出 JSON」是全局动作，跟视图切换按钮区分开 */
+/* 「导出 JSON」是全局动作，推到最底部跟视图切换区分开 */
 .nav-btn--action {
-  margin-left: auto;
+  margin-top: auto;
   border-color: var(--color-border);
   color: var(--color-text);
 }
@@ -103,10 +189,18 @@ body {
   background: var(--color-accent-bg);
 }
 
+/* ---------- 主区：包住所有视图，占满剩余空间 ---------- */
+.app-body {
+  flex: 1 1 auto;
+  min-width: 0;
+  position: relative;
+  overflow: hidden;
+}
+
 /* ---------- 视图区 ---------- */
 .app-main {
-  flex: 1 1 auto;
-  position: relative;
+  position: absolute;
+  inset: 0;
   overflow: hidden;   /* 地图视图需要撑满且不出现外层滚动条 */
 }
 
@@ -153,6 +247,30 @@ body {
   inset: 0;
 }
 
+/* ⚠️ Day 8：给地图加"暗角"，让它像被装裱过，而不是一块图直接贴在页面上。
+   ⚠️ 暖色主题下不能用黑色暗角（米白底配黑边会很脏），
+   改用极浅的暖棕晕染，只在边缘轻轻收一点。
+   ⚠️⚠️ pointer-events: none 绝对不能省！
+   这个浮层铺满整个地图，不设它就会吃掉所有点击，
+   表现是"点地图毫无反应"（Day 7 真实踩过这个坑）。
+   ⚠️ z-index 取 5：要高过高德内部的 canvas 图层（否则暗角被盖住看不见），
+   但必须低于工具条(10)和悬停提示(20)，否则会盖住搜索框。 */
+.map-canvas::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+  box-shadow: inset 0 0 70px rgba(138, 127, 114, 0.28);
+}
+
+/* 降饱和滤镜：暂缓。
+   ⚠️ 原因：高德 2.0 是 WebGL 渲染，底图和 CircleMarker/Polyline
+   很可能画在【同一个 canvas】里。如果盲目加 filter，
+   点的颜色会一起失真，直接破坏"类型靠颜色区分"这条 PRD 规则。
+   要做得先实测高德的 DOM 结构（F12 看 .map-canvas 里到底几层 canvas），
+   确认点和底图能分开再动手。本轮先不做。 */
+
 /* 左上角工具条：搜索框 + 筛选栏，一起浮在地图上方 */
 .map-toolbar {
   position: absolute;
@@ -175,18 +293,25 @@ body {
   width: 260px;
   max-width: 100%;
   padding: 8px 12px;
-  border: none;
+  border: 1px solid var(--color-border);
   border-radius: var(--radius);
-  background: rgba(255, 255, 255, 0.96);
-  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.15);
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 2px 10px rgba(58, 51, 43, 0.14);
   color: var(--color-text);
   font-family: inherit;
   font-size: 14px;
+  backdrop-filter: blur(8px);
+}
+
+.map-search::placeholder {
+  color: var(--color-text-weak);
+  opacity: 0.7;
 }
 
 .map-search:focus {
   outline: none;
-  box-shadow: 0 0 0 2px var(--color-accent);
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 2px var(--color-accent-bg);
 }
 
 /* 搜索候选下拉（自己画的，不是高德自带的） */
@@ -201,9 +326,10 @@ body {
   padding: 4px;
   overflow-y: auto;
   list-style: none;
+  border: 1px solid var(--color-border);
   border-radius: var(--radius);
-  background: #ffffff;
-  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.18);
+  background: var(--color-elevated);
+  box-shadow: 0 8px 26px rgba(58, 51, 43, 0.22);
 }
 
 .search-dropdown[hidden] {
@@ -246,18 +372,20 @@ body {
 
 .mini-btn {
   padding: 8px 12px;
-  border: none;
+  border: 1px solid var(--color-border);
   border-radius: var(--radius);
-  background: rgba(255, 255, 255, 0.96);
-  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.15);
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 2px 10px rgba(58, 51, 43, 0.14);
   color: var(--color-text);
   font-family: inherit;
   font-size: 13px;
   cursor: pointer;
-  transition: color 0.15s;
+  transition: color 0.15s, border-color 0.15s;
+  backdrop-filter: blur(8px);
 }
 
 .mini-btn:hover {
+  border-color: var(--color-accent);
   color: var(--color-accent);
 }
 
@@ -270,8 +398,8 @@ body {
   height: 26px;
   border-radius: 50%;
   background: var(--color-accent);
-  box-shadow: 0 0 0 3px #ffffff, 0 1px 8px rgba(0, 0, 0, 0.35);
-  color: #ffffff;
+  box-shadow: 0 0 0 3px rgba(250, 247, 242, 0.95), 0 1px 8px rgba(58, 51, 43, 0.4);
+  color: var(--color-on-accent);
   font-size: 14px;
   line-height: 1;
   user-select: none;
@@ -279,7 +407,7 @@ body {
 
 /* 该城市一个地点都还没有 → 灰色锚点，且不画任何线（验收标准 22） */
 .map-anchor--empty {
-  background: #a3a3a3;
+  background: #a89e91;
 }
 
 /* 类型筛选栏（不再自己定位，交给 .map-toolbar 排版） */
@@ -288,10 +416,12 @@ body {
   flex-wrap: wrap;
   gap: 6px;
   padding: 6px;
+  border: 1px solid var(--color-border);
   border-radius: var(--radius);
   background: rgba(255, 255, 255, 0.92);
-  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.12);
+  box-shadow: 0 2px 10px rgba(58, 51, 43, 0.14);
   align-self: flex-start;
+  backdrop-filter: blur(8px);
 }
 
 /* 筛选按钮 */
@@ -299,7 +429,7 @@ body {
   padding: 4px 12px;
   border: 1px solid var(--color-border);
   border-radius: 999px;
-  background: #ffffff;
+  background: transparent;
   color: var(--color-text-weak);
   font-family: inherit;
   font-size: 13px;
@@ -314,22 +444,26 @@ body {
 
 .chip.is-active {
   border-color: var(--color-accent);
-  background: var(--color-accent);
-  color: #ffffff;
+  background: var(--color-accent-bg);
+  color: var(--color-accent);
+  font-weight: 500;
 }
 
-/* 悬停提示：鼠标停在地点上时出现的小标签 */
+/* 悬停提示：鼠标停在地点上时出现的小标签
+   底部用深棕（而非米白）：浅色地图上深色小标签才有"浮起"的层级感，
+   也跟奶油色 UI 同属暖色系 */
 .map-tooltip {
   position: absolute;
   z-index: 20;
   padding: 6px 10px;
   border-radius: 6px;
-  background: rgba(44, 44, 42, 0.92);
-  color: #ffffff;
+  background: rgba(58, 51, 43, 0.93);
+  color: #faf7f2;
   font-family: inherit;
   font-size: 13px;
   line-height: 1.4;
   white-space: nowrap;
+  box-shadow: 0 2px 10px rgba(58, 51, 43, 0.25);
   /* 别让提示自己拦住鼠标，否则鼠标一移上去就触发 mouseout，提示会闪 */
   pointer-events: none;
   /* 定位到点的正上方（left/top 由 JS 设为点的坐标） */
@@ -354,10 +488,12 @@ body {
 /* 提示本身做成一张小卡片，浮在地图中央 */
 .view-empty--overlay p {
   padding: 14px 22px;
+  border: 1px solid var(--color-border);
   border-radius: 10px;
-  background: rgba(255, 255, 255, 0.94);
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12);
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 4px 20px rgba(58, 51, 43, 0.18);
   color: var(--color-text);
+  backdrop-filter: blur(8px);
 }
 
 /* ---------- 通用内容面板（时间轴 / 地点列表的容器） ---------- */
@@ -372,47 +508,188 @@ body {
 }
 
 /* ---------- 时间轴视图 ---------- */
-.timeline-card {
-  display: flex;
-  gap: 14px;
-  padding: 14px 8px;
+
+/* 面板放宽一点：卡片是横向的，太窄会挤 */
+#timeline-list {
+  max-width: 760px;
+}
+
+/* 一个年份 = 一个分组 */
+.timeline-year {
+  margin-bottom: 34px;
+}
+
+/* 年份标题：大号 + 弱色，作为"时间锚点" */
+.timeline-year-label {
+  margin: 0 0 14px;
+  padding-bottom: 8px;
   border-bottom: 1px solid var(--color-border);
-  cursor: pointer;
-  transition: background 0.15s;
-}
-
-.timeline-card:hover {
-  background: var(--color-surface);
-}
-
-/* 左侧的「停留开始时间」 */
-.timeline-when {
-  flex: 0 0 84px;
-  padding-top: 2px;
   color: var(--color-text-weak);
-  font-size: 13px;
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: 0.6px;
 }
 
-.timeline-body {
+/* 该年份下的卡片列表：左侧画一条时间竖线 */
+.timeline-year-list {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-left: 18px;
+}
+
+/* 时间竖线：贯穿这一年的所有卡片 */
+.timeline-year-list::before {
+  content: '';
+  position: absolute;
+  top: 6px;
+  bottom: 6px;
+  left: 4px;
+  width: 1px;
+  background: var(--color-border);
+}
+
+/* 一张地点卡片：左边图片位 + 右边文字（Day 8 重做成"真卡片"） */
+.timeline-card {
+  position: relative;
+  display: flex;                    /* 两栏：图在左，字在右 */
+  align-items: stretch;
+  gap: 14px;
+  padding: 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-elevated);
+  cursor: pointer;
+  /* 卡片感的关键：一点点阴影 + 圆角，让它"浮"在底上 */
+  box-shadow: 0 1px 2px rgba(58, 51, 43, 0.05);
+  transition: border-color 0.18s, box-shadow 0.18s, transform 0.18s;
+}
+
+/* 卡片左边的小圆点：钉在时间竖线上 */
+.timeline-card::before {
+  content: '';
+  position: absolute;
+  top: 22px;
+  left: -18px;
+  width: 7px;
+  height: 7px;
+  border: 2px solid var(--color-bg);
+  border-radius: 50%;
+  background: var(--color-accent);
+}
+
+/* 悬停：整张卡往右挪一点 + 抬起来 —— 这就是"翻阅"的手感 */
+.timeline-card:hover {
+  border-color: rgba(181, 118, 46, 0.38);
+  box-shadow: 0 6px 20px rgba(58, 51, 43, 0.13);
+  transform: translateX(3px);
+}
+
+/* ---------- 卡片左侧：图片位（为后续图片功能预留） ---------- */
+.timeline-thumb {
+  flex: 0 0 88px;                   /* 固定宽，不被文字挤扁 */
+  width: 88px;
+  height: 88px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 8px;
+  /* 用斜纹底表示"这里将来会有一张照片"，比纯色块更能说明意图 */
+  background:
+    repeating-linear-gradient(
+      45deg,
+      rgba(181, 118, 46, 0.07) 0 6px,
+      rgba(181, 118, 46, 0.02) 6px 12px
+    ),
+    var(--color-surface);
+  border: 1px dashed rgba(181, 118, 46, 0.28);
+}
+
+.timeline-thumb-hint {
+  color: var(--color-text-weak);
+  font-size: 11px;
+  letter-spacing: 0.5px;
+}
+
+/* 有图时：图铺满整个框 */
+.timeline-thumb-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* ---------- 卡片右侧：文字区 ---------- */
+.timeline-text {
   flex: 1 1 auto;
-  min-width: 0;
+  min-width: 0;                     /* 不加这句，长文字会把 flex 撑爆 */
+  display: flex;
+  flex-direction: column;
+  justify-content: center;          /* 文字在图高范围内垂直居中 */
+}
+
+/* 卡片头部：地点名在左、时间在右 */
+.timeline-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 5px;
 }
 
 .timeline-name {
-  margin: 0 0 4px;
-  font-size: 15px;
+  margin: 0;
+  font-size: 16px;
   font-weight: 600;
+  /* 名字太长时省略，不要撑破卡片 */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
+/* 停留起始时间（头部右侧的小字） */
+.timeline-when {
+  flex: 0 0 auto;
+  color: var(--color-text-weak);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+/* 元信息行：色点 + 城市 ｜ 类型 ｜ 时长 */
 .timeline-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
   margin: 0 0 6px;
   color: var(--color-text-weak);
   font-size: 13px;
 }
 
+/* 类型色点：和地图上的点同色 —— 一眼看出"这条对应地图上哪种类型"
+   ⚠️ 颜色只表示类型，不表示时长（PRD 4.2 #1） */
+.type-dot {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.timeline-city {
+  color: var(--color-text);
+}
+
+.timeline-stay {
+  white-space: nowrap;
+}
+
 .timeline-note {
-  margin: 0 0 8px;
-  font-size: 14px;
+  margin: 0 0 6px;
+  font-size: 13.5px;
+  line-height: 1.55;
 }
 
 /* 标签 */
@@ -422,7 +699,6 @@ body {
   gap: 6px;
   margin: 0;
 }
-
 .tag {
   padding: 2px 8px;
   border-radius: 999px;
@@ -431,20 +707,88 @@ body {
   font-size: 12px;
 }
 
-/* ---------- 地点列表视图（按城市分组） ---------- */
-.city-group {
-  margin-bottom: 10px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-  overflow: hidden;
+/* ============================================================
+   地点列表 · 卡片网格（Day 8 步骤 4）
+
+   改版前：每个城市是一整条可折叠长列表（details > 一长串 place-row），
+           城市一多就变成"一堵墙"，而且每个城市的样子完全一样。
+   改版后：每个城市 = 一张卡片，平铺成网格。
+           · 卡片头部：城市名 + 地点数 + 一行"总停留时长"（把大小映射讲出来）
+           · 头部有一条"时长占比条"，直接复用地图上的线宽算法
+             —— 这样列表和地图是同一套视觉语言，不是各做各的
+           · 地点条目带图片位（甲方案：图挂在地点上，符合 PRD 的 images 字段）
+           · 入场时卡片一张接一张"翻"进来
+   ============================================================ */
+
+/* 网格容器：能塞几张塞几张，每张至少 320px
+   （原来 240px 太扁，城市卡片挤成一排小条；320px 后一屏 2-3 张，
+     每张都有"卡片"的体量，也够放下以后的地点缩略图） */
+#places-list {
+  max-width: none;            /* 覆盖 .panel 的 720px —— 网格需要更宽 */
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 16px;
+  align-content: start;       /* 卡片不被拉伸成等高 */
+  padding-top: 4px;
 }
 
-/* 城市标题行（details 的 summary） */
+/* 一张城市卡片 */
+.city-group {
+  margin-bottom: 0;                              /* 交给 grid 的 gap 排间距 */
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  overflow: hidden;
+  background: var(--color-elevated);
+  box-shadow: 0 1px 2px rgba(58, 51, 43, 0.05);
+  transition: border-color 0.18s, box-shadow 0.2s, transform 0.2s;
+}
+
+.city-group:hover {
+  border-color: rgba(181, 118, 46, 0.32);
+  box-shadow: 0 8px 24px rgba(58, 51, 43, 0.13);
+  transform: translateY(-2px);                   /* 抬起来一点，卡片感更强 */
+}
+
+/* ---------- 入场动画：卡片像翻页一样，一张接一张落进来 ----------
+   做法：CSS 关键帧负责"怎么动"，JS 负责"隔多久动"（给每张卡设 animation-delay）。
+   为什么用延迟而不是滚动监听：滚动监听要绑 scroll 事件、算位置、处理抖动，
+   代码量大且容易掉帧；这里用纯粹的 CSS 时间差，零 JS 运行时开销。 */
+@keyframes card-flip-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px) rotateX(-8deg);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) rotateX(0);
+  }
+}
+
+.city-group {
+  /* backwards：延迟期间保持 from 状态（透明），不然会先闪现再动 */
+  animation: card-flip-in 0.38s cubic-bezier(0.22, 0.68, 0.36, 1) backwards;
+  transform-origin: center top;
+}
+
+/* ⚠️ 尊重系统的「减少动态效果」设置（无障碍，也是好习惯） */
+@media (prefers-reduced-motion: reduce) {
+  .city-group {
+    animation: none;
+  }
+}
+
+/* 城市头部（details 的 summary）
+   ⚠️ 布局演进记录（Day 8）：
+   第一版用 `position:absolute; right:14px` 把「收起 ▴」钉在右上角，
+   结果和同样在右上角的「N 个地点」胶囊**叠在一起**（他截图反馈）。
+   现在改成**正常文档流**：第一行是「城市名 + 胶囊 + 箭头」，第二行是时长条。
+   谁也不会压谁 —— 能用布局解决的，就别用定位。 */
 .city-head {
-  display: flex;
+  display: grid;                              /* 两行，谁也别挤谁 */
+  grid-template-columns: 1fr auto auto;       /* 城市名(可缩) | 胶囊 | 箭头 */
   align-items: center;
-  gap: 8px;
-  padding: 10px 14px;
+  gap: 4px 10px;
+  padding: 14px 15px 12px;
   background: var(--color-surface);
   cursor: pointer;
   list-style: none;
@@ -455,35 +799,87 @@ body {
   display: none;
 }
 
-/* 自定义展开/收起箭头 */
+/* 自定义展开/收起箭头：第三列，自动靠右 */
 .city-head::after {
-  content: '▾';
+  content: '展开 ▾';
+  grid-column: 3;
+  grid-row: 1;
+  min-width: 44px;                            /* 「展开 ▾」/「收起 ▴」都放得下 */
+  text-align: right;
   color: var(--color-text-weak);
-  font-size: 12px;
+  font-size: 11px;
+  white-space: nowrap;
 }
 
 .city-group[open] .city-head::after {
-  content: '▴';
+  content: '收起 ▴';
 }
 
+/* 城市名：第一列，可以压缩，压不下就省略号 */
 .city-name {
-  flex: 1 1 auto;
-  font-size: 14px;
-  font-weight: 500;
+  grid-column: 1;
+  grid-row: 1;
+  min-width: 0;
+  font-size: 18px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
+/* 地点数：第二列，做成小胶囊 */
 .city-count {
+  grid-column: 2;
+  grid-row: 1;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--color-accent-bg);
+  color: var(--color-accent);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+/* 第二行：总停留时长 + 时长占比条（跨 3 列，占满整行） */
+.city-sub {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
   color: var(--color-text-weak);
   font-size: 12px;
 }
 
-/* 城市下的每个地点 */
+/* 总停留时长的文字（'4 年 2 个月'），不换行 */
+.city-months {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+/* 时长占比条：宽度由 JS 按 lineWidthByMonths 换算后内联写入 */
+.city-bar {
+  flex: 1 1 auto;
+  height: 3px;
+  border-radius: 999px;
+  background: var(--color-border);
+  overflow: hidden;
+}
+
+.city-bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--color-accent);
+  opacity: 0.55;
+}
+
+/* 城市下的每个地点：左边图片位 + 右边文字（甲方案：图挂在地点上） */
 .place-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 9px 14px;
+  gap: 10px;
+  padding: 10px 14px;
   border-top: 1px solid var(--color-border);
   cursor: pointer;
   transition: background 0.15s;
@@ -493,13 +889,69 @@ body {
   background: var(--color-surface);
 }
 
-.place-name {
-  font-size: 14px;
+/* ---------- 地点条目的图片位（为后期图片插入预留） ---------- */
+.place-thumb {
+  flex: 0 0 56px;
+  width: 56px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 8px;
+  border: 1px dashed rgba(181, 118, 46, 0.28);
+  /* 和时间轴一样用斜纹底表示"这里将来有图"，保持两处视觉一致 */
+  background:
+    repeating-linear-gradient(
+      45deg,
+      rgba(181, 118, 46, 0.07) 0 6px,
+      rgba(181, 118, 46, 0.02) 6px 12px
+    ),
+    var(--color-surface);
 }
 
-.place-meta {
+.place-thumb-hint {
+  color: var(--color-text-weak);
+  font-size: 10px;
+  letter-spacing: 0.5px;
+}
+
+.place-thumb-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* 图片右边的文字区（名字一行、元信息一行） */
+.place-body {
+  flex: 1 1 auto;
+  min-width: 0;                   /* ⚠️ 不加这句，长地点名会把卡片撑破 */
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+/* 地点名最多显示一行，超出用省略号 */
+.place-row .place-name {
+  font-size: 14.5px;
+  font-weight: 500;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 元信息行：色点 + 类型 ｜ 时长 */
+.place-row .place-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   color: var(--color-text-weak);
   font-size: 12px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
@@ -516,19 +968,23 @@ body {
   align-items: center;
   justify-content: center;
   padding: 24px;
-  background: rgba(0, 0, 0, 0.35);
+  /* 遮罩用暖棕而非纯黑：纯黑压暖色底会显脏 */
+  background: rgba(58, 51, 43, 0.45);
 }
 
-/* 弹窗主体 */
+/* 弹窗主体
+   ⚠️ 用 --color-elevated（最亮的白）而不是 --color-surface（米色）：
+   弹窗是"浮起层"，要比背景更亮才浮得起来 */
 .modal-box {
   display: flex;
   flex-direction: column;
   width: 100%;
   max-width: 460px;
   max-height: 100%;
+  border: 1px solid var(--color-border);
   border-radius: 12px;
-  background: #ffffff;
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+  background: var(--color-elevated);
+  box-shadow: 0 12px 40px rgba(58, 51, 43, 0.28);
   overflow: hidden;
 }
 
@@ -610,7 +1066,7 @@ body {
 
 /* 必填星号 */
 .field-label em {
-  color: #a32d2d;
+  color: #c0392b;
   font-style: normal;
 }
 
@@ -621,10 +1077,24 @@ body {
   padding: 7px 10px;
   border: 1px solid var(--color-border);
   border-radius: 6px;
-  background: #ffffff;
+  background: var(--color-input);
   color: var(--color-text);
   font-family: inherit;
   font-size: 14px;
+}
+
+/* 日期选择器的日历小图标由 color-scheme: light 自动转成深色，无需额外处理 */
+
+/* 下拉选项的浮层由系统绘制，只能靠 color-scheme 影响 */
+.field select option {
+  background: var(--color-elevated);
+  color: var(--color-text);
+}
+
+.field input::placeholder,
+.field textarea::placeholder {
+  color: var(--color-text-weak);
+  opacity: 0.7;
 }
 
 .field input:focus,
@@ -643,8 +1113,8 @@ body {
   margin: 0;
   padding: 8px 10px;
   border-radius: 6px;
-  background: #fcebeb;
-  color: #a32d2d;
+  background: rgba(192, 57, 43, 0.1);
+  color: #c0392b;
   font-size: 13px;
 }
 
@@ -665,7 +1135,7 @@ body {
   padding: 7px 16px;
   border: 1px solid var(--color-border);
   border-radius: 6px;
-  background: #ffffff;
+  background: var(--color-input);
   color: var(--color-text);
   font-family: inherit;
   font-size: 14px;
@@ -681,24 +1151,145 @@ body {
 .btn--primary {
   border-color: var(--color-accent);
   background: var(--color-accent);
-  color: #ffffff;
+  color: var(--color-on-accent);
+  font-weight: 500;
 }
 
 .btn--primary:hover {
-  background: #14507c;
-  border-color: #14507c;
-  color: #ffffff;
+  background: #9c6325;
+  border-color: #9c6325;
+  color: var(--color-on-accent);
 }
 
 /* 删除按钮推到最左边 —— 别和「保存」挨着，免得误点 */
 .btn--danger {
   margin-right: auto;
-  border-color: #e3b0b0;
-  color: #a32d2d;
+  border-color: rgba(192, 57, 43, 0.35);
+  color: #c0392b;
 }
 
 .btn--danger:hover {
-  border-color: #a32d2d;
-  background: #fcebeb;
-  color: #a32d2d;
+  border-color: #c0392b;
+  background: rgba(192, 57, 43, 0.1);
+  color: #c0392b;
+}
+
+/* ---------- 窄屏（<1024px）：侧栏降级为顶部横条 ----------
+   PRD 验收 #26 要求 375px 不错位，189px 的侧栏在中小屏会挤爆内容区，
+   所以这里整体转回横条布局。 */
+@media (max-width: 1023px) {
+  body {
+    flex-direction: column;
+  }
+
+  .app-nav {
+    flex: 0 0 auto;
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    height: var(--nav-height);
+    padding: 0 12px;
+    border-right: none;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .app-title {
+    margin: 0;
+    padding: 0;
+    font-size: 14px;
+  }
+
+  .app-title::before {
+    width: 26px;
+    height: 26px;
+    font-size: 13px;
+  }
+
+  /* 按钮组改成横向排 */
+  .nav-items {
+    flex-direction: row;
+    gap: 2px;
+  }
+
+  .nav-btn {
+    width: auto;
+    padding: 7px 11px;
+    font-size: 13px;
+  }
+
+  .nav-icon {
+    width: auto;
+    font-size: 15px;
+  }
+
+  .nav-btn--action {
+    margin-top: 0;
+    margin-left: auto;
+  }
+
+  .app-body {
+    flex: 1 1 auto;
+  }
+}
+
+/* ---------- 窄屏的时间轴卡片 ----------
+   卡片是「图 + 文」两栏，屏幕一窄右侧文字就没地方了。
+   这里把图片位缩小成 64px，仍然并排；再窄（<560px）改成上下堆叠。 */
+@media (max-width: 767px) {
+  .timeline-thumb {
+    flex: 0 0 64px;
+    width: 64px;
+    height: 64px;
+  }
+
+  .timeline-card {
+    gap: 10px;
+    padding: 10px;
+  }
+
+  /* 地点网格：一列就够，卡片占满宽度 */
+  #places-list {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* 手机屏幕（<560px）：只留图标，文字标签藏起来，给内容区让位 */
+@media (max-width: 559px) {
+  .nav-btn .nav-label {
+    display: none;
+  }
+
+  .nav-btn {
+    padding: 8px 10px;
+  }
+
+  .nav-icon {
+    font-size: 17px;
+  }
+
+  .app-title {
+    display: none;
+  }
+
+  /* 时间轴卡片改上下堆叠：图片位变成顶部横幅 */
+  .timeline-card {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .timeline-thumb {
+    flex: 0 0 96px;
+    width: 100%;
+    height: 96px;
+  }
+
+  /* 堆叠后左边没地方放圆点了，藏掉，竖线保留 */
+  .timeline-card::before {
+    display: none;
+  }
+
+  .timeline-year-list {
+    padding-left: 12px;
+  }
 }
