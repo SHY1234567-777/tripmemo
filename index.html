@@ -4,9 +4,162 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>TripMemo · 人生记忆地图</title>
+  <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-  <h1>TripMemo</h1>
-  <p>占位页。站点内容从 Day 7 开始搭建。</p>
+
+  <!-- ===== 顶部导航栏：切换视图 + 导出 ===== -->
+  <header class="app-header">
+    <h1 class="app-title">TripMemo</h1>
+    <nav class="app-nav">
+      <button type="button" class="nav-btn is-active" data-view="map">地图</button>
+      <button type="button" class="nav-btn" data-view="timeline">时间轴</button>
+      <button type="button" class="nav-btn" data-view="places">地点列表</button>
+      <button type="button" class="nav-btn nav-btn--action" id="btn-export">导出 JSON</button>
+    </nav>
+  </header>
+
+  <!-- ===== 视图区 ===== -->
+  <main class="app-main">
+
+    <!-- 视图 1：地图（默认首屏） -->
+    <section class="view is-active" id="view-map">
+      <!-- 左上角工具条：搜索选点 + 类型筛选 -->
+      <div class="map-toolbar">
+        <!-- 搜索选点（PRD 4.1 #1 的第二种方式）：
+             输入地名 → 从下拉里选一个 → 自动定位到正确坐标。
+             下拉是我们自己画的（不依赖高德自带面板），方便统一风格。 -->
+        <div class="search-wrap">
+          <input type="text" class="map-search" id="map-search-input"
+                 placeholder="搜索地点，例如：华中科技大学" autocomplete="off">
+          <ul class="search-dropdown" id="search-dropdown" hidden></ul>
+        </div>
+
+        <!-- 主城市（人生锚点）：连线都从这里出发（PRD 4.1 #8） -->
+        <div class="map-maincity">
+          <input type="text" class="map-search map-search--small" id="main-city-input"
+                 placeholder="主城市（如：武汉）" autocomplete="off">
+          <button type="button" class="mini-btn" id="main-city-set">设定</button>
+          <button type="button" class="mini-btn" id="main-city-clear">清除</button>
+        </div>
+
+        <!-- 类型筛选栏：全部 / 长期居住 / 短期停留 / 旅游 / 想去 -->
+        <div class="map-filter" id="map-filter"></div>
+      </div>
+
+      <!-- 地图画布：由高德渲染 -->
+      <div class="map-canvas" id="map-canvas"></div>
+
+      <!-- 悬停提示：鼠标停在地点上时，跟着显示地点名与停留时长 -->
+      <div class="map-tooltip" id="map-tooltip" hidden></div>
+
+      <!-- 空状态：一个地点都没有时显示（有地点后由 JS 隐藏） -->
+      <div class="view-empty view-empty--overlay" id="map-empty">
+        <p>还没有记录。点地图上任意位置，开始记下第一个地方。</p>
+      </div>
+    </section>
+
+    <!-- 视图 2：时间轴 -->
+    <section class="view" id="view-timeline">
+      <!-- 卡片列表：由 js/timeline.js 渲染 -->
+      <div class="panel" id="timeline-list" hidden></div>
+
+      <!-- 空状态：一个地点都没有时显示 -->
+      <div class="view-empty" id="timeline-empty">
+        <p>还没有记录。先去地图上添加一个地点。</p>
+      </div>
+    </section>
+
+    <!-- 视图 3：地点列表 -->
+    <section class="view" id="view-places">
+      <!-- 按城市分组的列表：由 js/places.js 渲染 -->
+      <div class="panel" id="places-list" hidden></div>
+
+      <!-- 空状态 -->
+      <div class="view-empty" id="places-empty">
+        <p>还没有记录。先去地图上添加一个地点。</p>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ===== 地点详情弹窗：三种形态 =====
+         查看态（默认，只读）
+         编辑态（点「编辑」进入）
+         新增态（点地图空白处进入）
+       三态共用同一个弹窗，只是显示的内容和按钮不同。 -->
+  <div class="modal" id="modal-detail" hidden>
+    <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+
+      <div class="modal-head">
+        <h2 class="modal-title" id="modal-title">地点详情</h2>
+        <button type="button" class="modal-close" id="modal-close" aria-label="关闭">×</button>
+      </div>
+
+      <!-- 查看态：只读陈列 -->
+      <div class="modal-body" id="modal-view">
+        <dl class="detail-list" id="detail-list"></dl>
+      </div>
+
+      <!-- 编辑态 / 新增态：表单 -->
+      <form class="modal-body" id="modal-form" hidden>
+        <label class="field">
+          <span class="field-label">地点名称 <em>*</em></span>
+          <input type="text" id="f-name" autocomplete="off">
+        </label>
+
+        <label class="field">
+          <span class="field-label">所属城市 <em>*</em></span>
+          <input type="text" id="f-city" autocomplete="off" placeholder="例如：武汉">
+        </label>
+
+        <label class="field">
+          <span class="field-label">地点类型 <em>*</em></span>
+          <select id="f-type"></select>
+        </label>
+
+        <label class="field">
+          <span class="field-label">停留开始时间</span>
+          <input type="month" id="f-start">
+        </label>
+
+        <label class="field">
+          <span class="field-label">停留结束时间（留空表示"至今"）</span>
+          <input type="month" id="f-end">
+        </label>
+
+        <label class="field">
+          <span class="field-label">回忆正文</span>
+          <textarea id="f-note" rows="4" placeholder="在这里写下和这个地方有关的回忆……"></textarea>
+        </label>
+
+        <label class="field">
+          <span class="field-label">标签（多个用逗号分隔）</span>
+          <input type="text" id="f-tags" autocomplete="off" placeholder="例如：大学, 四年">
+        </label>
+
+        <!-- 校验失败时在这里提示 -->
+        <p class="form-error" id="form-error" hidden></p>
+      </form>
+
+      <div class="modal-foot" id="modal-foot"></div>
+    </div>
+  </div>
+
+  <!-- ===== 本地配置：含高德 Key，不提交（模板见 config.example.js）=====
+       找不到 config.js 时不会报错，只是地图加载不出来，页面其余部分照常可用 -->
+  <script src="config.js"
+          onerror="console.warn('[TripMemo] 未找到 config.js —— 地图将无法加载。请把 config.example.js 复制为 config.js 并填入 Key 与安全密钥。')"></script>
+
+  <!-- ===== 项目脚本：顺序不能乱 =====
+       model（算法）→ store（数据）→ detail（弹窗）
+       → map / timeline / places（三个视图）→ main（入口） -->
+  <script src="js/model.js"></script>
+  <script src="js/store.js"></script>
+  <script src="js/detail.js"></script>
+  <script src="js/map.js"></script>
+  <script src="js/timeline.js"></script>
+  <script src="js/places.js"></script>
+  <script src="js/main.js"></script>
 </body>
 </html>

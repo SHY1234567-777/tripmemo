@@ -7,6 +7,9 @@
 *.pem
 *.key
 
+# 本地配置（含高德 Key 与安全密钥）—— 只提交 config.example.js 模板
+config.js
+
 # 依赖包（体积大，随时能重装）
 node_modules/
 

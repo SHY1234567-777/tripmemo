@@ -1,0 +1,704 @@
+/* ============================================================
+   TripMemo 全站样式
+   Day 7 · 步骤 2a：骨架（导航栏 + 视图切换 + 空状态）
+   后续步骤会在此基础上补地图、卡片、弹窗等样式
+   ============================================================ */
+
+/* ---------- 设计变量：颜色与尺寸集中定义，方便统一修改 ---------- */
+:root {
+  --color-bg:         #ffffff;   /* 页面底色 */
+  --color-surface:    #f7f7f5;   /* 次级背景 */
+  --color-text:       #2c2c2a;   /* 主文字 */
+  --color-text-weak:  #5f5e5a;   /* 次要文字 */
+  --color-border:     #d3d1c7;   /* 边框 */
+  --color-accent:     #185fa5;   /* 主色（蓝） */
+  --color-accent-bg:  #e6f1fb;   /* 主色浅底 */
+
+  --header-height: 56px;
+  --radius: 8px;
+}
+
+/* ---------- 基础重置 ---------- */
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: system-ui, -apple-system, "Microsoft YaHei", "PingFang SC", sans-serif;
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+/* ---------- 顶部导航栏 ---------- */
+.app-header {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  height: var(--header-height);
+  padding: 0 20px;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-bg);
+}
+
+.app-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  white-space: nowrap;
+}
+
+.app-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 导航按钮：默认低调，激活时高亮 */
+.nav-btn {
+  padding: 6px 14px;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--color-text-weak);
+  font-family: inherit;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.nav-btn:hover {
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.nav-btn.is-active {
+  background: var(--color-accent-bg);
+  color: var(--color-accent);
+  font-weight: 500;
+}
+
+/* 「导出 JSON」是全局动作，跟视图切换按钮区分开 */
+.nav-btn--action {
+  margin-left: auto;
+  border-color: var(--color-border);
+  color: var(--color-text);
+}
+
+.nav-btn--action:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+  background: var(--color-accent-bg);
+}
+
+/* ---------- 视图区 ---------- */
+.app-main {
+  flex: 1 1 auto;
+  position: relative;
+  overflow: hidden;   /* 地图视图需要撑满且不出现外层滚动条 */
+}
+
+/* 视图容器：默认隐藏，激活时显示 */
+.view {
+  display: none;
+  position: absolute;
+  inset: 0;
+  overflow: auto;
+}
+
+.view.is-active {
+  display: block;
+}
+
+/* ---------- 空状态 ---------- */
+.view-empty {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  text-align: center;
+}
+
+.view-empty p {
+  margin: 0;
+  max-width: 360px;
+  color: var(--color-text-weak);
+  font-size: 14px;
+}
+
+/* ⚠️ 必须显式处理 hidden：
+   上面的 .view-empty 设了 display:flex，会盖掉浏览器对 [hidden] 的默认隐藏 */
+.view-empty[hidden] {
+  display: none;
+}
+
+/* ---------- 地图视图 ---------- */
+
+/* 地图画布：铺满整个视图区 */
+.map-canvas {
+  position: absolute;
+  inset: 0;
+}
+
+/* 左上角工具条：搜索框 + 筛选栏，一起浮在地图上方 */
+.map-toolbar {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: calc(100% - 24px);
+}
+
+/* 搜索框外面包一层，让下拉能跟着它定位 */
+.search-wrap {
+  position: relative;
+}
+
+/* 搜索选点的输入框 */
+.map-search {
+  width: 260px;
+  max-width: 100%;
+  padding: 8px 12px;
+  border: none;
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.15);
+  color: var(--color-text);
+  font-family: inherit;
+  font-size: 14px;
+}
+
+.map-search:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--color-accent);
+}
+
+/* 搜索候选下拉（自己画的，不是高德自带的） */
+.search-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 30;
+  width: 100%;
+  max-height: 280px;
+  margin: 0;
+  padding: 4px;
+  overflow-y: auto;
+  list-style: none;
+  border-radius: var(--radius);
+  background: #ffffff;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.18);
+}
+
+.search-dropdown[hidden] {
+  display: none;
+}
+
+.search-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 7px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.search-item:hover {
+  background: var(--color-accent-bg);
+}
+
+.search-item-name {
+  color: var(--color-text);
+  font-size: 14px;
+}
+
+.search-item-district {
+  color: var(--color-text-weak);
+  font-size: 12px;
+}
+
+/* 主城市设置行：输入框 + 两个小按钮 */
+.map-maincity {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.map-search--small {
+  width: 150px;
+}
+
+.mini-btn {
+  padding: 8px 12px;
+  border: none;
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.15);
+  color: var(--color-text);
+  font-family: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  transition: color 0.15s;
+}
+
+.mini-btn:hover {
+  color: var(--color-accent);
+}
+
+/* 主城市锚点：用 Marker + 自定义 HTML 画，和普通圆点区分开 */
+.map-anchor {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  box-shadow: 0 0 0 3px #ffffff, 0 1px 8px rgba(0, 0, 0, 0.35);
+  color: #ffffff;
+  font-size: 14px;
+  line-height: 1;
+  user-select: none;
+}
+
+/* 该城市一个地点都还没有 → 灰色锚点，且不画任何线（验收标准 22） */
+.map-anchor--empty {
+  background: #a3a3a3;
+}
+
+/* 类型筛选栏（不再自己定位，交给 .map-toolbar 排版） */
+.map-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 6px;
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.12);
+  align-self: flex-start;
+}
+
+/* 筛选按钮 */
+.chip {
+  padding: 4px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: #ffffff;
+  color: var(--color-text-weak);
+  font-family: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+
+.chip:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+.chip.is-active {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+  color: #ffffff;
+}
+
+/* 悬停提示：鼠标停在地点上时出现的小标签 */
+.map-tooltip {
+  position: absolute;
+  z-index: 20;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: rgba(44, 44, 42, 0.92);
+  color: #ffffff;
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.4;
+  white-space: nowrap;
+  /* 别让提示自己拦住鼠标，否则鼠标一移上去就触发 mouseout，提示会闪 */
+  pointer-events: none;
+  /* 定位到点的正上方（left/top 由 JS 设为点的坐标） */
+  transform: translate(-50%, -150%);
+}
+
+.map-tooltip[hidden] {
+  display: none;
+}
+
+/* 地图上的空状态：只是一句居中的提示，不遮挡地图、也不拦截点击 */.view-empty--overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  /* ⚠️ 必须有这一行：否则这个浮层会吃掉地图的点击事件，
+     表现就是"点地图毫无反应" */
+  pointer-events: none;
+  /* 不再铺满白底 —— 地图要看得清 */
+  background: transparent;
+}
+
+/* 提示本身做成一张小卡片，浮在地图中央 */
+.view-empty--overlay p {
+  padding: 14px 22px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12);
+  color: var(--color-text);
+}
+
+/* ---------- 通用内容面板（时间轴 / 地点列表的容器） ---------- */
+.panel {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 24px 20px 48px;
+}
+
+.panel[hidden] {
+  display: none;
+}
+
+/* ---------- 时间轴视图 ---------- */
+.timeline-card {
+  display: flex;
+  gap: 14px;
+  padding: 14px 8px;
+  border-bottom: 1px solid var(--color-border);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.timeline-card:hover {
+  background: var(--color-surface);
+}
+
+/* 左侧的「停留开始时间」 */
+.timeline-when {
+  flex: 0 0 84px;
+  padding-top: 2px;
+  color: var(--color-text-weak);
+  font-size: 13px;
+}
+
+.timeline-body {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.timeline-name {
+  margin: 0 0 4px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.timeline-meta {
+  margin: 0 0 6px;
+  color: var(--color-text-weak);
+  font-size: 13px;
+}
+
+.timeline-note {
+  margin: 0 0 8px;
+  font-size: 14px;
+}
+
+/* 标签 */
+.tag-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+}
+
+.tag {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--color-accent-bg);
+  color: var(--color-accent);
+  font-size: 12px;
+}
+
+/* ---------- 地点列表视图（按城市分组） ---------- */
+.city-group {
+  margin-bottom: 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+/* 城市标题行（details 的 summary） */
+.city-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: var(--color-surface);
+  cursor: pointer;
+  list-style: none;
+}
+
+/* 去掉浏览器默认的小三角，改用下面的自定义箭头 */
+.city-head::-webkit-details-marker {
+  display: none;
+}
+
+/* 自定义展开/收起箭头 */
+.city-head::after {
+  content: '▾';
+  color: var(--color-text-weak);
+  font-size: 12px;
+}
+
+.city-group[open] .city-head::after {
+  content: '▴';
+}
+
+.city-name {
+  flex: 1 1 auto;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.city-count {
+  color: var(--color-text-weak);
+  font-size: 12px;
+}
+
+/* 城市下的每个地点 */
+.place-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 14px;
+  border-top: 1px solid var(--color-border);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.place-row:hover {
+  background: var(--color-surface);
+}
+
+.place-name {
+  font-size: 14px;
+}
+
+.place-meta {
+  color: var(--color-text-weak);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+/* ---------- 地点详情弹窗（查看态 / 编辑态 / 新增态） ---------- */
+.modal[hidden] {
+  display: none;
+}
+
+.modal {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.35);
+}
+
+/* 弹窗主体 */
+.modal-box {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 460px;
+  max-height: 100%;
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+  overflow: hidden;
+}
+
+/* 头部 */
+.modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.modal-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.modal-close {
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-text-weak);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.modal-close:hover {
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+/* 内容区：内容多时可滚动 */
+.modal-body {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: 16px 18px;
+}
+
+.modal-body[hidden] {
+  display: none;
+}
+
+/* 查看态：字段清单 */
+.detail-list {
+  display: grid;
+  grid-template-columns: 84px 1fr;
+  gap: 10px 12px;
+  margin: 0;
+}
+
+.detail-list dt {
+  color: var(--color-text-weak);
+  font-size: 13px;
+}
+
+.detail-list dd {
+  margin: 0;
+  font-size: 14px;
+  word-break: break-word;
+  white-space: pre-wrap;
+}
+
+/* 表单字段 */
+.field {
+  display: block;
+  margin-bottom: 14px;
+}
+
+.field-label {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--color-text-weak);
+  font-size: 13px;
+}
+
+/* 必填星号 */
+.field-label em {
+  color: #a32d2d;
+  font-style: normal;
+}
+
+.field input,
+.field select,
+.field textarea {
+  width: 100%;
+  padding: 7px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: #ffffff;
+  color: var(--color-text);
+  font-family: inherit;
+  font-size: 14px;
+}
+
+.field input:focus,
+.field select:focus,
+.field textarea:focus {
+  outline: none;
+  border-color: var(--color-accent);
+}
+
+.field textarea {
+  resize: vertical;
+}
+
+/* 校验失败的提示条 */
+.form-error {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: #fcebeb;
+  color: #a32d2d;
+  font-size: 13px;
+}
+
+.form-error[hidden] {
+  display: none;
+}
+
+/* 底部按钮区 */
+.modal-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 18px;
+  border-top: 1px solid var(--color-border);
+}
+
+.btn {
+  padding: 7px 16px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: #ffffff;
+  color: var(--color-text);
+  font-family: inherit;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.btn:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+.btn--primary {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+  color: #ffffff;
+}
+
+.btn--primary:hover {
+  background: #14507c;
+  border-color: #14507c;
+  color: #ffffff;
+}
+
+/* 删除按钮推到最左边 —— 别和「保存」挨着，免得误点 */
+.btn--danger {
+  margin-right: auto;
+  border-color: #e3b0b0;
+  color: #a32d2d;
+}
+
+.btn--danger:hover {
+  border-color: #a32d2d;
+  background: #fcebeb;
+  color: #a32d2d;
+}
