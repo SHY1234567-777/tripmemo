@@ -474,7 +474,8 @@ body {
   display: none;
 }
 
-/* 地图上的空状态：只是一句居中的提示，不遮挡地图、也不拦截点击 */.view-empty--overlay {
+/* 地图上的空状态：只是一句居中的提示，不遮挡地图、也不拦截点击 */
+.view-empty--overlay {
   position: absolute;
   inset: 0;
   z-index: 5;
@@ -494,6 +495,124 @@ body {
   box-shadow: 0 4px 20px rgba(58, 51, 43, 0.18);
   color: var(--color-text);
   backdrop-filter: blur(8px);
+}
+
+/* ============================================================
+   页面状态：加载中 / 错误（Day 8）
+
+   为什么把「错误」和「空」分开做两套样式：
+     两者长得像（都是一块居中的提示），但**意思完全不同** ——
+       空   = 环境没问题，只是你还没记东西 → 用户自己能解决
+       错误 = 环境出问题了 → 用户解决不了，必须告诉他原因和下一步
+     而且这两种状态**不能同时出现**：数据同时"是空的"和"加载失败"
+     在逻辑上是矛盾的，同时显示必然让用户误解。
+
+   Day 8 之前：错误提示**复用了空状态的元素**，等于把错误伪装成
+   "没数据"。这是他提醒过的「错误状态最容易被忽略」在真实代码里的样子。
+   ============================================================ */
+
+/* 状态浮层：铺在地图上，居中显示 */
+.view-state {
+  position: absolute;
+  inset: 0;
+  z-index: 6;                 /* 比空状态(5)高一点：错误要盖过空状态 */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 24px;
+  text-align: center;
+  /* ⚠️ 铁律：浮层必须让出点击，否则会吃掉地图的点击事件
+     （本项目第 3 次强调这一点：暗角、空状态、状态浮层都踩过） */
+  pointer-events: none;
+}
+
+/* ⚠️ 必须显式处理 hidden：上面用了 display:flex 会盖掉 [hidden] */
+.view-state[hidden] {
+  display: none;
+}
+
+.view-state p {
+  margin: 0;
+  max-width: 460px;
+}
+
+/* 加载中的文案 */
+.view-state > p {
+  color: var(--color-text-weak);
+  font-size: 14px;
+}
+
+/* 转圈：纯 CSS，不依赖任何图标库 */
+.view-state-spinner {
+  width: 22px;
+  height: 22px;
+  border: 2px solid var(--color-border);
+  border-top-color: var(--color-accent);
+  border-radius: 50%;
+  animation: tm-spin 0.8s linear infinite;
+}
+
+@keyframes tm-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* 尊重系统的「减少动态效果」：不要转圈，改成静态的圆环 */
+@media (prefers-reduced-motion: reduce) {
+  .view-state-spinner {
+    animation: none;
+  }
+}
+
+/* 错误态的卡片：要够显眼，但不能做成"报错弹窗"吓人 */
+.view-state--error {
+  background: rgba(250, 247, 242, 0.94);   /* 盖住地图，避免底图干扰阅读 */
+  backdrop-filter: blur(3px);
+}
+
+.view-state--error .view-state-title {
+  color: var(--color-text);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.view-state--error .view-state-msg {
+  padding: 10px 16px;
+  border: 1px solid rgba(181, 118, 46, 0.35);
+  border-radius: 10px;
+  background: var(--color-accent-bg);
+  color: var(--color-text);
+  font-size: 13.5px;
+  line-height: 1.6;
+}
+
+.view-state--error .view-state-hint {
+  color: var(--color-text-weak);
+  font-size: 12.5px;
+  line-height: 1.7;
+}
+
+/* ---------- 全局错误提示条（数据层出错时出现） ----------
+   放在主区顶部，不遮住导航栏，也不影响地图尺寸 */
+.app-alert {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 30;
+  padding: 10px 16px;
+  border-bottom: 1px solid rgba(181, 118, 46, 0.35);
+  background: #fdf3e3;
+  color: var(--color-text);
+  font-size: 13px;
+  line-height: 1.55;
+  box-shadow: 0 2px 10px rgba(58, 51, 43, 0.08);
+  /* 这条不设 pointer-events:none —— 用户可能要选中复制错误信息 */
+}
+
+.app-alert[hidden] {
+  display: none;
 }
 
 /* ---------- 通用内容面板（时间轴 / 地点列表的容器） ---------- */

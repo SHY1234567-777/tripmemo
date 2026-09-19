@@ -18,9 +18,34 @@
   var KEY_PLACES = 'tripmemo.places.v1';
   var KEY_SETTINGS = 'tripmemo.settings.v1';   /* 全局设置（目前只有主城市） */
 
+  /* 载入示例数据前，把用户原有数据备份到这个键（Day 8）
+     只在"还没有备份"时才写 —— 防止手滑点两次把备份覆盖成示例数据 */
+  var KEY_BACKUP = 'tripmemo.backup.v1';
+
   /* 内存中的缓存：避免每次都读 localStorage */
   var placesCache = null;
   var settingsCache = null;
+
+  /* 最近一次数据层错误（Day 8 新增）
+     为什么要它：原来出错只写 console.error，用户看到的是一片空白，
+                完全不知道发生了什么。现在把它记下来，由界面显示出来。 */
+  var lastError = null;
+
+  /**
+   * 记一次数据层错误，并广播出去让界面显示
+   * @param {string} scope 出错的环节（读地点 / 写地点 / 读设置 / 写设置）
+   * @param {Error} err
+   */
+  function reportError(scope, err) {
+    lastError = {
+      scope: scope,
+      message: (err && err.message) ? err.message : String(err)
+    };
+    console.error('[TripMemo] 数据层出错（' + scope + '）：', err);
+    document.dispatchEvent(new CustomEvent('store:error', {
+      detail: lastError
+    }));
+  }
 
   /* ------------------------------------------------------------
      一、底层读写
@@ -36,7 +61,7 @@
       raw = global.localStorage.getItem(KEY_PLACES);
     } catch (err) {
       /* 浏览器禁用了 localStorage（隐私模式等） */
-      console.error('[TripMemo] 无法读取本地存储：', err);
+      reportError('读取地点', err);
       placesCache = [];
       return placesCache;
     }
@@ -48,7 +73,7 @@
       var parsed = JSON.parse(raw);
       placesCache = Array.isArray(parsed) ? parsed : [];
     } catch (err) {
-      console.error('[TripMemo] 本地数据解析失败，已按空数据继续：', err);
+      reportError('解析地点数据', err);
       placesCache = [];
     }
     return placesCache;
@@ -59,7 +84,7 @@
     try {
       global.localStorage.setItem(KEY_PLACES, JSON.stringify(placesCache));
     } catch (err) {
-      console.error('[TripMemo] 写入本地存储失败：', err);
+      reportError('保存地点', err);
     }
     /* 通知界面刷新 —— 各视图监听到后自己重画 */
     document.dispatchEvent(new CustomEvent('data:change', {
@@ -158,14 +183,14 @@
     try {
       raw = global.localStorage.getItem(KEY_SETTINGS);
     } catch (err) {
-      console.error('[TripMemo] 无法读取本地设置：', err);
+      reportError('读取设置', err);
       settingsCache = {};
       return settingsCache;
     }
     try {
       settingsCache = raw ? JSON.parse(raw) : {};
     } catch (err) {
-      console.error('[TripMemo] 本地设置解析失败，已按空设置继续：', err);
+      reportError('解析设置数据', err);
       settingsCache = {};
     }
     if (!settingsCache || typeof settingsCache !== 'object') {
@@ -178,7 +203,7 @@
     try {
       global.localStorage.setItem(KEY_SETTINGS, JSON.stringify(settingsCache));
     } catch (err) {
-      console.error('[TripMemo] 写入本地设置失败：', err);
+      reportError('保存设置', err);
     }
     document.dispatchEvent(new CustomEvent('settings:change', {
       detail: { mainCity: getMainCity() }
@@ -242,7 +267,128 @@
   }
 
   /* ------------------------------------------------------------
-     四、对外暴露
+     五、示例数据（Day 8）
+
+     为什么要它：项目原本是空的，必须手动录 5 分钟才看得到界面。
+                有了它，一载入就能看到完整效果，也方便以后改代码时自测。
+
+     设计要点：
+       · **整体替换**，不是"追加" —— 追加会把示例和你自己的数据混在一起，
+         想撤销就撤不干净；整体替换 + 备份，一键能回到原样。
+       · **载入前先备份**原数据到 KEY_BACKUP，清空时原样恢复。
+       · **只在没有备份时才备份** —— 防止连点两次把备份覆盖成示例数据。
+       · 是否处于"示例模式"记在 settings.sampleLoaded 上，重启浏览器也不丢。
+     ------------------------------------------------------------ */
+
+  /** 当前是不是加载了示例数据 */
+  function isSampleLoaded() {
+    return readSettings().sampleLoaded === true;
+  }
+
+  /**
+   * 把一批地点**整体替换**进存储
+   * 走 Model.createPlace 规范化，保证和表单录入出来的结构完全一致
+   * @param {Array} places 原始数据（可以是 mock-data.js 里那种"只填了部分字段"的）
+   */
+  function replaceAllPlaces(places) {
+    placesCache = (places || []).map(function (item) {
+      return Model.createPlace(item);
+    });
+    persist();
+  }
+
+  /**
+   * 载入示例数据
+   * @returns {{ok: boolean, count?: number, reason?: string}}
+   */
+  function loadSampleData() {
+    var Mock = global.TripMemoMock;
+    if (!Mock || !Array.isArray(Mock.places)) {
+      return { ok: false, reason: '示例数据文件没加载成功（js/mock-data.js）' };
+    }
+    if (isSampleLoaded()) {
+      return { ok: false, reason: '示例数据已经在用了' };
+    }
+
+    /* 1、先把当前数据备份起来（已经有备份就不覆盖） */
+    try {
+      if (global.localStorage.getItem(KEY_BACKUP) === null) {
+        global.localStorage.setItem(KEY_BACKUP, JSON.stringify({
+          places: listPlaces(),
+          settings: readSettings(),
+          savedAt: new Date().toISOString()
+        }));
+      }
+    } catch (err) {
+      reportError('备份原有数据', err);
+      return { ok: false, reason: '无法备份现有数据，为安全起见没有载入' };
+    }
+
+    /* 2、写入示例地点 */
+    replaceAllPlaces(Mock.places);
+
+    /* 3、设好主城市，这样一载入就能看到连线 */
+    var settings = readSettings();
+    settings.mainCity = Mock.mainCity;
+    settings.sampleLoaded = true;
+    persistSettings();
+
+    console.log('[TripMemo] 已载入示例数据：' + placesCache.length + ' 个地点');
+    return { ok: true, count: placesCache.length };
+  }
+
+  /**
+   * 清空示例数据，恢复载入前的原数据
+   * @returns {{ok: boolean, count?: number}}
+   */
+  function clearSampleData() {
+    var raw = null;
+    try {
+      raw = global.localStorage.getItem(KEY_BACKUP);
+    } catch (err) {
+      reportError('读取备份', err);
+    }
+
+    if (raw) {
+      /* 有备份 → 原样恢复 */
+      try {
+        var backup = JSON.parse(raw);
+        placesCache = Array.isArray(backup.places) ? backup.places : [];
+        settingsCache = (backup.settings && typeof backup.settings === 'object')
+          ? backup.settings
+          : {};
+        /* 恢复出来的设置里不该带示例标记 */
+        delete settingsCache.sampleLoaded;
+        persist();
+        persistSettings();
+      } catch (err) {
+        reportError('恢复备份', err);
+        placesCache = [];
+        settingsCache = {};
+        persist();
+        persistSettings();
+      }
+    } else {
+      /* 没备份（比如载入示例后手动清了浏览器数据）→ 退化成清空 */
+      placesCache = [];
+      settingsCache = {};
+      persist();
+      persistSettings();
+    }
+
+    /* 备份用完就删 —— 留着会让下次载入示例时不重新备份 */
+    try {
+      global.localStorage.removeItem(KEY_BACKUP);
+    } catch (err) {
+      reportError('删除备份', err);
+    }
+
+    console.log('[TripMemo] 已清空示例数据，恢复原有数据：' + (placesCache ? placesCache.length : 0) + ' 个地点');
+    return { ok: true, count: placesCache ? placesCache.length : 0 };
+  }
+
+  /* ------------------------------------------------------------
+     六、对外暴露
      ------------------------------------------------------------ */
   global.TripMemoStore = {
     listPlaces: listPlaces,
@@ -254,7 +400,12 @@
     getMainCity: getMainCity,
     setMainCity: setMainCity,
     exportJSON: exportJSON,
-    downloadJSON: downloadJSON
+    downloadJSON: downloadJSON,
+    /* Day 8 新增 */
+    isSampleLoaded: isSampleLoaded,
+    loadSampleData: loadSampleData,
+    clearSampleData: clearSampleData,
+    getLastError: function () { return lastError; }
   };
 
 }(window));

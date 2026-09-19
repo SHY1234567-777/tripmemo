@@ -38,9 +38,25 @@
   var elEmpty = null;
   var elFilterBar = null;
   var elTooltip = null;
+  var elLoading = null;      /* 加载中状态（Day 8） */
+  var elError = null;        /* 错误状态（Day 8） */
+  var elErrorMsg = null;
+
+  /* SDK 加载超时时间（毫秒）
+     ⚠️ 为什么必须有超时：只有"加载中"没有超时，就是**无限转圈** ——
+        网络断了或接口卡住时，用户会一直等下去，永远等不到结果，
+        也不会知道该干什么。这是"加载中"这个状态最常见的错误做法。
+        超时后转成明确的错误提示，用户才知道"它不会好了，要动手"。 */
+  var SDK_TIMEOUT_MS = 15000;
 
   /* 防止"点击标记"同时触发"点击地图空白处" */
   var lastMarkerClickAt = 0;
+
+  /* 地图是不是加载失败了（Day 8）
+     为什么要这个标志：空状态是根据"有没有数据"自动显示/隐藏的，
+     地图失败后再刷新数据时，它会把"还没有记录"重新显示出来，
+     和错误面板叠在一起、互相打架。用这个标志把空状态压住。 */
+  var mapFailed = false;
 
   /* 中国大致中心点，作为没有数据时的默认视野 */
   var CHINA_CENTER = [104.2, 35.9];
@@ -84,6 +100,58 @@
 
 
   /* ------------------------------------------------------------
+     一之二、三种页面状态（Day 8 新增）
+
+     加载中 / 错误 / 空 —— 三者长得像，但意思完全不同，不能混用：
+       · 加载中 = 还在等，别动，马上就好
+       · 错误   = 环境出问题了，用户解决不了，要告诉他原因和下一步
+       · 空     = 环境没问题，只是用户还没记东西，用户自己能解决
+
+     ⚠️ 改版前的情况：错误提示**复用了空状态元素**（把 map-empty 的
+        文案改成错误消息），等于把错误伪装成"没数据"。已拆开。
+     ------------------------------------------------------------ */
+
+  /** 显示「加载中」 */
+  function showLoading() {
+    mapFailed = false;
+    if (elLoading) {
+      elLoading.removeAttribute('hidden');
+    }
+    if (elError) {
+      elError.setAttribute('hidden', '');
+    }
+    if (elEmpty) {
+      elEmpty.setAttribute('hidden', '');
+    }
+  }
+
+  /** 隐藏「加载中」 */
+  function hideLoading() {
+    if (elLoading) {
+      elLoading.setAttribute('hidden', '');
+    }
+  }
+
+  /**
+   * 显示「错误」
+   * @param {string} message 人话描述的原因
+   */
+  function showError(message) {
+    mapFailed = true;
+    hideLoading();
+    if (elErrorMsg) {
+      elErrorMsg.textContent = message || '原因不明。';
+    }
+    if (elError) {
+      elError.removeAttribute('hidden');
+    }
+    /* 地图都起不来，"还没有记录"的提示就是噪音，收起来 */
+    if (elEmpty) {
+      elEmpty.setAttribute('hidden', '');
+    }
+  }
+
+  /* ------------------------------------------------------------
      一、加载高德 SDK
      ------------------------------------------------------------ */
 
@@ -95,9 +163,10 @@
   /**
    * 动态加载高德 JS API
    * 必须先设 _AMapSecurityConfig（安全密钥），再加载 SDK —— 顺序反了会失败
+   * @param {number} timeoutMs 超时时间；超时视为失败（避免无限转圈）
    * @returns {Promise}
    */
-  function loadAmapSDK() {
+  function loadAmapSDK(timeoutMs) {
     return new Promise(function (resolve, reject) {
       if (global.AMap) {
         resolve(global.AMap);
@@ -108,6 +177,26 @@
       if (!cfg || !cfg.amapKey || cfg.amapKey.indexOf('在这里填入') === 0) {
         reject(new Error('没有找到高德 Key。请把 config.example.js 复制成 config.js，并填入 Key 与安全密钥。'));
         return;
+      }
+
+      /* 超时保险：到点还没好就当失败，别让用户干等 */
+      var settled = false;
+      var timer = setTimeout(function () {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        reject(new Error('等了 ' + Math.round(timeoutMs / 1000) + ' 秒还没加载好，'
+          + '多半是网络太慢或被拦住了。'));
+      }, timeoutMs);
+
+      function finish(fn, arg) {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        clearTimeout(timer);
+        fn(arg);
       }
 
       /* 安全密钥必须在 SDK 之前设好 */
@@ -124,13 +213,13 @@
         + '&plugin=AMap.PlaceSearch,AMap.Geocoder';
       script.onload = function () {
         if (global.AMap) {
-          resolve(global.AMap);
+          finish(resolve, global.AMap);
         } else {
-          reject(new Error('高德 SDK 已加载，但 AMap 对象不存在。多半是 Key 或安全密钥不正确。'));
+          finish(reject, new Error('高德 SDK 已加载，但 AMap 对象不存在。多半是 Key 或安全密钥不正确。'));
         }
       };
       script.onerror = function () {
-        reject(new Error('高德 SDK 加载失败。请检查网络，或 Key 是否属于「Web端（JS API）」类型。'));
+        finish(reject, new Error('高德 SDK 加载失败。请检查网络，或 Key 是否属于「Web端（JS API）」类型。'));
       };
       document.head.appendChild(script);
     });
@@ -368,6 +457,12 @@
   function updateEmptyState() {
     var total = Store.listPlaces().length;
     if (!elEmpty) {
+      return;
+    }
+    /* 地图加载失败时不显示空状态 —— 否则"还没有记录"会和错误面板
+       叠在一起，让用户以为是没数据而不是出了问题（Day 8） */
+    if (mapFailed) {
+      elEmpty.setAttribute('hidden', '');
       return;
     }
     /* 一个地点都没有时，才显示空状态 */
@@ -672,6 +767,9 @@
     elEmpty = document.getElementById('map-empty');
     elFilterBar = document.getElementById('map-filter');
     elTooltip = document.getElementById('map-tooltip');
+    elLoading = document.getElementById('map-loading');
+    elError = document.getElementById('map-error');
+    elErrorMsg = document.getElementById('map-error-msg');
 
     if (!elCanvas) {
       return;
@@ -679,22 +777,26 @@
 
     renderFilterBar();
 
-    loadAmapSDK()
+    /* 先亮出"加载中" —— 地图 SDK 要联网下载，这期间画布是全白的 */
+    showLoading();
+
+    loadAmapSDK(SDK_TIMEOUT_MS)
       .then(function () {
+        /* ⚠️ initMap() 可能抛异常（比如配置里样式 ID 写错），
+           放在 Promise 链里抛出的错误会被下面的 catch 接住，
+           所以这里不额外包 try/catch，让失败统一走一条路。 */
         initMap();
         initSearch();
         initMainCityUI();
         refresh();
         resizeMap();
+        hideLoading();
         console.log('[TripMemo] 地图已就绪');
       })
       .catch(function (err) {
         /* 地图起不来时，把原因直接显示在页面上，别让它静默失败 */
         console.error('[TripMemo] 地图初始化失败：', err);
-        if (elEmpty) {
-          elEmpty.removeAttribute('hidden');
-          elEmpty.innerHTML = '<p>地图未能加载：' + err.message + '</p>';
-        }
+        showError(err.message);
       });
 
     /* 视图切换时重算地图尺寸 */

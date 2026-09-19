@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>TripMemo · 人生记忆地图</title>
   <!-- 给样式表加版本号，防止浏览器拿旧的缓存（改了 CSS 后把 v 的数字 +1 即可） -->
-  <link rel="stylesheet" href="css/style.css?v=11">
+  <link rel="stylesheet" href="css/style.css?v=12">
 </head>
 <body>
 
@@ -30,6 +30,11 @@
       </button>
     </div>
 
+    <button type="button" class="nav-btn nav-btn--action" id="btn-sample">
+      <span class="nav-icon" aria-hidden="true">✨</span>
+      <span class="nav-label" id="btn-sample-label">载入示例数据</span>
+    </button>
+
     <button type="button" class="nav-btn nav-btn--action" id="btn-export">
       <span class="nav-icon" aria-hidden="true">⬇</span>
       <span class="nav-label">导出 JSON</span>
@@ -38,6 +43,14 @@
 
   <!-- ===== 主区：视图 + 弹窗 ===== -->
   <div class="app-body">
+
+  <!-- 数据层出错时的全局提示条（Day 8）
+       ⚠️ 为什么需要它：数据层原来出错只写 console.error，
+          用户看到的是一片空白，完全不知道发生了什么。
+          错误状态是"最容易被忽略"的一种页面状态 —— 本地开发时
+          它永远不会自己出现，所以最容易漏掉。 -->
+  <div class="app-alert" id="app-alert" hidden></div>
+
   <main class="app-main">
 
     <!-- 视图 1：地图（默认首屏） -->
@@ -71,7 +84,29 @@
       <!-- 悬停提示：鼠标停在地点上时，跟着显示地点名与停留时长 -->
       <div class="map-tooltip" id="map-tooltip" hidden></div>
 
-      <!-- 空状态：一个地点都没有时显示（有地点后由 JS 隐藏） -->
+      <!-- 【状态 1：加载中】地图 SDK 正在下载时显示
+           为什么必须有：地图要联网下载高德 SDK，这段时间画布是全白的，
+                       用户会以为"页面坏了"。给一句话，就知道是在等。 -->
+      <div class="view-state" id="map-loading">
+        <span class="view-state-spinner" aria-hidden="true"></span>
+        <p>地图加载中……</p>
+      </div>
+
+      <!-- 【状态 2：错误】地图加载失败时显示（断网 / Key 不对 / 额度用完）
+           为什么要和"空状态"分开：两者长得像，但意思完全不同 ——
+           空状态是"你还没记东西"（用户自己能解决），
+           错误是"环境出问题了"（用户解决不了，需要知道原因）。
+           以前这里复用空状态元素，等于把错误伪装成"没数据"，已改掉。 -->
+      <div class="view-state view-state--error" id="map-error" hidden>
+        <p class="view-state-title">地图没能加载</p>
+        <p class="view-state-msg" id="map-error-msg"></p>
+        <p class="view-state-hint">
+          常见原因：① 网络断了　② 高德 Key 填错或类型不是「Web端（JS API）」
+          　③ 域名白名单拦住了。按 F12 看 Console 有更详细的原因。
+        </p>
+      </div>
+
+      <!-- 【状态 3：空】一个地点都没有时显示（有地点后由 JS 隐藏） -->
       <div class="view-empty view-empty--overlay" id="map-empty">
         <p>还没有记录。点地图上任意位置，开始记下第一个地方。</p>
       </div>
@@ -171,9 +206,10 @@
           onerror="console.warn('[TripMemo] 未找到 config.js —— 地图将无法加载。请把 config.example.js 复制为 config.js 并填入 Key 与安全密钥。')"></script>
 
   <!-- ===== 项目脚本：顺序不能乱 =====
-       model（算法）→ store（数据）→ detail（弹窗）
-       → map / timeline / places（三个视图）→ main（入口） -->
+       model（算法）→ mock-data（示例数据）→ store（数据）
+       → detail（弹窗）→ map / timeline / places（三个视图）→ main（入口） -->
   <script src="js/model.js"></script>
+  <script src="js/mock-data.js"></script>
   <script src="js/store.js"></script>
   <script src="js/detail.js"></script>
   <script src="js/map.js"></script>
