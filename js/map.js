@@ -62,25 +62,34 @@
   var CHINA_CENTER = [104.2, 35.9];
   var CHINA_ZOOM = 5;
 
-  /* 官方内置的底图样式（兜底用）。
+  /* 官方内置的底图样式（兜底 + 项目默认）。
      ⭐ 完整清单 = 官方 11 种（Day 8 查官方文档核实）：
        标准      amap://styles/normal
        幻影黑    amap://styles/dark
        月光银    amap://styles/light
-       远山黛    amap://styles/whitesmoke   ← 当前默认
-       草色青    amap://styles/fresh
+       远山黛    amap://styles/whitesmoke
+       草色青    amap://styles/fresh        ← 当前默认
        雅士灰    amap://styles/grey
        涂鸦      amap://styles/graffiti
        马卡龙    amap://styles/macaron
        靛青蓝    amap://styles/blue
        极夜蓝    amap://styles/darkblue
        酱籽      amap://styles/wine
-     ⚠️ 想换样式不用改这里 —— 改 config.js 里的 mapStyle 字段即可，
-        改完刷新页面就生效（控制台会打印当前用的是哪个）。
-     当前选 whitesmoke（远山黛）：极浅米白，跟奶油暖色 UI 同调性，
-     也符合"简洁大气、线条少"的目标。
-     （此前试过 dark / darkblue 深色方案，因高德自定义样式需注册调色而放弃） */
-  var DEFAULT_MAP_STYLE = 'amap://styles/whitesmoke';
+
+     ⭐⭐ 这里和 config.js 的关系（很容易搞混，务必看清）：
+       · 本文件里的 DEFAULT_MAP_STYLE = **项目默认样式，会进仓库**
+       · config.js 里的 mapStyle       = **个人本地覆盖，被 gitignore 挡着，不进仓库**
+       · 代码取值顺序：`config.js 的 mapStyle || 这里的 DEFAULT_MAP_STYLE`
+         也就是 **config 优先，但 config 只在你自己电脑上有效**
+
+     ⚠️ 2026-09-19 的教训：他在 config.js 里试出 fresh 之后，
+        以为"样式定下来了"—— 但仓库里仍是 whitesmoke，
+        别人克隆 / 他换电脑都会变回远山黛。
+        **想真正定格样式，必须改这一行。**
+
+     当前选 fresh（草色青）：2026-09-19 他逐个试过后挑的
+     （试过 wine 深酒红，觉得太丑已排除；dark / darkblue 深色方案也早已放弃）。 */
+  var DEFAULT_MAP_STYLE = 'amap://styles/fresh';
 
   /* ------------------------------------------------------------
      关于"能不能只改底图里的某一种元素"（如边界线颜色）
@@ -585,11 +594,33 @@
   /* 往哪一侧拱：+1 或 -1。换个符号，所有弧线一起朝另一边弯。 */
   var ARC_SIDE = 1;
 
-  /* 描边（"管子"质感）：只有 BezierCurve 支持。
-     ⚠️ 如果线看着发糊、发脏，把这里改成 false 就退回纯色细线。 */
+  /* ---------- 线的颜色与存在感 ----------
+     ⚠️ 2026-09-19：底图从 whitesmoke（极浅米白）换成 fresh（草色青）之后，
+        线看着"发糊、跟底图分不开"。原因不是线变了，是**底图变"有颜色"了** ——
+        原来那套线色是配浅米白底挑的。
+
+     ⭐ 结论（也是容易漏掉的连带影响）：
+        **换底图样式，必须回头复查所有画在它上面的元素。**
+        包括线的颜色、透明度、描边，甚至点的类型色（见下方笔记）。
+
+     这次同时动三个杠杆，让"我们的线"和"它的底图"分得更开：
+       ① 颜色更深（明度拉开）—— 不是换色系，是同色系里压深
+       ② 透明度提高（存在感变强）—— .55 在有色底上会被吃掉
+       ③ 描边加粗（加一圈纸白"光晕"）—— 这是分得最干净的一招，
+          因为它在线和底图之间插了一条明确的隔断 */
+  var ARC_COLOR = '#6E4318';        /* 更深的暖褐（原 #8A6A45） */
+  var ARC_OPACITY = 0.8;            /* 原 0.55 */
+
+  /* 描边（"管子"质感 + 光晕）：只有 BezierCurve 支持。
+     ⚠️ 如果线看着发糊、发脏，把 ARC_OUTLINE 改成 false 就退回纯色细线。 */
   var ARC_OUTLINE = true;
-  var ARC_OUTLINE_COLOR = 'rgba(250, 247, 242, 0.85)';   /* 用页面底色做描边，像给线镶了一圈纸边 */
-  var ARC_OUTLINE_WEIGHT = ARC_OUTLINE ? 1.5 : 0;
+  var ARC_OUTLINE_COLOR = 'rgba(253, 250, 244, 0.95)';   /* 接近纸白，比原来更实 */
+  var ARC_OUTLINE_WEIGHT = ARC_OUTLINE ? 2.6 : 0;        /* 原 1.5：加粗 → 光晕更明显 */
+
+  /* ⚠️ 待观察（尚未改）：草色青是绿调底图，而「短期停留」的类型色是
+     `#3D7A5F` 松绿 —— **绿点画在绿底上会不够醒目**。
+     真要改就得动 model.js 的四色体系（那套色是 Day 8 改了三轮才定的），
+     属于要单独决策的事，先记在这里，不顺手改。 */
 
   /**
    * 算一条"拱起来"的弧线路径（给 AMap.BezierCurve 用）
@@ -721,17 +752,13 @@
         return;
       }
 
-      /* 线的基础样式（弧线和直线共用） */
+      /* 线的基础样式（弧线和直线共用）
+         颜色 / 透明度用 ARC_COLOR / ARC_OPACITY 两个常量，
+         它们是为 fresh 底图重新配过的（见常量区的说明）。 */
       var lineOptions = {
-        /* ⚠️ Day 8 美化改版：连线用深棕褐。
-           之前用主题色 #B5762E（暖棕琥珀），但在米白底图上，
-           周围没有别的暖色时它容易被看成"砖红"，跟暖色 UI 不协调。
-           改成 #8A6A45：同属暖色系，但更偏"褐"不偏"橙"，
-           像泛黄旧地图上的墨线，贴合"回忆与记录"的调性，也不抢眼。
-           透明度 0.55：粗线（最大 8px）不做半透明会像一根管道压住地图。 */
-        strokeColor: '#8A6A45',
+        strokeColor: ARC_COLOR,
         strokeWeight: Model.lineWidthByMonths(item.totalMonths),  /* 线宽 ∝ 累计停留时长（验收标准 18） */
-        strokeOpacity: 0.55,
+        strokeOpacity: ARC_OPACITY,
         lineJoin: 'round',
         lineCap: 'round',
         zIndex: 100

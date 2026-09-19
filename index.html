@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>TripMemo · 人生记忆地图</title>
   <!-- 给样式表加版本号，防止浏览器拿旧的缓存（改了 CSS 后把 v 的数字 +1 即可） -->
-  <link rel="stylesheet" href="css/style.css?v=14">
+  <link rel="stylesheet" href="css/style.css?v=16">
 </head>
 <body>
 
@@ -202,7 +202,7 @@
 
   <!-- ===== 本地配置：含高德 Key，不提交（模板见 config.example.js）=====
        找不到 config.js 时不会报错，只是地图加载不出来，页面其余部分照常可用 -->
-  <script src="config.js?v=14"
+  <script src="config.js?v=16"
           onerror="console.warn('[TripMemo] 未找到 config.js —— 地图将无法加载。请把 config.example.js 复制为 config.js 并填入 Key 与安全密钥。')"></script>
 
   <!-- ===== 项目脚本：顺序不能乱 =====
@@ -212,14 +212,17 @@
        ⚠️ 每个都带 ?v= 版本号，理由和上面 css 那条一样：
           **浏览器对 .js 也会缓存**。之前只给 CSS 加了版本号，
           结果改完 JS 也可能看到旧代码，白折腾一轮排查。
-          **以后改完任何 css / js，把这里和上面的数字一起 +1。** -->
-  <script src="js/model.js?v=14"></script>
-  <script src="js/mock-data.js?v=14"></script>
-  <script src="js/store.js?v=14"></script>
-  <script src="js/detail.js?v=14"></script>
-  <script src="js/map.js?v=14"></script>
-  <script src="js/timeline.js?v=14"></script>
-  <script src="js/places.js?v=14"></script>
-  <script src="js/main.js?v=14"></script>
+
+       ⭐ 规则（就一句）：**改完任何 css / js，把这里和上面的数字一起 +1。**
+          10 个资源共用同一个编号 —— 多下载几 KB，换"永远不用想哪个该改"，
+          对学习阶段来说非常划算。 -->
+  <script src="js/model.js?v=16"></script>
+  <script src="js/mock-data.js?v=16"></script>
+  <script src="js/store.js?v=16"></script>
+  <script src="js/detail.js?v=16"></script>
+  <script src="js/map.js?v=16"></script>
+  <script src="js/timeline.js?v=16"></script>
+  <script src="js/places.js?v=16"></script>
+  <script src="js/main.js?v=16"></script>
 </body>
 </html>

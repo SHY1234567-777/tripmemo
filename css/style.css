@@ -21,6 +21,10 @@
   --color-text:       #3a332b;   /* 主文字（深棕灰，不用纯黑） */
   --color-text-weak:  #8a7f72;   /* 次要文字（暖灰） */
   --color-border:     rgba(58, 51, 43, 0.12);  /* 分隔线（半透明深棕） */
+  /* ⚠️ 时间轴竖线**不能**复用 --color-border ——
+     它 alpha 只有 .12，画成 1px 的细线在奶油底上**肉眼几乎看不见**
+     （2026-09-19 他截图反馈）。装饰性的细线需要单独一档颜色。 */
+  --color-timeline-line: rgba(58, 51, 43, 0.2);
   --color-accent:     #b5762e;   /* 主色（暖棕/琥珀 —— 呼应"旧照片"） */
   --color-accent-bg:  rgba(181, 118, 46, 0.12);   /* 主色浅底 */
   --color-nav-active: #ece2d2;   /* 侧栏选中项底色 */
@@ -752,15 +756,24 @@ body::after {
   padding-left: 18px;
 }
 
-/* 时间竖线：贯穿这一年的所有卡片 */
+/* 时间竖线：贯穿这一年的所有卡片
+   ⚠️ 对齐算法（改尺寸时一起改，不然线和小圆点会错开）：
+     · 卡片左边缘距列表左边 = padding-left 18px
+     · 小圆点用 `left: -18px` → 圆点盒子正好从列表的 0px 开始
+     · 圆点 10px 宽 → 圆心在 5px
+     · 所以竖线要「宽 2px + left 4px」→ 占 4~6px，中心也在 5px ✅
+   ⚠️ 注意全局是 `box-sizing: border-box`：
+     圆点写 width:10px 时，**这 10px 已经包含 2px 边框了**，
+     实际直径就是 10px（不是 10+2+2）。算对齐时别多加边框。 */
 .timeline-year-list::before {
   content: '';
   position: absolute;
   top: 6px;
   bottom: 6px;
   left: 4px;
-  width: 1px;
-  background: var(--color-border);
+  width: 2px;
+  border-radius: 999px;
+  background: var(--color-timeline-line);
 }
 
 /* 一张地点卡片：左边图片位 + 右边文字（Day 8 重做成"真卡片"） */
@@ -779,14 +792,16 @@ body::after {
   transition: border-color 0.18s, box-shadow 0.18s, transform 0.18s;
 }
 
-/* 卡片左边的小圆点：钉在时间竖线上 */
+/* 卡片左边的小圆点：钉在时间竖线上
+   （Day 8.5 修：7px → 10px，原来太小、几乎看不出是个圆点）
+   边框用页面底色，做出"圆点把竖线咬断一截"的效果。 */
 .timeline-card::before {
   content: '';
   position: absolute;
   top: 22px;
   left: -18px;
-  width: 7px;
-  height: 7px;
+  width: 10px;
+  height: 10px;
   border: 2px solid var(--color-bg);
   border-radius: 50%;
   background: var(--color-accent);
