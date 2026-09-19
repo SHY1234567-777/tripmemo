@@ -562,6 +562,104 @@
     }
   }
 
+  /* ------------------------------------------------------------
+     四之三、弧线（Day 8 加练 · 步骤③）
+
+     为什么把直线改成弧线：**直线是"平"的，弧线暗示了高度。**
+     就像航线图、地铁线路图 —— 线一旦拱起来，大脑会自动读出
+     "这条线是飘在上面的"，整张图立刻有了立体感。
+     （这是从 Tooolive/Map-Of-My-Journey 借来的手法，
+       它是 ECharts 的 `lineStyle.curveness: .12`；
+       高德这边对应的做法是 `AMap.BezierCurve` 贝塞尔曲线。）
+
+     下面三个常量是**唯一需要调的旋钮**，改完刷新页面就生效。
+     ------------------------------------------------------------ */
+
+  /* 拱起多少：相对「两点直线距离」的比例
+     ⚠️ 这个数最容易调不好 ——
+        太小（< .08）→ 看着还是直线，白改
+        太大（> .3 ）→ 7 条线互相交叉，糊成一团
+        .18 是初始值。觉得不够弯就调大，觉得乱就调小。 */
+  var ARC_BULGE = 0.18;
+
+  /* 往哪一侧拱：+1 或 -1。换个符号，所有弧线一起朝另一边弯。 */
+  var ARC_SIDE = 1;
+
+  /* 描边（"管子"质感）：只有 BezierCurve 支持。
+     ⚠️ 如果线看着发糊、发脏，把这里改成 false 就退回纯色细线。 */
+  var ARC_OUTLINE = true;
+  var ARC_OUTLINE_COLOR = 'rgba(250, 247, 242, 0.85)';   /* 用页面底色做描边，像给线镶了一圈纸边 */
+  var ARC_OUTLINE_WEIGHT = ARC_OUTLINE ? 1.5 : 0;
+
+  /**
+   * 算一条"拱起来"的弧线路径（给 AMap.BezierCurve 用）
+   *
+   * 怎么拱：把两个控制点都往【垂直于连线的同一侧】推出去，
+   *        分别放在 25% 和 75% 的位置 —— 这样曲线对称、单方向鼓出去。
+   *
+   * ⚠️ 这里有个**很容易写错**的地方：经度和纬度不能等量算！
+   *   1 度纬度 ≈ 111 公里（到处都一样），
+   *   但 1 度经度 ≈ 111 × cos(纬度) 公里 ——
+   *   在乌鲁木齐（北纬 43.8°）只有约 80 公里，在赤道才是 111 公里。
+   *   **直接拿经纬度当平面坐标算垂直方向，高纬度地区的弧线会歪掉**
+   *   （看着像被斜着拉了一把）。
+   *   所以这里先把经度按 cos(纬度) 缩放成"近似等距空间"，
+   *   算完垂直方向和控制点，再换回经纬度。
+   *
+   * @param {{lng:number, lat:number}} from 起点（主城市锚点）
+   * @param {{lng:number, lat:number}} to   终点（目标城市中心）
+   * @returns {Array} BezierCurve 要的 path：
+   *          [0] = 起点；[1] = [控制点1, 控制点2, 终点]（6 个数）
+   */
+  function arcPath(from, to) {
+    var latMid = (from.lat + to.lat) / 2;
+    /* cos(纬度)：经度方向的缩放系数。乘上它，经度差就近似变成"等距"的差 */
+    var kx = Math.cos(latMid * Math.PI / 180);
+    if (!kx) {
+      kx = 1;   /* 防极端情况（理论上到不了两极） */
+    }
+
+    /* 1、换到"近似等距空间" */
+    var ax = from.lng * kx, ay = from.lat;
+    var bx = to.lng * kx,   by = to.lat;
+
+    var dx = bx - ax;
+    var dy = by - ay;
+    var len = Math.sqrt(dx * dx + dy * dy);
+
+    /* 两点重合（理论上不该发生）→ 退回直线路径，不要产生 NaN */
+    if (len === 0) {
+      return [[from.lng, from.lat], [to.lng, to.lat]];
+    }
+
+    /* 2、垂直单位向量：把 (dx,dy) 转 90°，再乘 ARC_SIDE 决定朝哪边鼓 */
+    var px = (-dy / len) * ARC_SIDE;
+    var py = (dx / len) * ARC_SIDE;
+
+    /* 3、推出去多少：跟两点距离成正比 —— 近的线拱得少，远的拱得多，
+          这样长短不同的线看起来弧度才协调 */
+    var push = len * ARC_BULGE;
+
+    /* 4、控制点放在 25% / 75% 处，都往同一侧推 */
+    function ctrlAt(t) {
+      var cx = ax + dx * t + px * push;
+      var cy = ay + dy * t + py * push;
+      /* 换回经纬度：经度要把刚才乘的 kx 除回去 */
+      return [cx / kx, cy];
+    }
+
+    var c1 = ctrlAt(0.25);
+    var c2 = ctrlAt(0.75);
+
+    /* 5、组装成 BezierCurve 要的格式：
+          第一个元素是起点；第二个元素是「控制点1、控制点2、终点」
+          （高德的 path 是**扁平的坐标数组**，一段最多两个控制点） */
+    return [
+      [from.lng, from.lat],
+      [c1[0], c1[1], c2[0], c2[1], to.lng, to.lat]
+    ];
+  }
+
   /** 画锚点与连线 */
   function renderOverlay() {
     if (!map) {
@@ -608,16 +706,23 @@
     });
     var stats = Model.cityStats(visited);
 
+    /* 画线用哪个类：优先贝塞尔曲线（弧线），拿不到就退回直线
+       ⚠️ 为什么要这个兜底：万一是旧版 SDK 里没有 BezierCurve，
+          **不兜底的话 7 条线会全部消失** —— 那比"线是直的"严重得多。
+          （Day 8 加练 · 步骤③） */
+    var useCurve = typeof AMap.BezierCurve === 'function';
+    if (!useCurve) {
+      console.warn('[TripMemo] 当前高德 SDK 没有 BezierCurve，连线退回直线');
+    }
+
     stats.forEach(function (item) {
       /* 主城市自己的点不连线（验收标准 17） */
       if (Model.isSameCity(item.city, mainCity.city)) {
         return;
       }
-      lines.push(new AMap.Polyline({
-        path: [
-          [mainCity.lng, mainCity.lat],
-          [item.lng, item.lat]
-        ],
+
+      /* 线的基础样式（弧线和直线共用） */
+      var lineOptions = {
         /* ⚠️ Day 8 美化改版：连线用深棕褐。
            之前用主题色 #B5762E（暖棕琥珀），但在米白底图上，
            周围没有别的暖色时它容易被看成"砖红"，跟暖色 UI 不协调。
@@ -628,14 +733,31 @@
         strokeWeight: Model.lineWidthByMonths(item.totalMonths),  /* 线宽 ∝ 累计停留时长（验收标准 18） */
         strokeOpacity: 0.55,
         lineJoin: 'round',
+        lineCap: 'round',
         zIndex: 100
-      }));
+      };
+
+      if (useCurve) {
+        lineOptions.path = arcPath(mainCity, item);
+        /* 描边：给线镶一圈浅色边，做出"管子"的厚度感 */
+        lineOptions.isOutline = ARC_OUTLINE;
+        lineOptions.outlineColor = ARC_OUTLINE_COLOR;
+        lineOptions.borderWeight = ARC_OUTLINE_WEIGHT;
+        lines.push(new AMap.BezierCurve(lineOptions));
+      } else {
+        lineOptions.path = [
+          [mainCity.lng, mainCity.lat],
+          [item.lng, item.lat]
+        ];
+        lines.push(new AMap.Polyline(lineOptions));
+      }
     });
 
     if (lines.length) {
       map.add(lines);
     }
-    console.log('[TripMemo] 已画 ' + lines.length + ' 条连线，从「' + mainCity.city + '」出发');
+    console.log('[TripMemo] 已画 ' + lines.length + ' 条'
+      + (useCurve ? '弧线' : '直线') + '，从「' + mainCity.city + '」出发');
   }
 
   /** 重画地图上的全部内容（点 + 锚点 + 线） */
@@ -831,7 +953,12 @@
   global.TripMemoMap = {
     init: init,
     renderMarkers: renderMarkers,
-    highlightCity: highlightCity
+    highlightCity: highlightCity,
+    /* 暴露出来只为**单独验证弧度算得对不对**（Day 8 加练 · 步骤③）。
+       弧线算法里有"经纬度要按 cos(纬度) 缩放"这种容易写错的地方，
+       不抽出来就没法实算，只能靠肉眼 —— 那就说不清是"算法对但难看"
+       还是"算法本身就错"。 */
+    arcPath: arcPath
   };
 
 }(window));

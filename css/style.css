@@ -25,7 +25,27 @@
   --color-accent-bg:  rgba(181, 118, 46, 0.12);   /* 主色浅底 */
   --color-nav-active: #ece2d2;   /* 侧栏选中项底色 */
   --color-on-accent:  #fffaf3;   /* 主色底上的文字色（浅色） */
-  --color-glass:      rgba(255, 255, 255, 0.6);   /* 玻璃卡片底 */
+
+  /* ---------- 玻璃拟态（Day 8 加练 · 步骤②）----------
+     手法参考 Tooolive/Map-Of-My-Journey 的 `.glass`：
+       半透明底 + backdrop-filter 模糊 + 一道顶部内高光 + 外投影
+     ⭐ 但要先讲清一件事：
+       本轮之前这几个浮层写的是 `rgba(255,255,255,.92)` + `blur(8px)`，
+       而 **92% 不透明等于把背后的地图盖死了 —— 模糊完全白加**，
+       看着就是一块白板。**模糊只有在背景足够透明时才看得见。**
+       所以本轮把 alpha 降到 .66 左右，模糊才真正生效。
+
+     ⚠️ 色值也做了浅色化改造：
+       Tooolive 的玻璃边是**浅色描边**（因为它是深色页面，浅边才亮）。
+       我们是奶油浅底，**浅色边等于看不见** → 改用主题原有的深色细边
+       （`--color-border`）保住"边界"，另用**白色顶部内高光**做出玻璃的厚度感。
+       一句话：**手法照搬，色值按自己的主题重做。** */
+  --color-glass:        rgba(255, 255, 255, 0.66);  /* 玻璃底：地图能透上来 */
+  --color-glass-strong: rgba(255, 255, 255, 0.82);  /* 玻璃底·强（下拉这类要看清文字） */
+  --color-glass-sheen:  rgba(255, 255, 255, 0.55);  /* 顶部内高光：做出"玻璃有一层厚度" */
+  --glass-blur:         16px;
+  --glass-shadow:       0 2px 10px rgba(58, 51, 43, 0.14),
+                        inset 0 1px 0 var(--color-glass-sheen);
 
   --nav-width: 189px;   /* 参考图实测：1260px 视口下侧栏占 189px */
   --nav-height: 56px;
@@ -49,11 +69,62 @@ body {
   /* ⚠️ 宽屏是「侧栏 + 主区」左右布局，所以用 row；
      窄屏时由媒体查询改回 column（见文件末尾） */
   flex-direction: row;
-  background: var(--color-bg);
   color: var(--color-text);
   font-family: system-ui, -apple-system, "Microsoft YaHei", "PingFang SC", sans-serif;
   font-size: 15px;
   line-height: 1.6;
+
+  /* ---------- 页面底色晕染（Day 8 加练 · 步骤①）----------
+     不再是"一整块平色"，而是两层极淡的径向渐变：
+       · 上方偏暖棕一点（像旧纸被光晒过）
+       · 下方偏暖灰一点（轻轻收住底部）
+     目的：大面积浅色最怕"平"，一平就显得空、像没做完。
+
+     ⚠️ 手法参考 Tooolive/Map-Of-My-Journey 的 `.veil`（双层渐变面纱），
+        但它的色值是给【深色页面】用的，直接照搬会把米白染脏。
+        所以**手法搬过来，色值按浅色重做**，透明度压到 0.05～0.08 这个量级。 */
+  background-color: var(--color-bg);
+  background-image:
+    radial-gradient(130% 78% at 50% -12%,
+      rgba(181, 118, 46, 0.055) 0%, rgba(181, 118, 46, 0) 62%),
+    radial-gradient(120% 74% at 50% 112%,
+      rgba(138, 127, 114, 0.08) 0%, rgba(138, 127, 114, 0) 60%);
+}
+
+/* ---------- 纸感噪点（Day 8 加练 · 步骤①）----------
+   一层极淡的噪点，铺满整页（**连同地图一起**）。
+
+   为什么要它：大面积浅色背景最容易显出"塑料感 / 空" ——
+             它太均匀了，真实世界的纸不是均匀的。
+             叠一层看不见的噪声，整块页面立刻像"纸"。
+
+   ⭐ 这一层是"融合"的关键之一：因为它在【所有东西之上】，
+      地图、侧栏、卡片、列表就被同一层材质"罩"住了，
+      看起来才像同一个作品，而不是几块拼起来的。
+
+   ⚠️ 三点必须注意：
+     ① `position: fixed` 让它脱离文档流 —— 这一点特别重要，
+        因为 body 是 flex 容器，**不脱离文档流的话 ::after 会变成一个
+        flex 子项**，把原本「侧栏 + 主区」的布局挤歪。
+     ② `pointer-events: none` 是铁律 —— 它铺满整页，
+        不设就吃掉所有点击（本项目第 4 次强调这一条）。
+     ③ z-index 取 7：高过地图(5)与地图状态层(6)，所以地图也带纸感；
+        但低于工具条(10)、悬停提示(20)、搜索下拉/错误条(30)、弹窗(100)，
+        保证文字与交互始终清晰锐利。
+
+   噪声怎么来的：内联 SVG 的 feTurbulence 生成随机噪声，
+   再用 feColorMatrix 去饱和变成灰噪点。
+   ⭐ 用内联 data URI 的好处：**不需要任何图片文件**，不增加项目资源。 */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 7;
+  pointer-events: none;
+  /* 浅底上的噪点必须非常轻 —— 到 0.1 就开始显脏了。
+     觉得看不见就调大这个值，觉得脏就调小。 */
+  opacity: 0.05;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.55'/%3E%3C/svg%3E");
 }
 
 /* 滚动条暖色化（WebKit 内核浏览器）—— 跟米白底协调，不用默认的灰 */
@@ -288,19 +359,22 @@ body {
   position: relative;
 }
 
-/* 搜索选点的输入框 */
+/* 搜索选点的输入框 —— 真玻璃（Day 8 加练 · 步骤②） */
 .map-search {
   width: 260px;
   max-width: 100%;
   padding: 8px 12px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
-  background: rgba(255, 255, 255, 0.92);
-  box-shadow: 0 2px 10px rgba(58, 51, 43, 0.14);
+  background: var(--color-glass);        /* 原来是 .92 不透明 → 模糊看不见 */
+  box-shadow: var(--glass-shadow);
   color: var(--color-text);
   font-family: inherit;
   font-size: 14px;
-  backdrop-filter: blur(8px);
+  /* ⚠️ -webkit- 前缀是给 Safari 的（它至今仍只认前缀版）。
+     不写的话 Safari 上就是"一块没有模糊的白板"。 */
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
 }
 
 .map-search::placeholder {
@@ -311,10 +385,13 @@ body {
 .map-search:focus {
   outline: none;
   border-color: var(--color-accent);
-  box-shadow: 0 0 0 2px var(--color-accent-bg);
+  /* 焦点环 + **保留玻璃投影** —— 只写焦点环会把玻璃的高光抹掉 */
+  box-shadow: 0 0 0 2px var(--color-accent-bg), var(--glass-shadow);
 }
 
-/* 搜索候选下拉（自己画的，不是高德自带的） */
+/* 搜索候选下拉（自己画的，不是高德自带的）
+   ⚠️ 这一块用「强玻璃」(--color-glass-strong, .82) 而不是普通玻璃 ——
+      它里面是一行行**要读的文字**，太透了会跟背后的地图线打架，看不清。 */
 .search-dropdown {
   position: absolute;
   top: calc(100% + 4px);
@@ -328,8 +405,10 @@ body {
   list-style: none;
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
-  background: var(--color-elevated);
+  background: var(--color-glass-strong);
   box-shadow: 0 8px 26px rgba(58, 51, 43, 0.22);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
 }
 
 .search-dropdown[hidden] {
@@ -374,14 +453,15 @@ body {
   padding: 8px 12px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
-  background: rgba(255, 255, 255, 0.92);
-  box-shadow: 0 2px 10px rgba(58, 51, 43, 0.14);
+  background: var(--color-glass);
+  box-shadow: var(--glass-shadow);
   color: var(--color-text);
   font-family: inherit;
   font-size: 13px;
   cursor: pointer;
   transition: color 0.15s, border-color 0.15s;
-  backdrop-filter: blur(8px);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
 }
 
 .mini-btn:hover {
@@ -418,10 +498,11 @@ body {
   padding: 6px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
-  background: rgba(255, 255, 255, 0.92);
-  box-shadow: 0 2px 10px rgba(58, 51, 43, 0.14);
+  background: var(--color-glass);
+  box-shadow: var(--glass-shadow);
   align-self: flex-start;
-  backdrop-filter: blur(8px);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
 }
 
 /* 筛选按钮 */
@@ -464,6 +545,12 @@ body {
   line-height: 1.4;
   white-space: nowrap;
   box-shadow: 0 2px 10px rgba(58, 51, 43, 0.25);
+  /* 深色标签也用玻璃，但**底色故意保持高不透明** ——
+     它是要读的文字，透出来会跟地图的点/线混在一起。
+     加模糊的作用只是让边缘那一圈背后的地图柔化，标签本身就是清晰的一块。 */
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   /* 别让提示自己拦住鼠标，否则鼠标一移上去就触发 mouseout，提示会闪 */
   pointer-events: none;
   /* 定位到点的正上方（left/top 由 JS 设为点的坐标） */
@@ -486,15 +573,16 @@ body {
   background: transparent;
 }
 
-/* 提示本身做成一张小卡片，浮在地图中央 */
+/* 提示本身做成一张小卡片，浮在地图中央 —— 用「强玻璃」保证文字清楚 */
 .view-empty--overlay p {
   padding: 14px 22px;
   border: 1px solid var(--color-border);
   border-radius: 10px;
-  background: rgba(255, 255, 255, 0.9);
+  background: var(--color-glass-strong);
   box-shadow: 0 4px 20px rgba(58, 51, 43, 0.18);
   color: var(--color-text);
-  backdrop-filter: blur(8px);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
 }
 
 /* ============================================================
@@ -565,10 +653,16 @@ body {
   }
 }
 
-/* 错误态的卡片：要够显眼，但不能做成"报错弹窗"吓人 */
+/* 错误态的卡片：要够显眼，但不能做成"报错弹窗"吓人
+   ⚠️ 这一块**故意不做成真玻璃** —— 它铺满整张地图，
+      如果透出来，底图会穿过文字，用户正急着看原因却看不清。
+      **可读性优先于效果**：底色保持高不透明，只加一点模糊柔化边缘。
+      （Tooolive 项目在"播放回忆"时也是同样的取舍：
+        它把 .veil 从渐变换成近实色 #020817c7，让注意力集中在内容上） */
 .view-state--error {
-  background: rgba(250, 247, 242, 0.94);   /* 盖住地图，避免底图干扰阅读 */
-  backdrop-filter: blur(3px);
+  background: rgba(250, 247, 242, 0.94);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
 }
 
 .view-state--error .view-state-title {
