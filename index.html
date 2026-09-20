@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>TripMemo · 人生记忆地图</title>
   <!-- 给样式表加版本号，防止浏览器拿旧的缓存（改了 CSS 后把 v 的数字 +1 即可） -->
-  <link rel="stylesheet" href="css/style.css?v=16">
+  <link rel="stylesheet" href="css/style.css?v=20">
 </head>
 <body>
 
@@ -60,10 +60,17 @@
         <!-- 搜索选点（PRD 4.1 #1 的第二种方式）：
              输入地名 → 从下拉里选一个 → 自动定位到正确坐标。
              下拉是我们自己画的（不依赖高德自带面板），方便统一风格。 -->
+        <!-- ⚠️ 无障碍（Day 9）：搜索框 + 自绘下拉，是标准的 combobox 模式。
+             这几个 aria 属性让读屏知道"这是一个可选列表、现在选到第几条"。
+             ⚠️ 属性本身不会自动更新，必须和 js/map.js 里的 syncActive() 配合。 -->
         <div class="search-wrap">
           <input type="text" class="map-search" id="map-search-input"
-                 placeholder="搜索地点，例如：华中科技大学" autocomplete="off">
-          <ul class="search-dropdown" id="search-dropdown" hidden></ul>
+                 placeholder="搜索地点，例如：华中科技大学" autocomplete="off"
+                 role="combobox" aria-autocomplete="list"
+                 aria-expanded="false" aria-controls="search-dropdown"
+                 aria-label="搜索地点">
+          <ul class="search-dropdown" id="search-dropdown" role="listbox"
+              aria-label="搜索结果" hidden></ul>
         </div>
 
         <!-- 主城市（人生锚点）：连线都从这里出发（PRD 4.1 #8） -->
@@ -202,7 +209,7 @@
 
   <!-- ===== 本地配置：含高德 Key，不提交（模板见 config.example.js）=====
        找不到 config.js 时不会报错，只是地图加载不出来，页面其余部分照常可用 -->
-  <script src="config.js?v=16"
+  <script src="config.js?v=20"
           onerror="console.warn('[TripMemo] 未找到 config.js —— 地图将无法加载。请把 config.example.js 复制为 config.js 并填入 Key 与安全密钥。')"></script>
 
   <!-- ===== 项目脚本：顺序不能乱 =====
@@ -216,13 +223,13 @@
        ⭐ 规则（就一句）：**改完任何 css / js，把这里和上面的数字一起 +1。**
           10 个资源共用同一个编号 —— 多下载几 KB，换"永远不用想哪个该改"，
           对学习阶段来说非常划算。 -->
-  <script src="js/model.js?v=16"></script>
-  <script src="js/mock-data.js?v=16"></script>
-  <script src="js/store.js?v=16"></script>
-  <script src="js/detail.js?v=16"></script>
-  <script src="js/map.js?v=16"></script>
-  <script src="js/timeline.js?v=16"></script>
-  <script src="js/places.js?v=16"></script>
-  <script src="js/main.js?v=16"></script>
+  <script src="js/model.js?v=20"></script>
+  <script src="js/mock-data.js?v=20"></script>
+  <script src="js/store.js?v=20"></script>
+  <script src="js/detail.js?v=20"></script>
+  <script src="js/map.js?v=20"></script>
+  <script src="js/timeline.js?v=20"></script>
+  <script src="js/places.js?v=20"></script>
+  <script src="js/main.js?v=20"></script>
 </body>
 </html>

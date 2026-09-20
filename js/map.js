@@ -316,11 +316,66 @@
       var debounceTimer = null;
       var currentPois = [];
 
+      /* 键盘当前高亮的是第几条（Day 9）。
+         ⚠️ 为什么需要它：下拉的 <li> **不可聚焦**，
+            键盘焦点始终停在输入框上，"当前选到第几条"没法靠 :focus 表达 ——
+            只能自己记一个下标，再把它同步到 DOM 上（对应 aria-activedescendant）。
+            -1 表示"还没选"。 */
+      var activeIndex = -1;
+
+      /* 把"当前选到第几条"同步到 DOM（Day 9）——
+         一次做三件事：类名（看得见的高亮）、
+         aria-activedescendant（告诉读屏"就是这条"）、aria-expanded（下拉开着没）。 */
+      function syncActive() {
+        var items = dropdown.querySelectorAll('.search-item');
+        for (var i = 0; i < items.length; i++) {
+          var on = (i === activeIndex);
+          items[i].classList.toggle('is-active', on);
+          items[i].setAttribute('aria-selected', on ? 'true' : 'false');
+        }
+        if (activeIndex >= 0 && items[activeIndex]) {
+          input.setAttribute('aria-activedescendant', items[activeIndex].id);
+          /* 高亮项可能在滚动区外 → 滚进可视范围。
+             用 block:'nearest'，避免整页跟着跳。 */
+          if (items[activeIndex].scrollIntoView) {
+            items[activeIndex].scrollIntoView({ block: 'nearest' });
+          }
+        } else {
+          input.removeAttribute('aria-activedescendant');
+        }
+        /* ⚠️ aria-expanded 必须在这一起同步 —— 它和"下拉开没开"本来就是同一件事。
+           我第一版只在 closeDropdown 里写了 'false'，结果**开着时也一直报 'false'**，
+           读屏会被反过来误导。⭐ 一个状态分两处各写一半，必然漏一边。 */
+        input.setAttribute('aria-expanded',
+          dropdown.hasAttribute('hidden') ? 'false' : 'true');
+      }
+
       /* 收起下拉 */
       function closeDropdown() {
         dropdown.setAttribute('hidden', '');
         dropdown.innerHTML = '';
         currentPois = [];
+        activeIndex = -1;
+        /* aria 统一交给 syncActive 收尾，不在两处各写一半（见上面的教训） */
+        syncActive();
+      }
+
+      /* 方向键移动高亮项。step = +1 / -1。
+         ⚠️ 到两端就停住、**不循环** —— 不循环更容易判断"到底了"，
+            也和浏览器原生下拉的行为一致。 */
+      function moveActive(step) {
+        if (!currentPois.length) {
+          return;
+        }
+        var next = activeIndex + step;
+        if (next < 0) {
+          next = 0;
+        }
+        if (next > currentPois.length - 1) {
+          next = currentPois.length - 1;
+        }
+        activeIndex = next;
+        syncActive();
       }
 
       /* 选中一条搜索结果 */
@@ -358,9 +413,16 @@
         }
         currentPois = pois;
 
-        pois.forEach(function (poi) {
+        pois.forEach(function (poi, i) {
           var li = document.createElement('li');
           li.className = 'search-item';
+
+          /* 无障碍（Day 9）：listbox / option 这一对角色，
+             id 是被输入框 aria-activedescendant 引用的"地址"。
+             ⚠️ 不加 role 的话读屏只会念出一串孤立的文字，用户不知道这是可选列表。 */
+          li.setAttribute('role', 'option');
+          li.id = 'search-option-' + i;
+          li.setAttribute('aria-selected', 'false');
 
           var nameEl = document.createElement('span');
           nameEl.className = 'search-item-name';
@@ -378,6 +440,10 @@
         });
 
         dropdown.removeAttribute('hidden');
+        /* 新一批结果 → 高亮回到第一条（和浏览器原生下拉一致：
+           搜完直接按回车就是选第一条，不用先按方向键）。 */
+        activeIndex = 0;
+        syncActive();
       }
 
       /* 输入 → 防抖 300 毫秒 → 搜索（防抖是为了省额度、也少发无用请求） */
@@ -402,11 +468,39 @@
         }, 300);
       });
 
-      /* 回车直接选第一条；Esc 收起 */
+      /* 键盘操作下拉（Day 9 修复）
+         ⚠️ 修复前这里**只有 Enter 和 Escape** ——
+            键盘用户**永远只能选第一条**，第 2 条以后够不着。
+            而搜索选点是"知道地名时唯一的精确入口"，等于半个功能不可用。
+
+         ⭐ Day 9 补：左右方向键也参与导航（由 shy 试用后提出）。
+            四个方向对称：下/右 = 下一条，上/左 = 上一条。
+
+         ⚠️ 这里有一个**要付的代价**，说清楚：
+            左右键在原生的文本输入框里是"移动光标"，现在被借去走列表了。
+            所以**下拉开着的时候，光标没法用左右键移动** —— 想移动光标，
+            按 Esc 先收起下拉（文字会保留），或者直接用鼠标点。
+            对这个场景的取舍理由：搜索关键词只有几个字，需要挪光标的场合很少；
+            而"四个方向键都能走列表"是很多人下意识的用法。
+            （`preventDefault` 只在**有结果可走**时才拦 —— 没结果时左右键
+              完全保持原生行为，不白抢按键。） */
       input.addEventListener('keydown', function (e) {
-        if (e.key === 'Enter' && currentPois.length) {
-          e.preventDefault();
-          choosePoi(currentPois[0]);
+        if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
+          if (currentPois.length) {
+            e.preventDefault();   /* 不拦的话光标会跳到文字末尾 */
+            moveActive(1);
+          }
+        } else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
+          if (currentPois.length) {
+            e.preventDefault();
+            moveActive(-1);
+          }
+        } else if (e.key === 'Enter') {
+          if (currentPois.length) {
+            e.preventDefault();
+            /* 选"当前高亮的那一条"，不再是写死的第 0 条 */
+            choosePoi(currentPois[activeIndex >= 0 ? activeIndex : 0]);
+          }
         } else if (e.key === 'Escape') {
           closeDropdown();
         }

@@ -260,10 +260,25 @@
         body.appendChild(meta);
         row.appendChild(body);
 
-        /* 点条目 → 打开「查看态」弹窗 */
-        row.addEventListener('click', function () {
+        /* 打开「查看态」弹窗 —— 鼠标和键盘共用这一个入口 */
+        function openRow() {
           if (global.TripMemoDetail) {
             global.TripMemoDetail.openView(place.id);
+          }
+        }
+
+        /* ⚠️ 键盘可达性（Day 9 修复）
+           原来只有 click 监听，而 `<div class="place-row">` **不可聚焦** →
+           **键盘用户完全到不了地点条目**，只能靠城市头部（那是原生可聚焦的 <summary>）。
+           同时间轴卡片：补 tabindex="0" + role="button" + Enter/空格 的 keydown。 */
+        row.setAttribute('tabindex', '0');
+        row.setAttribute('role', 'button');
+
+        row.addEventListener('click', openRow);
+        row.addEventListener('keydown', function (e) {
+          if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
+            e.preventDefault();   /* 空格不拦会滚动页面 */
+            openRow();
           }
         });
 

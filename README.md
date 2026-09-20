@@ -122,7 +122,8 @@ window.TRIPMEMO_CONFIG = {
 ├─ config.example.js     配置模板（提交）
 ├─ research.md           需求研究
 ├─ PRD.md                产品需求文档（含 33 条验收标准）
-└─ TECH_DESIGN.md        技术设计（技术路线、项目结构、数据流图）
+├─ TECH_DESIGN.md        技术设计（技术路线、项目结构、数据流图）
+└─ DESIGN.md             设计规则（颜色 / 字号 / 间距 / 交互状态 / 审查清单）
 ```
 
 ---
@@ -164,5 +165,6 @@ window.TRIPMEMO_CONFIG = {
 1. `research.md` —— 研究过哪些类似产品、发现了什么机会
 2. `PRD.md` —— 要做什么、不做什么、**什么算做完（33 条验收标准）**
 3. `TECH_DESIGN.md` —— 用什么技术、项目怎么组织、数据怎么流
-4. `AGENTS.md` —— 本项目的协作规则
-5. `README.md` —— 就是本文件，含运行方式与当前进度
+4. `DESIGN.md` —— **视觉规则**：颜色 / 字号 / 间距 / 圆角 / 交互状态 / 响应式，以及一张可逐条核对的审查清单
+5. `AGENTS.md` —— 本项目的协作规则
+6. `README.md` —— 就是本文件，含运行方式与当前进度

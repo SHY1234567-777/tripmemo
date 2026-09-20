@@ -19,16 +19,43 @@
   --color-hover:      #ffffff;   /* 有底色的元素上的悬停高亮 */
   --color-input:      #fdfcfa;   /* 输入框 / 按钮底（在白弹窗里要能看出边界） */
   --color-text:       #3a332b;   /* 主文字（深棕灰，不用纯黑） */
-  --color-text-weak:  #8a7f72;   /* 次要文字（暖灰） */
+  /* 次要文字（暖灰）。
+     ⚠️ 原值 #8a7f72 的对比度是 3.67 / 3.42 / 3.92 —— **低于 WCAG AA 正文要求的 4.5**，
+        而它偏偏被用在 19 处、其中 12 处字号 ≤13px。
+        ⭐ 小字比大字**更**需要对比度（不是更不需要），所以必须压深，
+           不能靠"看着淡一点更像次要信息"来定色。
+        压到 #746a5d 后：页面底 4.96 / 面板 4.63 / 浮起白 5.30。
+     ⚠️ 但它**不能压在 --color-nav-active（选中胶囊 #ece2d2）上** —— 那里只有 4.13，
+        那个底色上要用 --color-accent-text。（完整矩阵见 DESIGN.md 3.2） */
+  --color-text-weak:  #746a5d;
   --color-border:     rgba(58, 51, 43, 0.12);  /* 分隔线（半透明深棕） */
   /* ⚠️ 时间轴竖线**不能**复用 --color-border ——
      它 alpha 只有 .12，画成 1px 的细线在奶油底上**肉眼几乎看不见**
      （2026-09-19 他截图反馈）。装饰性的细线需要单独一档颜色。 */
   --color-timeline-line: rgba(58, 51, 43, 0.2);
-  --color-accent:     #b5762e;   /* 主色（暖棕/琥珀 —— 呼应"旧照片"） */
+  /* ---------- 主色：⚠️ 它有三个角色，必须用三个变量 ----------
+     ⭐ 一个颜色当"边框"和当"文字"，需要的明度**天生不同** ——
+        这是"设计系统"和"一堆散颜色"的分水岭。
+
+       · 图形（边框 / 线 / 占比条）：#b5762e 这个明度正好，再深就显得重；
+       · 文字：#b5762e 只有 2.93~3.75，**选中胶囊上仅 2.93** → 必须压深到 #8a531c（最差 4.91）；
+       · 填充底（上面要压浅色文字）：#b5762e 只有 3.61，而且**换成纯白也只有 3.75**
+         → 靠"把文字提亮"救不动，**只能把底色压到 #9c6325**（4.79）。
+
+     ⚠️ 所以：图形用 --color-accent，文字用 --color-accent-text，填充底用 --color-accent-fill。
+        用错角色必然有一处不达标。（完整实测矩阵见 DESIGN.md 3.3） */
+  --color-accent:            #b5762e;   /* 图形：边框 / 占比条 / 连线 / 色点 */
+  --color-accent-text:       #8a531c;   /* 文字：主色文字（最差 4.91） */
+  --color-accent-fill:       #9c6325;   /* 填充底：主按钮底（压浅字 4.79） */
+  --color-accent-fill-hover: #8a531c;   /* 主按钮悬停（压浅字 6.06） */
   --color-accent-bg:  rgba(181, 118, 46, 0.12);   /* 主色浅底 */
   --color-nav-active: #ece2d2;   /* 侧栏选中项底色 */
-  --color-on-accent:  #fffaf3;   /* 主色底上的文字色（浅色） */
+  --color-on-accent:  #fffaf3;   /* 主色**填充底**上的文字色（浅色） */
+
+  /* ---------- 功能色 ----------
+     原来是直接写死的 #c0392b（4 处），现已收进变量，改一处全站生效。 */
+  --color-danger:    #c0392b;   /* 删除 / 必填星号 / 表单错误（白底上 5.44） */
+  --color-danger-bg: rgba(192, 57, 43, 0.1);
 
   /* ---------- 玻璃拟态（Day 8 加练 · 步骤②）----------
      手法参考 Tooolive/Map-Of-My-Journey 的 `.glass`：
@@ -53,7 +80,44 @@
 
   --nav-width: 189px;   /* 参考图实测：1260px 视口下侧栏占 189px */
   --nav-height: 56px;
-  --radius: 8px;
+  /* ---------- 字号阶梯（Day 9 修复）----------
+     ⭐ 本项目第一条字号规则：**相邻层级至少差 2px**。
+        修复前有 13 种取值，其中 13px 和 14px 各出现 10 次 ——
+        差 1px 的两个值占了近一半用量，**肉眼分不出，只让"层级"变成噪声**。
+     为什么不用技能的 1.25 比例（12 / 15 / 18.75 / 23.4…）：
+        我们层级只有 5 档、范围只有 12–20px，1.25 前几步会算出带小数的值；
+        +2px 线性阶梯在这个区间才保证"每一级都看得出来"。（详见 DESIGN.md 4.3） */
+  --text-xs:   12px;   /* 标签、辅助元信息、装饰性标记（下限，不再往下） */
+  --text-sm:   14px;   /* 界面正文：按钮、输入框、列表正文、字段说明、卡片元信息 */
+  --text-base: 16px;   /* 页面基准（body）、卡片标题、弹窗标题 */
+  --text-lg:   18px;   /* 城市名、区块小标题 */
+  --text-xl:   20px;   /* 年份标题 */
+  --icon-size:    16px;   /* 导航图标 */
+  --icon-size-lg: 18px;   /* 导航图标（手机端放大，便于点按） */
+
+  /* ---------- 间距刻度：4px 网格（Day 9 修复）----------
+     ⚠️ 用变量而不是直接写 px，是为了**让违规变得不可能** ——
+        只能从这几档里挑，想写 7px / 15px / 34px 都没有对应的 token。
+     （修复前有 19 种取值，其中 57% 不在网格上；详见 DESIGN.md 5.1） */
+  --space-1:  4px;
+  --space-2:  8px;
+  --space-3:  12px;
+  --space-4:  16px;
+  --space-5:  20px;
+  --space-6:  24px;
+  --space-8:  32px;
+  --space-10: 40px;
+  --space-12: 48px;
+
+  /* ---------- 圆角（按"元素体量"分档，Day 9 修复）----------
+     ⚠️ 禁止硬写数值。`50%` 只用于正圆（地图色点 / 时间轴圆点 / 主城市锚点），
+        那是"形状"不是"圆角档"，所以不在这套刻度里。 */
+  --radius-sm:   4px;
+  --radius-md:   8px;     /* 按钮、输入框、面板（最常用） */
+  --radius-lg:   12px;    /* 卡片、消息块 */
+  --radius-xl:   16px;    /* 大卡片、弹窗 */
+  --radius-2xl:  24px;    /* 预留：当前还没有这么大的容器 */
+  --radius-full: 999px;   /* 胶囊 */
 }
 
 /* ---------- 基础重置 ---------- */
@@ -75,8 +139,8 @@ body {
   flex-direction: row;
   color: var(--color-text);
   font-family: system-ui, -apple-system, "Microsoft YaHei", "PingFang SC", sans-serif;
-  font-size: 15px;
-  line-height: 1.6;
+  font-size: var(--text-base);
+  line-height: 1.7;
 
   /* ---------- 页面底色晕染（Day 8 加练 · 步骤①）----------
      不再是"一整块平色"，而是两层极淡的径向渐变：
@@ -143,7 +207,7 @@ body::after {
 
 ::-webkit-scrollbar-thumb {
   border: 2px solid transparent;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   background: rgba(58, 51, 43, 0.18);
   background-clip: padding-box;
 }
@@ -159,9 +223,9 @@ body::after {
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: 4px;
+  gap: var(--space-1);
   width: var(--nav-width);
-  padding: 18px 12px 16px;
+  padding: var(--space-5) var(--space-3) var(--space-4);
   border-right: 1px solid var(--color-border);
   background: var(--color-surface);
 }
@@ -171,11 +235,11 @@ body::after {
 .app-title {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin: 0 0 20px;
-  padding: 0 4px;
+  gap: var(--space-3);
+  margin: 0 0 var(--space-5);
+  padding: 0 var(--space-1);
   color: var(--color-text);
-  font-size: 15px;
+  font-size: var(--text-base);
   font-weight: 600;
   letter-spacing: 0.2px;
   white-space: nowrap;
@@ -191,10 +255,10 @@ body::after {
   width: 30px;
   height: 30px;
   border: 1px solid rgba(181, 118, 46, 0.45);
-  border-radius: 9px;
+  border-radius: var(--radius-md);
   background: rgba(181, 118, 46, 0.14);
-  color: var(--color-accent);
-  font-size: 12px;
+  color: var(--color-accent-text);
+  font-size: var(--text-xs);
   font-weight: 700;
   letter-spacing: 0.5px;
   line-height: 1;
@@ -204,7 +268,7 @@ body::after {
 .nav-items {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--space-1);
 }
 
 /* 导航按钮：图标在左、文字在右，整行左对齐（参考图的做法） */
@@ -212,16 +276,16 @@ body::after {
   display: flex;
   flex-direction: row;
   align-items: center;
-  gap: 11px;
+  gap: var(--space-3);
   width: 100%;
-  padding: 10px 12px;
+  padding: var(--space-3) var(--space-3);
   border: 1px solid transparent;
-  border-radius: var(--radius);
+  border-radius: var(--radius-md);
   background: transparent;
   color: var(--color-text-weak);
   font-family: inherit;
-  font-size: 14px;
-  line-height: 1.3;
+  font-size: var(--text-sm);
+  line-height: 1.4;
   text-align: left;
   cursor: pointer;
   transition: background 0.15s, color 0.15s;
@@ -230,7 +294,7 @@ body::after {
 .nav-icon {
   flex: 0 0 auto;
   width: 18px;
-  font-size: 16px;
+  font-size: var(--text-base);
   line-height: 1;
   text-align: center;
 }
@@ -247,7 +311,7 @@ body::after {
 /* 当前视图：整行圆角胶囊底 + 主色文字（参考图的选中样式） */
 .nav-btn.is-active {
   background: var(--color-nav-active);
-  color: var(--color-accent);
+  color: var(--color-accent-text);
   font-weight: 500;
 }
 
@@ -260,7 +324,7 @@ body::after {
 
 .nav-btn--action:hover {
   border-color: var(--color-accent);
-  color: var(--color-accent);
+  color: var(--color-accent-text);
   background: var(--color-accent-bg);
 }
 
@@ -297,7 +361,7 @@ body::after {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 24px;
+  padding: var(--space-6);
   text-align: center;
 }
 
@@ -305,7 +369,7 @@ body::after {
   margin: 0;
   max-width: 360px;
   color: var(--color-text-weak);
-  font-size: 14px;
+  font-size: var(--text-sm);
 }
 
 /* ⚠️ 必须显式处理 hidden：
@@ -354,7 +418,7 @@ body::after {
   z-index: 10;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--space-2);
   max-width: calc(100% - 24px);
 }
 
@@ -367,14 +431,14 @@ body::after {
 .map-search {
   width: 260px;
   max-width: 100%;
-  padding: 8px 12px;
+  padding: var(--space-2) var(--space-3);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius);
+  border-radius: var(--radius-md);
   background: var(--color-glass);        /* 原来是 .92 不透明 → 模糊看不见 */
   box-shadow: var(--glass-shadow);
   color: var(--color-text);
   font-family: inherit;
-  font-size: 14px;
+  font-size: var(--text-sm);
   /* ⚠️ -webkit- 前缀是给 Safari 的（它至今仍只认前缀版）。
      不写的话 Safari 上就是"一块没有模糊的白板"。 */
   backdrop-filter: blur(var(--glass-blur));
@@ -383,7 +447,11 @@ body::after {
 
 .map-search::placeholder {
   color: var(--color-text-weak);
-  opacity: 0.7;
+  /* ⚠️ 这里**故意不设 opacity**。
+     原来写的是 opacity: 0.7，看着"更淡更像个提示"，
+     但它会把 --color-text-weak 的有效对比度从 5.30 **拉到 2.89**（低于 4.5）。
+     ⭐ "弱"应该由**颜色本身**表达（#746a5d 已经比正文 #3a332b 淡），
+        不能靠再叠一层半透明 —— 那是把可读性直接乘掉。 */
 }
 
 .map-search:focus {
@@ -404,11 +472,11 @@ body::after {
   width: 100%;
   max-height: 280px;
   margin: 0;
-  padding: 4px;
+  padding: var(--space-1);
   overflow-y: auto;
   list-style: none;
   border: 1px solid var(--color-border);
-  border-radius: var(--radius);
+  border-radius: var(--radius-md);
   background: var(--color-glass-strong);
   box-shadow: 0 8px 26px rgba(58, 51, 43, 0.22);
   backdrop-filter: blur(var(--glass-blur));
@@ -422,9 +490,9 @@ body::after {
 .search-item {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  padding: 7px 10px;
-  border-radius: 6px;
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
   cursor: pointer;
 }
 
@@ -432,21 +500,33 @@ body::after {
   background: var(--color-accent-bg);
 }
 
+/* 键盘上下键选中的那一项（Day 9 新增）
+   ⚠️ 为什么必须有：下拉是 <li>，**不可聚焦**，
+      所以键盘焦点永远停在输入框上 —— 那"当前选到第几条"就只能靠这个类来表达。
+      （规范上对应 combobox 的 aria-activedescendant，见 DESIGN.md 第八节）
+   ⚠️ 故意不写"hover 时清掉竖条"：留着反而更有用 ——
+      鼠标停在别的条目上时，仍能看见"回车会选中哪一条"。 */
+.search-item.is-active {
+  background: var(--color-accent-bg);
+  /* 左侧一道主色竖条，比单纯变色更清楚"选中的是哪一条" */
+  box-shadow: inset 3px 0 0 var(--color-accent);
+}
+
 .search-item-name {
   color: var(--color-text);
-  font-size: 14px;
+  font-size: var(--text-sm);
 }
 
 .search-item-district {
   color: var(--color-text-weak);
-  font-size: 12px;
+  font-size: var(--text-xs);
 }
 
 /* 主城市设置行：输入框 + 两个小按钮 */
 .map-maincity {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-2);
 }
 
 .map-search--small {
@@ -454,14 +534,14 @@ body::after {
 }
 
 .mini-btn {
-  padding: 8px 12px;
+  padding: var(--space-2) var(--space-3);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius);
+  border-radius: var(--radius-md);
   background: var(--color-glass);
   box-shadow: var(--glass-shadow);
   color: var(--color-text);
   font-family: inherit;
-  font-size: 13px;
+  font-size: var(--text-sm);
   cursor: pointer;
   transition: color 0.15s, border-color 0.15s;
   backdrop-filter: blur(var(--glass-blur));
@@ -470,7 +550,7 @@ body::after {
 
 .mini-btn:hover {
   border-color: var(--color-accent);
-  color: var(--color-accent);
+  color: var(--color-accent-text);
 }
 
 /* 主城市锚点：用 Marker + 自定义 HTML 画，和普通圆点区分开 */
@@ -484,7 +564,7 @@ body::after {
   background: var(--color-accent);
   box-shadow: 0 0 0 3px rgba(250, 247, 242, 0.95), 0 1px 8px rgba(58, 51, 43, 0.4);
   color: var(--color-on-accent);
-  font-size: 14px;
+  font-size: var(--text-sm);
   line-height: 1;
   user-select: none;
 }
@@ -498,10 +578,10 @@ body::after {
 .map-filter {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
-  padding: 6px;
+  gap: var(--space-2);
+  padding: var(--space-2);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius);
+  border-radius: var(--radius-md);
   background: var(--color-glass);
   box-shadow: var(--glass-shadow);
   align-self: flex-start;
@@ -511,26 +591,26 @@ body::after {
 
 /* 筛选按钮 */
 .chip {
-  padding: 4px 12px;
+  padding: var(--space-1) var(--space-3);
   border: 1px solid var(--color-border);
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   background: transparent;
   color: var(--color-text-weak);
   font-family: inherit;
-  font-size: 13px;
+  font-size: var(--text-sm);
   cursor: pointer;
   transition: border-color 0.15s, color 0.15s, background 0.15s;
 }
 
 .chip:hover {
   border-color: var(--color-accent);
-  color: var(--color-accent);
+  color: var(--color-accent-text);
 }
 
 .chip.is-active {
   border-color: var(--color-accent);
   background: var(--color-accent-bg);
-  color: var(--color-accent);
+  color: var(--color-accent-text);
   font-weight: 500;
 }
 
@@ -540,12 +620,12 @@ body::after {
 .map-tooltip {
   position: absolute;
   z-index: 20;
-  padding: 6px 10px;
-  border-radius: 6px;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
   background: rgba(58, 51, 43, 0.93);
   color: #faf7f2;
   font-family: inherit;
-  font-size: 13px;
+  font-size: var(--text-sm);
   line-height: 1.4;
   white-space: nowrap;
   box-shadow: 0 2px 10px rgba(58, 51, 43, 0.25);
@@ -579,9 +659,9 @@ body::after {
 
 /* 提示本身做成一张小卡片，浮在地图中央 —— 用「强玻璃」保证文字清楚 */
 .view-empty--overlay p {
-  padding: 14px 22px;
+  padding: var(--space-4) var(--space-6);
   border: 1px solid var(--color-border);
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   background: var(--color-glass-strong);
   box-shadow: 0 4px 20px rgba(58, 51, 43, 0.18);
   color: var(--color-text);
@@ -612,8 +692,8 @@ body::after {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 10px;
-  padding: 24px;
+  gap: var(--space-3);
+  padding: var(--space-6);
   text-align: center;
   /* ⚠️ 铁律：浮层必须让出点击，否则会吃掉地图的点击事件
      （本项目第 3 次强调这一点：暗角、空状态、状态浮层都踩过） */
@@ -633,7 +713,7 @@ body::after {
 /* 加载中的文案 */
 .view-state > p {
   color: var(--color-text-weak);
-  font-size: 14px;
+  font-size: var(--text-sm);
 }
 
 /* 转圈：纯 CSS，不依赖任何图标库 */
@@ -671,23 +751,23 @@ body::after {
 
 .view-state--error .view-state-title {
   color: var(--color-text);
-  font-size: 16px;
+  font-size: var(--text-base);
   font-weight: 600;
 }
 
 .view-state--error .view-state-msg {
-  padding: 10px 16px;
+  padding: var(--space-3) var(--space-4);
   border: 1px solid rgba(181, 118, 46, 0.35);
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   background: var(--color-accent-bg);
   color: var(--color-text);
-  font-size: 13.5px;
-  line-height: 1.6;
+  font-size: var(--text-sm);
+  line-height: 1.7;
 }
 
 .view-state--error .view-state-hint {
   color: var(--color-text-weak);
-  font-size: 12.5px;
+  font-size: var(--text-sm);
   line-height: 1.7;
 }
 
@@ -699,12 +779,12 @@ body::after {
   left: 0;
   right: 0;
   z-index: 30;
-  padding: 10px 16px;
+  padding: var(--space-3) var(--space-4);
   border-bottom: 1px solid rgba(181, 118, 46, 0.35);
   background: #fdf3e3;
   color: var(--color-text);
-  font-size: 13px;
-  line-height: 1.55;
+  font-size: var(--text-sm);
+  line-height: 1.7;
   box-shadow: 0 2px 10px rgba(58, 51, 43, 0.08);
   /* 这条不设 pointer-events:none —— 用户可能要选中复制错误信息 */
 }
@@ -717,7 +797,7 @@ body::after {
 .panel {
   max-width: 720px;
   margin: 0 auto;
-  padding: 24px 20px 48px;
+  padding: var(--space-6) var(--space-5) var(--space-12);
 }
 
 .panel[hidden] {
@@ -733,16 +813,16 @@ body::after {
 
 /* 一个年份 = 一个分组 */
 .timeline-year {
-  margin-bottom: 34px;
+  margin-bottom: var(--space-8);
 }
 
 /* 年份标题：大号 + 弱色，作为"时间锚点" */
 .timeline-year-label {
-  margin: 0 0 14px;
-  padding-bottom: 8px;
+  margin: 0 0 var(--space-4);
+  padding-bottom: var(--space-2);
   border-bottom: 1px solid var(--color-border);
   color: var(--color-text-weak);
-  font-size: 20px;
+  font-size: var(--text-xl);
   font-weight: 600;
   letter-spacing: 0.6px;
 }
@@ -752,14 +832,14 @@ body::after {
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding-left: 18px;
+  gap: var(--space-3);
+  padding-left: var(--space-5);
 }
 
 /* 时间竖线：贯穿这一年的所有卡片
    ⚠️ 对齐算法（改尺寸时一起改，不然线和小圆点会错开）：
-     · 卡片左边缘距列表左边 = padding-left 18px
-     · 小圆点用 `left: -18px` → 圆点盒子正好从列表的 0px 开始
+     · 卡片左边缘距列表左边 = padding-left 20px
+     · 小圆点用 `left: -20px` → 圆点盒子正好从列表的 0px 开始
      · 圆点 10px 宽 → 圆心在 5px
      · 所以竖线要「宽 2px + left 4px」→ 占 4~6px，中心也在 5px ✅
    ⚠️ 注意全局是 `box-sizing: border-box`：
@@ -772,7 +852,7 @@ body::after {
   bottom: 6px;
   left: 4px;
   width: 2px;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   background: var(--color-timeline-line);
 }
 
@@ -781,10 +861,10 @@ body::after {
   position: relative;
   display: flex;                    /* 两栏：图在左，字在右 */
   align-items: stretch;
-  gap: 14px;
-  padding: 12px;
+  gap: var(--space-4);
+  padding: var(--space-3);
   border: 1px solid var(--color-border);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   background: var(--color-elevated);
   cursor: pointer;
   /* 卡片感的关键：一点点阴影 + 圆角，让它"浮"在底上 */
@@ -794,12 +874,18 @@ body::after {
 
 /* 卡片左边的小圆点：钉在时间竖线上
    （Day 8.5 修：7px → 10px，原来太小、几乎看不出是个圆点）
-   边框用页面底色，做出"圆点把竖线咬断一截"的效果。 */
+   边框用页面底色，做出"圆点把竖线咬断一截"的效果。
+
+   ⚠️ Day 9：`left` 用 calc 从 --space-5 反推，**不再写死 -20px**。
+      为什么：圆点必须永远落在列表的 0px 处，而那是靠
+      「列表的 padding-left」把它推过去的 —— 两个值天生耦合。
+      以前靠注释提醒"改一个要改另一个"，现在把依赖直接写进 CSS，
+      **改 --space-5 时圆点会自动跟上，不可能再错开。** */
 .timeline-card::before {
   content: '';
   position: absolute;
   top: 22px;
-  left: -18px;
+  left: calc(-1 * var(--space-5));   /* = -20px，与 .timeline-year-list 的 padding-left 同一档 */
   width: 10px;
   height: 10px;
   border: 2px solid var(--color-bg);
@@ -823,7 +909,7 @@ body::after {
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   /* 用斜纹底表示"这里将来会有一张照片"，比纯色块更能说明意图 */
   background:
     repeating-linear-gradient(
@@ -837,7 +923,7 @@ body::after {
 
 .timeline-thumb-hint {
   color: var(--color-text-weak);
-  font-size: 11px;
+  font-size: var(--text-xs);
   letter-spacing: 0.5px;
 }
 
@@ -863,13 +949,13 @@ body::after {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 5px;
+  gap: var(--space-3);
+  margin-bottom: var(--space-1);
 }
 
 .timeline-name {
   margin: 0;
-  font-size: 16px;
+  font-size: var(--text-base);
   font-weight: 600;
   /* 名字太长时省略，不要撑破卡片 */
   overflow: hidden;
@@ -881,7 +967,7 @@ body::after {
 .timeline-when {
   flex: 0 0 auto;
   color: var(--color-text-weak);
-  font-size: 12px;
+  font-size: var(--text-xs);
   white-space: nowrap;
 }
 
@@ -890,10 +976,10 @@ body::after {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 6px;
-  margin: 0 0 6px;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-2);
   color: var(--color-text-weak);
-  font-size: 13px;
+  font-size: var(--text-sm);
 }
 
 /* 类型色点：和地图上的点同色 —— 一眼看出"这条对应地图上哪种类型"
@@ -915,24 +1001,24 @@ body::after {
 }
 
 .timeline-note {
-  margin: 0 0 6px;
-  font-size: 13.5px;
-  line-height: 1.55;
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-sm);
+  line-height: 1.7;
 }
 
 /* 标签 */
 .tag-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: var(--space-2);
   margin: 0;
 }
 .tag {
-  padding: 2px 8px;
-  border-radius: 999px;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-full);
   background: var(--color-accent-bg);
-  color: var(--color-accent);
-  font-size: 12px;
+  color: var(--color-accent-text);
+  font-size: var(--text-xs);
 }
 
 /* ============================================================
@@ -955,16 +1041,16 @@ body::after {
   max-width: none;            /* 覆盖 .panel 的 720px —— 网格需要更宽 */
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 16px;
+  gap: var(--space-4);
   align-content: start;       /* 卡片不被拉伸成等高 */
-  padding-top: 4px;
+  padding-top: var(--space-1);
 }
 
 /* 一张城市卡片 */
 .city-group {
   margin-bottom: 0;                              /* 交给 grid 的 gap 排间距 */
   border: 1px solid var(--color-border);
-  border-radius: 14px;
+  border-radius: var(--radius-xl);
   overflow: hidden;
   background: var(--color-elevated);
   box-shadow: 0 1px 2px rgba(58, 51, 43, 0.05);
@@ -1015,8 +1101,8 @@ body::after {
   display: grid;                              /* 两行，谁也别挤谁 */
   grid-template-columns: 1fr auto auto;       /* 城市名(可缩) | 胶囊 | 箭头 */
   align-items: center;
-  gap: 4px 10px;
-  padding: 14px 15px 12px;
+  gap: var(--space-1) var(--space-3);
+  padding: var(--space-4) var(--space-4) var(--space-3);
   background: var(--color-surface);
   cursor: pointer;
   list-style: none;
@@ -1035,7 +1121,7 @@ body::after {
   min-width: 44px;                            /* 「展开 ▾」/「收起 ▴」都放得下 */
   text-align: right;
   color: var(--color-text-weak);
-  font-size: 11px;
+  font-size: var(--text-xs);
   white-space: nowrap;
 }
 
@@ -1048,7 +1134,7 @@ body::after {
   grid-column: 1;
   grid-row: 1;
   min-width: 0;
-  font-size: 18px;
+  font-size: var(--text-lg);
   font-weight: 600;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1059,11 +1145,11 @@ body::after {
 .city-count {
   grid-column: 2;
   grid-row: 1;
-  padding: 2px 8px;
-  border-radius: 999px;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-full);
   background: var(--color-accent-bg);
-  color: var(--color-accent);
-  font-size: 11px;
+  color: var(--color-accent-text);
+  font-size: var(--text-xs);
   white-space: nowrap;
 }
 
@@ -1073,10 +1159,10 @@ body::after {
   grid-row: 2;
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-top: 2px;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
   color: var(--color-text-weak);
-  font-size: 12px;
+  font-size: var(--text-xs);
 }
 
 /* 总停留时长的文字（'4 年 2 个月'），不换行 */
@@ -1089,7 +1175,7 @@ body::after {
 .city-bar {
   flex: 1 1 auto;
   height: 3px;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   background: var(--color-border);
   overflow: hidden;
 }
@@ -1097,7 +1183,7 @@ body::after {
 .city-bar-fill {
   display: block;
   height: 100%;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   background: var(--color-accent);
   opacity: 0.55;
 }
@@ -1106,8 +1192,8 @@ body::after {
 .place-row {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 10px 14px;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
   border-top: 1px solid var(--color-border);
   cursor: pointer;
   transition: background 0.15s;
@@ -1126,7 +1212,7 @@ body::after {
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   border: 1px dashed rgba(181, 118, 46, 0.28);
   /* 和时间轴一样用斜纹底表示"这里将来有图"，保持两处视觉一致 */
   background:
@@ -1140,7 +1226,7 @@ body::after {
 
 .place-thumb-hint {
   color: var(--color-text-weak);
-  font-size: 10px;
+  font-size: var(--text-xs);
   letter-spacing: 0.5px;
 }
 
@@ -1157,12 +1243,12 @@ body::after {
   min-width: 0;                   /* ⚠️ 不加这句，长地点名会把卡片撑破 */
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: var(--space-1);
 }
 
 /* 地点名最多显示一行，超出用省略号 */
 .place-row .place-name {
-  font-size: 14.5px;
+  font-size: var(--text-base);
   font-weight: 500;
   min-width: 0;
   overflow: hidden;
@@ -1174,9 +1260,9 @@ body::after {
 .place-row .place-meta {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-2);
   color: var(--color-text-weak);
-  font-size: 12px;
+  font-size: var(--text-xs);
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1195,7 +1281,7 @@ body::after {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 24px;
+  padding: var(--space-6);
   /* 遮罩用暖棕而非纯黑：纯黑压暖色底会显脏 */
   background: rgba(58, 51, 43, 0.45);
 }
@@ -1210,7 +1296,7 @@ body::after {
   max-width: 460px;
   max-height: 100%;
   border: 1px solid var(--color-border);
-  border-radius: 12px;
+  border-radius: var(--radius-xl);
   background: var(--color-elevated);
   box-shadow: 0 12px 40px rgba(58, 51, 43, 0.28);
   overflow: hidden;
@@ -1221,13 +1307,13 @@ body::after {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 14px 18px;
+  padding: var(--space-4) var(--space-5);
   border-bottom: 1px solid var(--color-border);
 }
 
 .modal-title {
   margin: 0;
-  font-size: 16px;
+  font-size: var(--text-base);
   font-weight: 600;
 }
 
@@ -1235,10 +1321,10 @@ body::after {
   width: 28px;
   height: 28px;
   border: none;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   background: transparent;
   color: var(--color-text-weak);
-  font-size: 20px;
+  font-size: var(--text-xl);
   line-height: 1;
   cursor: pointer;
 }
@@ -1252,7 +1338,7 @@ body::after {
 .modal-body {
   flex: 1 1 auto;
   overflow-y: auto;
-  padding: 16px 18px;
+  padding: var(--space-4) var(--space-5);
 }
 
 .modal-body[hidden] {
@@ -1263,18 +1349,18 @@ body::after {
 .detail-list {
   display: grid;
   grid-template-columns: 84px 1fr;
-  gap: 10px 12px;
+  gap: var(--space-3) var(--space-3);
   margin: 0;
 }
 
 .detail-list dt {
   color: var(--color-text-weak);
-  font-size: 13px;
+  font-size: var(--text-sm);
 }
 
 .detail-list dd {
   margin: 0;
-  font-size: 14px;
+  font-size: var(--text-sm);
   word-break: break-word;
   white-space: pre-wrap;
 }
@@ -1282,19 +1368,19 @@ body::after {
 /* 表单字段 */
 .field {
   display: block;
-  margin-bottom: 14px;
+  margin-bottom: var(--space-4);
 }
 
 .field-label {
   display: block;
-  margin-bottom: 4px;
+  margin-bottom: var(--space-1);
   color: var(--color-text-weak);
-  font-size: 13px;
+  font-size: var(--text-sm);
 }
 
 /* 必填星号 */
 .field-label em {
-  color: #c0392b;
+  color: var(--color-danger);
   font-style: normal;
 }
 
@@ -1302,13 +1388,13 @@ body::after {
 .field select,
 .field textarea {
   width: 100%;
-  padding: 7px 10px;
+  padding: var(--space-2) var(--space-3);
   border: 1px solid var(--color-border);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   background: var(--color-input);
   color: var(--color-text);
   font-family: inherit;
-  font-size: 14px;
+  font-size: var(--text-sm);
 }
 
 /* 日期选择器的日历小图标由 color-scheme: light 自动转成深色，无需额外处理 */
@@ -1322,7 +1408,7 @@ body::after {
 .field input::placeholder,
 .field textarea::placeholder {
   color: var(--color-text-weak);
-  opacity: 0.7;
+  /* 同上：不叠 opacity，否则有效对比度会掉到 2.85 */
 }
 
 .field input:focus,
@@ -1339,11 +1425,11 @@ body::after {
 /* 校验失败的提示条 */
 .form-error {
   margin: 0;
-  padding: 8px 10px;
-  border-radius: 6px;
-  background: rgba(192, 57, 43, 0.1);
-  color: #c0392b;
-  font-size: 13px;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+  font-size: var(--text-sm);
 }
 
 .form-error[hidden] {
@@ -1354,38 +1440,42 @@ body::after {
 .modal-foot {
   display: flex;
   justify-content: flex-end;
-  gap: 8px;
-  padding: 12px 18px;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-5);
   border-top: 1px solid var(--color-border);
 }
 
 .btn {
-  padding: 7px 16px;
+  padding: var(--space-2) var(--space-4);
   border: 1px solid var(--color-border);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   background: var(--color-input);
   color: var(--color-text);
   font-family: inherit;
-  font-size: 14px;
+  font-size: var(--text-sm);
   cursor: pointer;
   transition: background 0.15s, border-color 0.15s, color 0.15s;
 }
 
 .btn:hover {
   border-color: var(--color-accent);
-  color: var(--color-accent);
+  color: var(--color-accent-text);
 }
 
+/* 主按钮：⚠️ 它的底色**不能**用 --color-accent ——
+   那是"图形"角色的值，压 --color-on-accent 只有 3.61:1，不达标。
+   主按钮属于"填充底"角色，必须用 --color-accent-fill（4.79:1）。
+   这是"一个颜色三个角色"最容易被搞混的一处。 */
 .btn--primary {
-  border-color: var(--color-accent);
-  background: var(--color-accent);
+  border-color: var(--color-accent-fill);
+  background: var(--color-accent-fill);
   color: var(--color-on-accent);
   font-weight: 500;
 }
 
 .btn--primary:hover {
-  background: #9c6325;
-  border-color: #9c6325;
+  background: var(--color-accent-fill-hover);
+  border-color: var(--color-accent-fill-hover);
   color: var(--color-on-accent);
 }
 
@@ -1393,13 +1483,96 @@ body::after {
 .btn--danger {
   margin-right: auto;
   border-color: rgba(192, 57, 43, 0.35);
-  color: #c0392b;
+  color: var(--color-danger);
 }
 
 .btn--danger:hover {
-  border-color: #c0392b;
-  background: rgba(192, 57, 43, 0.1);
-  color: #c0392b;
+  border-color: var(--color-danger);
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+}
+
+/* ============================================================
+   交互状态（Day 9 修复）
+
+   ⚠️ 修复前的状况：`:hover` 有 13 处，但
+      `:focus-visible` **0 处**、`:active` **0 处**、`:disabled` **0 处**
+      —— 也就是**只考虑了鼠标，完全没考虑键盘**。
+
+   ⭐ 为什么这条特别容易漏：
+      **鼠标用户永远遇不到"看不见焦点"这件事**，开发时自己也不会遇到，
+      所以没有任何东西会提醒你它缺了。但它是"产品有没有真的做完"最容易验的一条。
+
+   ⚠️ 还有两类问题是**结构性的，不是样式能补的**（改在 js/ 里）：
+      · `<article class="timeline-card">`、`<div class="place-row">`
+        挂了 click 监听，但**不可聚焦、也没有 tabindex** → 键盘根本到不了
+      · 搜索下拉的 `<li>` 同理 → 键盘原先只能选第一条
+   ============================================================ */
+
+/* ---------- 键盘焦点环 ----------
+   用一个分组规则覆盖所有可交互元素：既不用逐个写，也不会漏掉以后新加的。
+
+   ⚠️ 三条规矩：
+     ① 用 `outline` **不用** `box-shadow` —— box-shadow 是**整体覆盖**，
+        会把玻璃的内高光和卡片投影一起抹掉（Day 8 已经踩过一次）。
+     ② 用 `:focus-visible` 而不是 `:focus` —— 前者**只对键盘生效**，
+        鼠标点按钮时不会留下一个圈。
+     ③ `outline-offset: 2px` 让环和元素之间留一条缝，元素自身边界仍看得清。 */
+.btn:focus-visible,
+.chip:focus-visible,
+.mini-btn:focus-visible,
+.nav-btn:focus-visible,
+.modal-close:focus-visible,
+.place-row:focus-visible,
+.timeline-card:focus-visible,
+.city-head:focus-visible,
+.search-item:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* ⚠️ 输入框走的是另一套（边框转主色），是允许的替代方案：
+   `:focus` + `border-color` 而不是焦点环 —— 见下面 .map-search:focus / .field input:focus。
+   对文本输入来说，"任何时候聚焦都要看得见"比"只有键盘才显示"更合理。 */
+
+/* ---------- 按下反馈（:active）----------
+   为什么要有：点击时毫无变化，会让人怀疑"我到底点到了没"。 */
+.btn:active,
+.chip:active,
+.mini-btn:active,
+.nav-btn:active,
+.modal-close:active {
+  /* 按钮类：往下沉 1px —— 最省事也最直观的"按下去了"信号 */
+  transform: translateY(1px);
+}
+
+/* 卡片 / 列表行是整块的，往下沉会显得抖，改用"边界加深" */
+.timeline-card:active {
+  border-color: rgba(181, 118, 46, 0.55);
+}
+
+.place-row:active {
+  background: var(--color-accent-bg);
+}
+
+.city-head:active {
+  background: var(--color-nav-active);
+}
+
+/* ---------- 不可用状态（:disabled）----------
+   ⚠️ 诚实说明：**当前没有任何功能会给按钮加 disabled**，
+      所以这条规则暂时不会出现在页面上。它和刻度盘里的
+      `--space-10`、`--radius-2xl` 同理 —— **属于规范预留**：
+      等以后有了"正在提交中"这类场景直接用，不必临时再想样式。
+      （"状态齐四态"本身是可核对的硬指标，所以值得先立起来。） */
+.btn:disabled,
+.chip:disabled,
+.mini-btn:disabled,
+.nav-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  /* 不可用时不该再有"按下去"的反馈 */
+  transform: none;
 }
 
 /* ---------- 窄屏（<1024px）：侧栏降级为顶部横条 ----------
@@ -1413,11 +1586,24 @@ body::after {
   .app-nav {
     flex: 0 0 auto;
     flex-direction: row;
+    /* ⭐ Day 9 修复：允许换行。
+       顶部横条里装了「标题 + 3 个视图按钮 + 2 个动作按钮」，
+       在 560~720px 这一段（此时还没触发手机上"只留图标"的降级）宽度不够，
+       而原来是 `height: 56px` + 不换行 → **会直接把页面横向撑破**。
+
+       现在的做法是「能一行就一行，装不下就换行」：
+       **从结构上保证永不溢出**，不需要去测一个精确的临界宽度
+       （临界值受浏览器缩放/显示缩放影响，调断点很容易调错）。
+       ⚠️ flex 子项默认 `min-width: auto` 会拒绝收缩，所以必须显式
+          允许换行，光靠 `overflow: hidden` 只会把内容裁掉、更糟。 */
+    flex-wrap: wrap;
     align-items: center;
-    gap: 10px;
+    align-content: center;
+    gap: var(--space-1) var(--space-3);
     width: 100%;
-    height: var(--nav-height);
-    padding: 0 12px;
+    min-height: var(--nav-height);   /* 一行时仍是 56px，换行后自动变高 */
+    height: auto;
+    padding: var(--space-1) var(--space-3);
     border-right: none;
     border-bottom: 1px solid var(--color-border);
   }
@@ -1425,30 +1611,30 @@ body::after {
   .app-title {
     margin: 0;
     padding: 0;
-    font-size: 14px;
+    font-size: var(--text-sm);
   }
 
   .app-title::before {
     width: 26px;
     height: 26px;
-    font-size: 13px;
+    font-size: var(--text-xs);
   }
 
   /* 按钮组改成横向排 */
   .nav-items {
     flex-direction: row;
-    gap: 2px;
+    gap: var(--space-1);
   }
 
   .nav-btn {
     width: auto;
-    padding: 7px 11px;
-    font-size: 13px;
+    padding: var(--space-2) var(--space-3);
+    font-size: var(--text-sm);
   }
 
   .nav-icon {
     width: auto;
-    font-size: 15px;
+    font-size: var(--icon-size);
   }
 
   .nav-btn--action {
@@ -1472,8 +1658,8 @@ body::after {
   }
 
   .timeline-card {
-    gap: 10px;
-    padding: 10px;
+    gap: var(--space-3);
+    padding: var(--space-3);
   }
 
   /* 地点网格：一列就够，卡片占满宽度 */
@@ -1489,11 +1675,11 @@ body::after {
   }
 
   .nav-btn {
-    padding: 8px 10px;
+    padding: var(--space-2) var(--space-3);
   }
 
   .nav-icon {
-    font-size: 17px;
+    font-size: var(--icon-size-lg);
   }
 
   .app-title {
@@ -1503,7 +1689,7 @@ body::after {
   /* 时间轴卡片改上下堆叠：图片位变成顶部横幅 */
   .timeline-card {
     flex-direction: column;
-    gap: 8px;
+    gap: var(--space-2);
   }
 
   .timeline-thumb {
@@ -1518,6 +1704,6 @@ body::after {
   }
 
   .timeline-year-list {
-    padding-left: 12px;
+    padding-left: var(--space-3);
   }
 }

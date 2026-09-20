@@ -213,10 +213,31 @@
 
     card.appendChild(text);
 
-    /* 点卡片 → 打开「查看态」弹窗（PRD 验收标准 33） */
-    card.addEventListener('click', function () {
+    /* 打开「查看态」弹窗（PRD 验收标准 33）—— 鼠标和键盘共用这一个入口 */
+    function openCard() {
       if (global.TripMemoDetail) {
         global.TripMemoDetail.openView(place.id);
+      }
+    }
+
+    /* ⚠️ 键盘可达性（Day 9 修复）
+       原来只有 `card.addEventListener('click', ...)`，而 `<article>` **不可聚焦** →
+       **键盘用户完全到不了时间轴卡片**，整条时间轴对键盘等于不存在。
+
+       修法是补三样：
+         ① `tabindex="0"`  → 能被 Tab 键走到
+         ② `role="button"` → 读屏念"按钮"而不是"文章"，并会提示可用空格/回车激活
+         ③ `keydown`       → 把 Enter / 空格 映射成"打开"
+       ⚠️ 空格必须 `preventDefault`，否则页面会跟着往下滚。
+       （tabindex 用 "0" 而不是 "1/2/3"：正数会打乱浏览器原生的 Tab 顺序。） */
+    card.setAttribute('tabindex', '0');
+    card.setAttribute('role', 'button');
+
+    card.addEventListener('click', openCard);
+    card.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
+        e.preventDefault();
+        openCard();
       }
     });
 
