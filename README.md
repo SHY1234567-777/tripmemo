@@ -114,8 +114,10 @@ window.TRIPMEMO_CONFIG = {
 │  ├─ main.js            入口：初始化、视图切换、导航
 │  ├─ store.js           数据层：localStorage 读写、导出 JSON（唯一数据出口）
 │  ├─ model.js           数据模型：停留时长、点大小 / 线宽算法
+│  ├─ mock-data.js       内置示例数据（13 条地点，可在侧栏一键载入 / 清空）
 │  ├─ map.js             地图视图：打点、点大小、筛选、搜索、锚点、连线
 │  ├─ detail.js          地点详情弹窗（查看态 / 编辑态 / 新增态）
+│  ├─ drawer.js          地点详情抽屉（只读 · Day 10 新增）
 │  ├─ timeline.js        时间轴视图
 │  └─ places.js          地点列表视图（按城市分组）
 ├─ config.js             本地配置：高德 Key（**不提交**）

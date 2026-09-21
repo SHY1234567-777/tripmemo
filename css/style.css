@@ -92,6 +92,10 @@
   --text-base: 16px;   /* 页面基准（body）、卡片标题、弹窗标题 */
   --text-lg:   18px;   /* 城市名、区块小标题 */
   --text-xl:   20px;   /* 年份标题 */
+  /* Day 10 新增一档：地点抽屉的主视觉大标题。
+     参考图里那块字非常大（相当于 40px+），20px 撑不住；但也不照搬那么夸张，
+     28px 在"够突出"和"不吵"之间。刻度盘往上加一档要记进 DESIGN.md 4.2。 */
+  --text-2xl:  28px;   /* 抽屉主视觉大标题 */
   --icon-size:    16px;   /* 导航图标 */
   --icon-size-lg: 18px;   /* 导航图标（手机端放大，便于点按） */
 
@@ -1034,21 +1038,40 @@ body::after {
            · 入场时卡片一张接一张"翻"进来
    ============================================================ */
 
-/* 网格容器：能塞几张塞几张，每张至少 320px
-   （原来 240px 太扁，城市卡片挤成一排小条；320px 后一屏 2-3 张，
-     每张都有"卡片"的体量，也够放下以后的地点缩略图） */
+/* 城市卡片容器：能塞几列塞几列，每列至少 320px
+   （原来 240px 太扁，城市卡片挤成一排小条；320px 后一屏 2-3 列，
+     每张都有"卡片"的体量，也够放下以后的地点缩略图）
+
+   ⚠️⚠️ 这两个属性名字像、管的事完全不同，**Day 10 的 bug 就出在搞混它们**：
+       · align-content → **整排轨道（行）在容器里怎么对齐**：
+                          容器比内容高时，行靠上还是垂直居中。
+       · align-items   → **卡片在它那一行里怎么对齐**：要不要被拉满整行高度。
+     ⚠️ Grid 的 `align-items` 默认值是 `normal`，对网格子项**等价于 `stretch`** ——
+        不管它，同一排的卡片就会被拉成等高 = **那一排最高的那张**。
+     （原来的注释把 `align-content` 写成"卡片不被拉伸成等高"，是错的 ——
+      正是这句错注释把 bug 一起写进了代码：武汉有 3 个地点、其余城市只有 1 个，
+      同排时矮卡被拉到和武汉一样高，卡片白框底部空出一大块。Day 10 由 shy 截图发现。）
+
+   ⚠️ 已经试过**并放弃**的方案（Day 10，记在这里免得以后重复折腾）：
+      换成「多列」（`columns`）确实能让空隙消失，但代价太大 ——
+        ① 阅读顺序变成"先往下再往右"，列表不再按行读
+        ② 展开 / 收起卡片时整列重排，卡片会跳
+      → 最终结论：**接受"排与排之间高低错落"**。
+        用下面的 `align-items: start` 让卡片贴合自己的内容 ——
+        这样至少每张卡片本身是健康的（白框里不会有空洞），错落是正常的排版。 */
 #places-list {
   max-width: none;            /* 覆盖 .panel 的 720px —— 网格需要更宽 */
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
   gap: var(--space-4);
-  align-content: start;       /* 卡片不被拉伸成等高 */
+  align-content: start;       /* 行从顶部开始排（不是垂直居中） */
+  align-items: start;         /* ⭐ 卡片贴合自己的内容，不被拉成等高 */
   padding-top: var(--space-1);
 }
 
 /* 一张城市卡片 */
 .city-group {
-  margin-bottom: 0;                              /* 交给 grid 的 gap 排间距 */
+  margin-bottom: 0;                              /* 间距交给 #places-list 的 gap */
   border: 1px solid var(--color-border);
   border-radius: var(--radius-xl);
   overflow: hidden;
@@ -1267,6 +1290,335 @@ body::after {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* ============================================================
+   地点详情抽屉（Day 10 新增 · 骨架版）
+
+   点「地点列表」里的某个地点 → 从右侧铺开，左侧留一条变暗的底。
+   ⚠️ 宽度（Day 10 由 shy 定）：**65%**，左边留 35% 露底。
+      一开始我按参考图估的是 86%，他看完觉得"太大、压得太满" → 改成 65%。
+
+   ⚠️ 参考图是**深色主题**，我们整站是奶油浅色 ——
+      按 Day 8 定下的老规矩：**借它的结构和比例，颜色用自己的主题重做**。
+      照搬深色会和全站冲突，而且我们已经有一整套 --color-* 变量该用。
+   ============================================================ */
+
+.drawer {
+  position: fixed;
+  inset: 0;
+  /* z-index 和 .modal 同级（100）—— 两者**不会同时出现**：
+     点抽屉里的「编辑这个地点」会先关抽屉、再开弹窗。 */
+  z-index: 100;
+}
+
+/* ⚠️ 必须显式处理 hidden，否则 [hidden] 会被上面的定位规则盖掉 */
+.drawer[hidden] {
+  display: none;
+}
+
+/* 左侧那条"暗底"，同时充当遮罩 */
+.drawer-scrim {
+  position: absolute;
+  inset: 0;
+  /* 暖棕遮罩，不用纯黑（和原弹窗一致：纯黑压暖色底会显脏） */
+  background: rgba(58, 51, 43, 0.45);
+  /* ⚠️ 这里**不能**设 pointer-events: none —— 它要能被点（点它就是关闭） */
+}
+
+.drawer-panel {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 65%;                     /* 左侧留 35% 露底（见上面说明） */
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  background: var(--color-bg);
+  border-left: 1px solid var(--color-border);
+  box-shadow: -12px 0 40px rgba(58, 51, 43, 0.28);
+  animation: drawer-in 0.26s cubic-bezier(0.22, 0.68, 0.36, 1) backwards;
+}
+
+/* 从右侧滑入一点 + 淡入。
+   ⚠️ 用 40px 的小位移而不是整个宽度：抽屉占 86% 屏，整屏位移会显得晃。 */
+@keyframes drawer-in {
+  from { transform: translateX(40px); opacity: 0; }
+  to   { transform: translateX(0);    opacity: 1; }
+}
+
+/* ⚠️ 尊重系统的「减少动态效果」（DESIGN.md 第七节的硬规矩） */
+@media (prefers-reduced-motion: reduce) {
+  .drawer-panel {
+    animation: none;
+  }
+}
+
+/* ---------- 主视觉区 ----------
+   参考图这里是「照片 + 底部深色渐变」；我们还没有照片功能（PRD 4.3），
+   所以先用主题色晕染撑住这一块。等照片能存进来，这里换成真图 + 渐变即可，
+   上下的结构（返回按钮、标题组）都不用动。 */
+.drawer-hero {
+  position: relative;
+  flex: 0 0 auto;
+  /* ⚠️ 高度（Day 10 由 shy 定）：**放大到 420px**（原来 320px）。
+     这块将来就是放**照片**的地方（参考图里是一张全宽大图），
+     所以现在即使还没有照片也要把版面留够 —— 等照片能存进来直接换背景即可，
+     上下的结构（返回按钮、标题组）一行都不用动。 */
+  min-height: 420px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: var(--space-6);
+  background:
+    radial-gradient(120% 120% at 15% 0%,
+      rgba(181, 118, 46, 0.22) 0%, rgba(181, 118, 46, 0) 62%),
+    var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+}
+
+/* 返回按钮：钉在左上角 */
+.drawer-back {
+  position: absolute;
+  top: var(--space-6);
+  left: var(--space-6);
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--color-border);
+  border-radius: 50%;
+  background: var(--color-glass-strong);
+  color: var(--color-text);
+  font-family: inherit;
+  font-size: var(--text-base);
+  line-height: 1;
+  cursor: pointer;
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+}
+
+.drawer-back:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent-text);
+}
+
+.drawer-back:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.drawer-back:active {
+  transform: translateY(1px);
+}
+
+.drawer-kicker {
+  margin: 0 0 var(--space-1);
+  color: var(--color-text-weak);
+  font-size: var(--text-xs);
+  letter-spacing: 0.6px;
+}
+
+/* 主标题：这一档字是 Day 10 为抽屉新加的（见 :root） */
+.drawer-title {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-2xl);
+  font-weight: 600;
+  line-height: 1.3;
+  word-break: break-word;
+}
+
+.drawer-sub {
+  margin: 0;
+  color: var(--color-text-weak);
+  font-size: var(--text-sm);
+}
+
+/* ---------- 一条只读信息（三格）----------
+   ⚠️ Day 10 由 shy 调过：**要短一些**。
+      原来每格是「标签一行 + 值一行」、上下各 20px 内边距，整条约 95px 高；
+      改成**标签和值同一行**、内边距减到 12/20 → 整条约 45px，矮了一半。
+      值用 `nowrap + 省略号` 保证每格只占一行（我们的值都很短，实测放得下）。 */
+.drawer-stats {
+  flex: 0 0 auto;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-4);
+  margin: 0;
+  padding: var(--space-3) var(--space-5);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.drawer-stat {
+  display: flex;
+  align-items: baseline;          /* 标签和值字号不同，按基线对齐才不会错位 */
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.drawer-stat-label {
+  flex: 0 0 auto;
+  margin: 0;
+  color: var(--color-text-weak);
+  font-size: var(--text-xs);
+}
+
+.drawer-stat-value {
+  margin: 0;
+  color: var(--color-text);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---------- 标签页 ---------- */
+.drawer-tabs {
+  flex: 0 0 auto;
+  display: flex;
+  gap: var(--space-6);
+  padding: 0 var(--space-6);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.drawer-tab {
+  padding: var(--space-3) 0;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--color-text-weak);
+  font-family: inherit;
+  font-size: var(--text-sm);
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.drawer-tab:hover {
+  color: var(--color-text);
+}
+
+.drawer-tab.is-active {
+  border-bottom-color: var(--color-accent);
+  color: var(--color-text);
+  font-weight: 500;
+}
+
+.drawer-tab:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.drawer-tab:active {
+  transform: translateY(1px);
+}
+
+/* ---------- 内容区 ---------- */
+.drawer-body {
+  flex: 1 1 auto;
+  padding: var(--space-6);
+}
+
+/* 回忆正文：保留换行，行高用"正文"那一档 */
+.drawer-text {
+  margin: 0;
+  font-size: var(--text-sm);
+  line-height: 1.7;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.drawer-tag-row {
+  margin-top: var(--space-4);
+}
+
+.drawer-timeline {
+  margin: 0;
+  padding-left: var(--space-5);
+  font-size: var(--text-sm);
+  line-height: 1.7;
+}
+
+/* 空状态 / 占位说明：用弱文字，别抢注意力 */
+.drawer-empty {
+  margin: 0;
+  color: var(--color-text-weak);
+  font-size: var(--text-sm);
+  line-height: 1.7;
+}
+
+/* 「照片」页签的占位框（Day 10）——
+   ⚠️ 这不是"摆个空 div 敷衍"，而是**明确把版面留给照片**：
+      等高、带虚线框，照片上线后把这个框换成 <img> 网格即可。
+      虚线框的质感和项目里其它"暂无照片"占位框保持一致
+      （`.place-thumb` / `.timeline-thumb` 用的是同一套斜纹底 + 主色虚线）。 */
+.drawer-photo-slot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 240px;
+  padding: var(--space-5);
+  border: 1px dashed rgba(181, 118, 46, 0.28);
+  border-radius: var(--radius-lg);
+  background:
+    repeating-linear-gradient(
+      45deg,
+      rgba(181, 118, 46, 0.07) 0 6px,
+      rgba(181, 118, 46, 0.02) 6px 12px
+    ),
+    var(--color-surface);
+  color: var(--color-text-weak);
+  font-size: var(--text-sm);
+  line-height: 1.7;
+  text-align: center;
+}
+
+/* ---------- 底部 ---------- */
+.drawer-foot {
+  flex: 0 0 auto;
+  display: flex;
+  justify-content: flex-start;
+  padding: var(--space-4) var(--space-6) var(--space-5);
+  border-top: 1px solid var(--color-border);
+}
+
+/* ---------- 窄屏：抽屉铺满整屏（左侧不再留那条底）---------- */
+@media (max-width: 767px) {
+  .drawer-panel {
+    width: 100%;
+    border-left: none;
+  }
+
+  .drawer-hero {
+    min-height: 240px;
+    padding: var(--space-4);
+  }
+
+  .drawer-back {
+    top: var(--space-4);
+    left: var(--space-4);
+  }
+
+  .drawer-stats {
+    grid-template-columns: 1fr;
+    gap: var(--space-3);
+    padding: var(--space-4);
+  }
+
+  .drawer-tabs {
+    gap: var(--space-5);
+    padding: 0 var(--space-4);
+  }
+
+  .drawer-body {
+    padding: var(--space-4);
+  }
+
+  .drawer-foot {
+    padding: var(--space-4);
+  }
 }
 
 /* ---------- 地点详情弹窗（查看态 / 编辑态 / 新增态） ---------- */

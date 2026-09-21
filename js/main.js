@@ -203,6 +203,12 @@
       window.TripMemoDetail.init();
     }
 
+    // 初始化地点详情抽屉（只读 · Day 10 新增）
+    // ⚠️ 必须排在地点列表之前 —— 列表里点条目要用到它
+    if (window.TripMemoDrawer) {
+      window.TripMemoDrawer.init();
+    }
+
     // 初始化地图视图（内部会自己去加载高德 SDK）
     if (window.TripMemoMap) {
       window.TripMemoMap.init();

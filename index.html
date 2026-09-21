@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>TripMemo · 人生记忆地图</title>
   <!-- 给样式表加版本号，防止浏览器拿旧的缓存（改了 CSS 后把 v 的数字 +1 即可） -->
-  <link rel="stylesheet" href="css/style.css?v=20">
+  <link rel="stylesheet" href="css/style.css?v=26">
 </head>
 <body>
 
@@ -144,6 +144,46 @@
   </main>
   </div>
 
+  <!-- ===== 地点详情抽屉（Day 10 新增 · 骨架版）=====
+       点「地点列表」里的某个地点 → 从右侧铺开这个抽屉，左侧留一条变暗的底。
+       规则（Day 10 由 shy 定）：
+         · 粒度 = **地点**（不是城市）
+         · **只读** —— 要改内容，点底部的按钮回到原来那个三态弹窗（PRD 5.4）
+         · 尺寸/结构参考图：**铺满大半屏、左侧留一条暗底**（约 14%）
+       ⚠️ 骨架版**暂不做照片相关的区域** —— 照片上传排在 Day 8–28（见 PRD 4.3），
+          现在做只能是一屏空占位框。「照片」标签页里写明了这一点，不是忘了做。 -->
+  <div class="drawer" id="drawer-place" hidden>
+
+    <!-- 左侧那条「暗底」：同时充当遮罩，点它就关掉 -->
+    <div class="drawer-scrim" id="drawer-scrim"></div>
+
+    <div class="drawer-panel" role="dialog" aria-modal="true" aria-labelledby="drawer-title">
+
+      <!-- 主视觉区：参考图这里是照片，我们还没有照片功能 → 用主题色晕染占位 -->
+      <div class="drawer-hero">
+        <button type="button" class="drawer-back" id="drawer-close" aria-label="返回">←</button>
+        <div class="drawer-hero-text">
+          <p class="drawer-kicker" id="drawer-kicker"></p>
+          <h2 class="drawer-title" id="drawer-title"></h2>
+          <p class="drawer-sub" id="drawer-sub"></p>
+        </div>
+      </div>
+
+      <!-- 一条只读信息（三格，对应参考图那条统计行） -->
+      <dl class="drawer-stats" id="drawer-stats"></dl>
+
+      <!-- 标签页：故事 / 时间轴 / 照片 -->
+      <div class="drawer-tabs" role="tablist" id="drawer-tabs"></div>
+
+      <!-- 内容区：跟着标签页换 -->
+      <div class="drawer-body" id="drawer-body"></div>
+
+      <div class="drawer-foot">
+        <button type="button" class="btn" id="drawer-edit">编辑这个地点</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ===== 地点详情弹窗：三种形态 =====
          查看态（默认，只读）
          编辑态（点「编辑」进入）
@@ -209,27 +249,28 @@
 
   <!-- ===== 本地配置：含高德 Key，不提交（模板见 config.example.js）=====
        找不到 config.js 时不会报错，只是地图加载不出来，页面其余部分照常可用 -->
-  <script src="config.js?v=20"
+  <script src="config.js?v=26"
           onerror="console.warn('[TripMemo] 未找到 config.js —— 地图将无法加载。请把 config.example.js 复制为 config.js 并填入 Key 与安全密钥。')"></script>
 
   <!-- ===== 项目脚本：顺序不能乱 =====
        model（算法）→ mock-data（示例数据）→ store（数据）
-       → detail（弹窗）→ map / timeline / places（三个视图）→ main（入口）
+       → detail（三态弹窗）→ drawer（只读详情抽屉）→ map / timeline / places（三个视图）→ main（入口）
 
        ⚠️ 每个都带 ?v= 版本号，理由和上面 css 那条一样：
           **浏览器对 .js 也会缓存**。之前只给 CSS 加了版本号，
           结果改完 JS 也可能看到旧代码，白折腾一轮排查。
 
        ⭐ 规则（就一句）：**改完任何 css / js，把这里和上面的数字一起 +1。**
-          10 个资源共用同一个编号 —— 多下载几 KB，换"永远不用想哪个该改"，
+          11 个资源共用同一个编号 —— 多下载几 KB，换"永远不用想哪个该改"，
           对学习阶段来说非常划算。 -->
-  <script src="js/model.js?v=20"></script>
-  <script src="js/mock-data.js?v=20"></script>
-  <script src="js/store.js?v=20"></script>
-  <script src="js/detail.js?v=20"></script>
-  <script src="js/map.js?v=20"></script>
-  <script src="js/timeline.js?v=20"></script>
-  <script src="js/places.js?v=20"></script>
-  <script src="js/main.js?v=20"></script>
+  <script src="js/model.js?v=26"></script>
+  <script src="js/mock-data.js?v=26"></script>
+  <script src="js/store.js?v=26"></script>
+  <script src="js/detail.js?v=26"></script>
+  <script src="js/drawer.js?v=26"></script>
+  <script src="js/map.js?v=26"></script>
+  <script src="js/timeline.js?v=26"></script>
+  <script src="js/places.js?v=26"></script>
+  <script src="js/main.js?v=26"></script>
 </body>
 </html>

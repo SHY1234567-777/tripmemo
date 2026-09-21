@@ -162,7 +162,20 @@
          不用自己写状态管理 —— 少写代码，少出 bug */
       var box = document.createElement('details');
       box.className = 'city-group';
-      box.open = true;   /* 默认展开：一眼能看到全部 */
+
+      /* ⚠️ Day 10：改成**默认收起**（原来是 `true`）。
+         为什么改：Grid 的每一行高度天生 = 那一排最高的卡片，
+         所以只要同一排两张卡高度不同，就一定会空出一块 ——
+         `align-items` 只能决定这块空白出现在「卡片里」还是「卡片下」，**不能让它消失**。
+         （示例数据里武汉有 3 个地点、其余 10 个城市各 1 个，差异被放得最大。）
+
+         收起之后每张卡都只剩标题行（约 78px）→ **高度完全一致 → 一条空隙都没有**，
+         而且排与排之间不会再错落、展开时也不会跳动。
+
+         ⭐ 这其实也是这个页面**本来的设计意图**：
+         `.city-head::after` 里写着「展开 ▾」/「收起 ▴」两个状态，
+         而「展开 ▾」就是给"收起"准备的 —— 是 Day 8 把它设成默认展开才引出的问题。 */
+      box.open = false;
 
       /* 入场动画的延迟：第 N 张卡晚 N×55ms 落进来（上限 8 步，见常量说明）
          ⚠️ 用 Math.min 卡上限，不要让第 30 张卡等 1.6 秒 */
@@ -260,8 +273,15 @@
         body.appendChild(meta);
         row.appendChild(body);
 
-        /* 打开「查看态」弹窗 —— 鼠标和键盘共用这一个入口 */
+        /* 打开「地点详情抽屉」—— 鼠标和键盘共用这一个入口。
+           ⚠️ Day 10 改：原来这里打开的是**可编辑的三态弹窗**，
+              现在改成打开**只读抽屉**（抽屉里点「编辑这个地点」再回弹窗）。
+           ⚠️ 兜底：万一抽屉模块没加载成功，退回原来的弹窗 ——
+              不能让用户遇到"点一下毫无反应"这种事。 */
         function openRow() {
+          if (global.TripMemoDrawer && global.TripMemoDrawer.open(place.id)) {
+            return;
+          }
           if (global.TripMemoDetail) {
             global.TripMemoDetail.openView(place.id);
           }
