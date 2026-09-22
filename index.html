@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>TripMemo · 人生记忆地图</title>
   <!-- 给样式表加版本号，防止浏览器拿旧的缓存（改了 CSS 后把 v 的数字 +1 即可） -->
-  <link rel="stylesheet" href="css/style.css?v=26">
+  <link rel="stylesheet" href="css/style.css?v=29">
 </head>
 <body>
 
@@ -16,7 +16,10 @@
     <h1 class="app-title">TripMemo</h1>
 
     <div class="nav-items">
-      <button type="button" class="nav-btn is-active" data-view="map">
+      <!-- ⚠️ Day 11：这里**不再预置 `is-active`** —— 默认首屏改成门面页了，
+           门面页不在导航里，所以进来时导航应是"一个都没选中"。
+           （以前写死在地图上，会出现"门面页显示着、导航却高亮地图"的错位。） -->
+      <button type="button" class="nav-btn" data-view="map">
         <span class="nav-icon" aria-hidden="true">🗺</span>
         <span class="nav-label">地图</span>
       </button>
@@ -53,8 +56,60 @@
 
   <main class="app-main">
 
-    <!-- 视图 1：地图（默认首屏） -->
-    <section class="view is-active" id="view-map">
+    <!-- ===== 视图 0：门面页（Day 11 新增）=====
+         访客看到的第一屏 —— **不是功能页**，是"这是什么"的自我介绍。
+         点「开始记录」进入地图视图。
+
+         结构与参考站（html5up.net/dimension）一致：
+           全屏背景 + 一圈内缩细描边 → 圆形徽标 + 竖线 → 大标题
+           → 横线 → 一行小字 → 横线 → 一个按钮 → 底部一行小字
+
+         ⚠️ 这一屏**不显示左侧导航**（靠 body.is-landing 控制）。
+            门面就该是整屏一屏，露出一排功能菜单就不像门面了。
+         ⚠️ 它没有"返回入口"：它是**门**，不是视图之一。
+            想再看一次刷新页面即可。 -->
+    <section class="view is-active" id="view-landing">
+      <div class="landing">
+
+        <!-- 徽标：**把地图上那张图抽象出来** ——
+             一个实心点（主城市锚点）+ 三条弧线放射出去，弧线**越短越细**
+             （呼应"线宽 ∝ 停留时长"这条产品主视觉）。
+             ⚠️ 用内联 SVG 而不是图片文件：**不增加任何项目资产**，
+                而且能跟着 CSS 的 color 走（换主题色不用重画）。
+             ⚠️ 口径统一：三条弧的 `stroke-width` 递减 = 时长递减，
+                所以最细那条别细到看不见（下面是 2.2 / 1.7 / 1.2）。 -->
+        <div class="landing-mark" aria-hidden="true">
+          <svg class="landing-mark-svg" viewBox="0 0 48 48" focusable="false"
+               fill="none" stroke="currentColor" stroke-linecap="round">
+            <!-- 三条弧：从锚点放射出去 -->
+            <path d="M13 36 Q 20 13 37 11" stroke-width="2.2"></path>
+            <path d="M13 36 Q 25 21 39 24" stroke-width="1.7"></path>
+            <path d="M13 36 Q 25 28 37 35" stroke-width="1.2"></path>
+            <!-- 终点：越远的越大（对应地图上"停得越久的点越大"） -->
+            <circle cx="37" cy="11" r="2.7" fill="currentColor" stroke="none"></circle>
+            <circle cx="39" cy="24" r="2.1" fill="currentColor" stroke="none"></circle>
+            <circle cx="37" cy="35" r="1.5" fill="currentColor" stroke="none"></circle>
+            <!-- 锚点最后画，压在三条弧的起点上，视觉上"从这里出发" -->
+            <circle cx="13" cy="36" r="4.2" fill="currentColor" stroke="none"></circle>
+          </svg>
+        </div>
+
+        <h1 class="landing-title">TripMemo</h1>
+
+        <hr class="landing-rule">
+
+        <p class="landing-sub">记录足迹，珍藏每一段在路上的故事</p>
+
+        <hr class="landing-rule">
+
+        <button type="button" class="landing-cta" id="landing-enter">开始记录</button>
+
+        <p class="landing-foot">数据存在你自己的浏览器里，不上传任何服务器。</p>
+      </div>
+    </section>
+
+    <!-- 视图 1：地图（Day 11 起**不再是**默认首屏，改由门面页开门） -->
+    <section class="view" id="view-map">
       <!-- 左上角工具条：搜索选点 + 类型筛选 -->
       <div class="map-toolbar">
         <!-- 搜索选点（PRD 4.1 #1 的第二种方式）：
@@ -249,7 +304,7 @@
 
   <!-- ===== 本地配置：含高德 Key，不提交（模板见 config.example.js）=====
        找不到 config.js 时不会报错，只是地图加载不出来，页面其余部分照常可用 -->
-  <script src="config.js?v=26"
+  <script src="config.js?v=29"
           onerror="console.warn('[TripMemo] 未找到 config.js —— 地图将无法加载。请把 config.example.js 复制为 config.js 并填入 Key 与安全密钥。')"></script>
 
   <!-- ===== 项目脚本：顺序不能乱 =====
@@ -263,14 +318,14 @@
        ⭐ 规则（就一句）：**改完任何 css / js，把这里和上面的数字一起 +1。**
           11 个资源共用同一个编号 —— 多下载几 KB，换"永远不用想哪个该改"，
           对学习阶段来说非常划算。 -->
-  <script src="js/model.js?v=26"></script>
-  <script src="js/mock-data.js?v=26"></script>
-  <script src="js/store.js?v=26"></script>
-  <script src="js/detail.js?v=26"></script>
-  <script src="js/drawer.js?v=26"></script>
-  <script src="js/map.js?v=26"></script>
-  <script src="js/timeline.js?v=26"></script>
-  <script src="js/places.js?v=26"></script>
-  <script src="js/main.js?v=26"></script>
+  <script src="js/model.js?v=29"></script>
+  <script src="js/mock-data.js?v=29"></script>
+  <script src="js/store.js?v=29"></script>
+  <script src="js/detail.js?v=29"></script>
+  <script src="js/drawer.js?v=29"></script>
+  <script src="js/map.js?v=29"></script>
+  <script src="js/timeline.js?v=29"></script>
+  <script src="js/places.js?v=29"></script>
+  <script src="js/main.js?v=29"></script>
 </body>
 </html>

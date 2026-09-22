@@ -107,9 +107,11 @@ window.TRIPMEMO_CONFIG = {
 ## 五、项目结构
 
 ```
-├─ index.html            唯一页面（4 个视图都在里面，靠切换显示）
+├─ index.html            唯一页面（5 个视图都在里面，靠切换显示）
 ├─ css/
 │  └─ style.css          全站样式
+├─ assets/
+│  └─ landing-bg.jpg     门面页背景图（Day 11 新增）
 ├─ js/
 │  ├─ main.js            入口：初始化、视图切换、导航
 │  ├─ store.js           数据层：localStorage 读写、导出 JSON（唯一数据出口）

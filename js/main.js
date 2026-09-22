@@ -9,15 +9,24 @@
 (function () {
   'use strict';
 
-  /* 视图名 → 容器 id 的对应关系 */
+  /* 视图名 → 容器 id 的对应关系
+     ⚠️ Day 11 新增 `landing`（门面页）—— 它**不在导航栏里**，
+        所以没有对应的 `.nav-btn[data-view]`；switchView 里那段
+        "同步导航高亮" 对它天然是个空操作（全部取消高亮），不用特判。 */
   var VIEW_IDS = {
+    landing: 'view-landing',
     map: 'view-map',
     timeline: 'view-timeline',
     places: 'view-places'
   };
 
-  /* 默认首屏：地图视图（PRD 5.1） */
-  var DEFAULT_VIEW = 'map';
+  /* 默认首屏：**门面页**（Day 11 改，原来写的是 'map'）
+     ⚠️ 这和 PRD 5.1「地图视图（默认首屏）」目前是**不一致**的 ——
+        按他要求先做的原型；PRD / TECH_DESIGN 等他确定要留下门面页再补。 */
+  var DEFAULT_VIEW = 'landing';
+
+  /* 地图有没有初始化过（Day 11：地图改成"进地图时才初始化"，见 ensureMapInited） */
+  var mapInited = false;
 
   /* 当前正在显示的视图名 */
   var currentView = DEFAULT_VIEW;
@@ -30,11 +39,37 @@
    * 切换视图
    * @param {string} name 视图名（map / timeline / places）
    */
+  /**
+   * 确保地图已经初始化（Day 11 新增）
+   *
+   * ⚠️ 为什么改成"进地图时才初始化"，而不是页面一加载就初始化：
+   *   ① **门面页显示时 `#view-map` 是 `display: none`** —— 容器尺寸是 0×0，
+   *      高德在这种容器里建地图会算错视野。
+   *   ② 门面页就一屏字，**没必要先把高德那一大坨 SDK 下下来**再让访客点进来。
+   *
+   * 只在第一次进地图时跑一次；后面再切回来什么都不做
+   * （尺寸变化由 map.js 里监听 `view:change` 的 `resizeMap()` 负责）。
+   */
+  function ensureMapInited() {
+    if (mapInited || !window.TripMemoMap) {
+      return;
+    }
+    mapInited = true;
+    console.log('[TripMemo] 首次进入地图视图，开始初始化地图');
+    window.TripMemoMap.init();
+  }
+
   function switchView(name) {
     if (!VIEW_IDS[name]) {
       return;
     }
     currentView = name;
+
+    /* 门面页是"没有导航"的一屏：进去时把导航栏整个藏起来。
+       靠 body 上的类控制，CSS 里就一句 `body.is-landing .app-nav { display: none }`。
+       为什么要藏：门面就该是**整屏一屏**，露出一排功能菜单就不像门面了 ——
+       参考的那个站（html5up.net/dimension）也是整屏无导航。 */
+    document.body.classList.toggle('is-landing', name === 'landing');
 
     // 1、视图容器：只让目标视图显示
     Object.keys(VIEW_IDS).forEach(function (key) {
@@ -49,7 +84,15 @@
       btn.classList.toggle('is-active', btn.dataset.view === name);
     });
 
-    // 3、广播事件：2b 接入地图后，需要知道「自己被显示了」才能正确计算尺寸
+    /* 3、如果目标就是地图，这时候才去初始化它。
+       ⚠️ 顺序有讲究：必须**排在广播 view:change 之前** ——
+          上面第 1 步刚把地图视图切为可见，此时容器才有真实尺寸，
+          高德才能算对视野（map.js 在 init 末尾也会自己 resize 一次）。 */
+    if (name === 'map') {
+      ensureMapInited();
+    }
+
+    // 4、广播事件：地图需要知道「自己被显示了」才能正确计算尺寸
     document.dispatchEvent(new CustomEvent('view:change', {
       detail: { view: name }
     }));
@@ -195,7 +238,17 @@
     document.addEventListener('store:error', showStoreError);
     initGlobalErrorWatch();
 
-    // 显示默认视图
+    /* 门面页的「开始记录」按钮 → 进地图视图
+       ⚠️ 用 switchView 而不是给个 <a href>：这是单页应用，
+          没有第二个 URL，切视图才是"进门"的正确做法。 */
+    var landingBtn = document.getElementById('landing-enter');
+    if (landingBtn) {
+      landingBtn.addEventListener('click', function () {
+        switchView('map');
+      });
+    }
+
+    // 显示默认视图（Day 11 起是门面页）
     switchView(DEFAULT_VIEW);
 
     // 初始化地点详情弹窗（三态）
@@ -209,10 +262,10 @@
       window.TripMemoDrawer.init();
     }
 
-    // 初始化地图视图（内部会自己去加载高德 SDK）
-    if (window.TripMemoMap) {
-      window.TripMemoMap.init();
-    }
+    /* ⚠️ 地图**不再在这里初始化**（Day 11 改）：
+       门面页显示时 #view-map 是 display:none，容器 0×0，高德会算错视野；
+       而且门面页没必要先把高德 SDK 下下来。
+       现在改成"第一次切到地图视图时才初始化"，见 ensureMapInited()。 */
 
     // 初始化另外两个视图
     if (window.TripMemoTimeline) {

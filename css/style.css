@@ -96,6 +96,11 @@
      参考图里那块字非常大（相当于 40px+），20px 撑不住；但也不照搬那么夸张，
      28px 在"够突出"和"不吵"之间。刻度盘往上加一档要记进 DESIGN.md 4.2。 */
   --text-2xl:  28px;   /* 抽屉主视觉大标题 */
+  /* Day 11 新增：**门面页 / 海报级**大标题（整屏一屏那种）。
+     ⚠️ 特意叫 display 而不是接着编号叫 -3xl：它**不属于常规界面阶梯** ——
+        界面里最高只到 --text-2xl（28px），这一档只给"整屏一屏"的场景用。
+        混进界面阶梯，会诱导以后在卡片里也用 40px。 */
+  --text-display: 40px;
   --icon-size:    16px;   /* 导航图标 */
   --icon-size-lg: 18px;   /* 导航图标（手机端放大，便于点按） */
 
@@ -380,6 +385,202 @@ body::after {
    上面的 .view-empty 设了 display:flex，会盖掉浏览器对 [hidden] 的默认隐藏 */
 .view-empty[hidden] {
   display: none;
+}
+
+/* ============================================================
+   门面页（Day 11 新增）
+
+   访客看到的第一屏 —— 不是功能页，是"这是什么"的自我介绍。
+   结构与参考站 html5up.net/dimension 一致：
+     全屏背景 + 一圈内缩细描边 → 圆形徽标 + 竖线 → 大标题
+     → 横线 → 一行小字 → 横线 → 一个按钮 → 底部一行小字
+
+   ⚠️ 为什么门面可以用深色照片，而应用内部不行：
+      项目内核就是"旧照片 / 回忆"，暖调照片正好同族（参考那张也是黄昏金色）；
+      Day 8 那条"浅色主题别铺照片"的结论**只适用于应用内部**（地图/时间轴那些
+      要长时间看数据的页面），门面是"看一眼"的一屏，规则不一样。
+   ============================================================ */
+
+/* 门面页显示时，把左侧导航整条藏起来（门面就该是整屏一屏） */
+body.is-landing .app-nav {
+  display: none;
+}
+
+.landing {
+  position: relative;
+  /* ⚠️ 用 min-height 而不是 height，而且**不设 overflow: hidden** ——
+      否则窗口一矮（比如 600px 高的笔记本），内容超出就被裁掉、
+      **「开始记录」按钮会直接看不见**。现在超出就让外层的 .view 自己滚。 */
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-5);
+  padding: var(--space-8);
+  text-align: center;
+  /* 压照片用的浅色 —— 直接用主题里那支，不再是随手挑的白 */
+  color: var(--color-on-accent);
+
+  /* ---------- 背景：照片 + 两层罩 ----------
+     ⚠️ 第 1 层是"暗罩"（压住照片，保证白字读得清），第 2 层是暖色晕染。
+     ⚠️ 第 3 层是照片；**文件不存在时会退化成前两层的颜色，页面不会崩**。
+        所以背景图可以后补、可以替换，代码一行都不用动。 */
+  background-color: #4a3a2c;
+  background-image:
+    linear-gradient(rgba(30, 22, 15, 0.55), rgba(30, 22, 15, 0.74)),
+    radial-gradient(120% 90% at 50% 6%,
+      rgba(181, 118, 46, 0.38) 0%, rgba(181, 118, 46, 0) 62%),
+    url('../assets/landing-bg.jpg');
+  background-size: cover, cover, cover;
+  background-position: center, center, center;
+  background-repeat: no-repeat;
+}
+
+/* 参考图那圈"内缩的细描边" */
+.landing::after {
+  content: '';
+  position: absolute;
+  inset: var(--space-4);
+  border: 1px solid rgba(255, 250, 243, 0.32);
+  /* ⚠️ 铁律：铺满容器的浮层必须让出点击，否则按钮点不动 */
+  pointer-events: none;
+}
+
+/* ---------- 圆形徽标 + 下面那根竖线 ---------- */
+.landing-mark {
+  position: relative;
+  flex: 0 0 auto;
+  width: 64px;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 250, 243, 0.5);
+  border-radius: 50%;
+  /* 圈内一点点中心高光 + 圈外一圈很淡的辉光：
+     压在照片上时，这两样能让徽标"浮"起来，不至于糊进背景。
+     ⚠️ 都很淡（.10 / .08）—— 压照片的装饰只经得起这么点，再多就脏。 */
+  background: radial-gradient(circle at 50% 50%,
+    rgba(255, 250, 243, 0.10) 0%, rgba(255, 250, 243, 0) 70%);
+  box-shadow: 0 0 24px rgba(255, 250, 243, 0.08);
+}
+
+.landing-mark-svg {
+  width: 38px;
+  height: 38px;
+  display: block;
+}
+
+/* 竖线：用伪元素挂在徽标下面，让它和徽标视觉上连成一体 */
+.landing-mark::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  width: 1px;
+  height: var(--space-6);
+  background: rgba(255, 250, 243, 0.32);
+}
+
+/* ---------- 大标题 ----------
+   ⚠️ 字距会把最后一个字后面也撑出一份空白 → 用等量的 padding-left 补回来，
+      不然"居中"会看着偏左。这是 letter-spacing 居中时的老毛病。 */
+.landing-title {
+  margin: 0;
+  padding-left: 0.18em;
+  font-size: var(--text-display);
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+/* ---------- 横线 ---------- */
+.landing-rule {
+  width: min(440px, 72%);
+  height: 1px;
+  margin: 0;
+  border: 0;
+  background: rgba(255, 250, 243, 0.32);
+}
+
+/* ---------- 一行小字 ---------- */
+.landing-sub {
+  margin: 0;
+  max-width: 34em;
+  font-size: var(--text-base);
+  line-height: 1.7;
+  letter-spacing: 0.08em;
+}
+
+/* ---------- 唯一那个按钮 ---------- */
+.landing-cta {
+  margin-top: var(--space-2);
+  padding: var(--space-3) var(--space-8);
+  border: 1px solid rgba(255, 250, 243, 0.5);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: inherit;
+  font-family: inherit;
+  font-size: var(--text-sm);
+  letter-spacing: 0.18em;
+  padding-left: calc(var(--space-8) + 0.18em);   /* 同上：补掉字距造成的偏移 */
+  cursor: pointer;
+  transition: background 0.18s, border-color 0.18s;
+}
+
+.landing-cta:hover {
+  border-color: var(--color-on-accent);
+  background: rgba(255, 250, 243, 0.14);
+}
+
+/* 键盘焦点环（Day 9 立下的规矩，新组件也要守） */
+.landing-cta:focus-visible {
+  outline: 2px solid var(--color-on-accent);
+  outline-offset: 3px;
+}
+
+.landing-cta:active {
+  transform: translateY(1px);
+}
+
+/* ---------- 底部那行小字 ---------- */
+.landing-foot {
+  position: absolute;
+  left: var(--space-6);
+  right: var(--space-6);
+  bottom: var(--space-6);
+  margin: 0;
+  /* ⚠️ 它是小字，压在照片上 —— 小字比大字**更**需要对比度，
+      所以这里用 .78 而不是 .6（Day 9 那条教训）。 */
+  color: rgba(255, 250, 243, 0.78);
+  font-size: var(--text-xs);
+  letter-spacing: 0.08em;
+}
+
+/* ---------- 窄屏 ---------- */
+@media (max-width: 767px) {
+  .landing {
+    gap: var(--space-4);
+    padding: var(--space-6) var(--space-4);
+  }
+
+  /* 40px 的大标题在 375px 上会换行挤爆，降到 --text-2xl */
+  .landing-title {
+    font-size: var(--text-2xl);
+    letter-spacing: 0.12em;
+  }
+
+  .landing::after {
+    inset: var(--space-2);
+  }
+
+  .landing-foot {
+    left: var(--space-4);
+    right: var(--space-4);
+    bottom: var(--space-4);
+  }
 }
 
 /* ---------- 地图视图 ---------- */

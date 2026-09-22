@@ -596,19 +596,16 @@
          （比较用规范化城市名，免得"武汉市"和"武汉"对不上） */
       var highlighted = !!highlightedCity && Model.isSameCity(place.city, highlightedCity);
 
-      /* ⚠️ Day 8 美化改版（最终）：描边用白色。
-         现在是【奶油浅色地图底】，点的填充色是深色系（藏蓝/松绿/橙/暖灰），
-         深色块在浅底上本来就清楚，加一圈白边是为了：
-         ① 让相邻的点在重叠时能分开边界
-         ② 让点在米色底图上显得"干净、像贴上去的"
-         高亮态（点城市列表里的城市名）用更粗的暖棕边把它框出来。 */
+      /* ⚠️ 描边**不能**再用白色（Day 11 改，原因见文件上方 DOT_STROKE_COLOR 那段说明）：
+         浅色底图上白边会和底图融成一片，还把点的彩色部分啃掉一圈，看着又小又虚。
+         现在普通态用深棕细边（让点立住），高亮态把同一支深棕加粗到 2 倍。 */
       var marker = new AMap.CircleMarker({
         center: [place.lng, place.lat],
         radius: diameter / 2,           /* 高德这里要的是半径 */
         fillColor: color,
         fillOpacity: 0.92,
-        strokeColor: highlighted ? '#3A332B' : '#FFFFFF',
-        strokeWeight: highlighted ? 3 : 1.5,
+        strokeColor: DOT_STROKE_COLOR,
+        strokeWeight: highlighted ? DOT_STROKE_WEIGHT_ON : DOT_STROKE_WEIGHT,
         zIndex: highlighted ? 9999 : diameter,  /* 高亮的点压在最上层 */
         extData: { placeId: place.id }
       });
@@ -711,10 +708,23 @@
   var ARC_OUTLINE_COLOR = 'rgba(253, 250, 244, 0.95)';   /* 接近纸白，比原来更实 */
   var ARC_OUTLINE_WEIGHT = ARC_OUTLINE ? 2.6 : 0;        /* 原 1.5：加粗 → 光晕更明显 */
 
-  /* ⚠️ 待观察（尚未改）：草色青是绿调底图，而「短期停留」的类型色是
-     `#3D7A5F` 松绿 —— **绿点画在绿底上会不够醒目**。
-     真要改就得动 model.js 的四色体系（那套色是 Day 8 改了三轮才定的），
-     属于要单独决策的事，先记在这里，不顺手改。 */
+  /* ---------- 地图上「点」的描边（Day 11 改）----------
+     ⚠️ 原来普通状态用**纯白**描边 —— 那是**深色底图**的做法。
+        底图换成 fresh（草色青，浅绿）之后：白边和底图**融成一片、看不见**，
+        但它照样占掉点的边缘 —— 一个 8px 的点（「想去」和 0 月的地点就是这么大），
+        可见彩色直径只剩约 6.5px，读起来**又小又虚**
+        （他 2026-09-22 反馈："点的颜色太淡了，没有线的时候不能一下子看到点在哪里"）。
+     ⭐ 换成深色边之后，点的暗色范围**向外扩**，反而读起来更大更实 ——
+        这是个反直觉但很实在的点：**浅底上的点靠深边立住，深底上的点才靠白边**。
+     ⚠️ 描边色取 `--color-text` 那个值（#3A332B）：和文字同源，比纯黑柔和。 */
+  var DOT_STROKE_COLOR = '#3A332B';
+  var DOT_STROKE_WEIGHT = 1.5;
+  var DOT_STROKE_WEIGHT_ON = 3;      /* 高亮态（点城市列表里的城市名）时加粗 */
+
+  /* ✅ 已解决（Day 11）：这条原来写的是"待观察（尚未改）"——
+     「草色青是绿调底图，而「短期停留」用松绿 #3D7A5F，绿点画绿底会不够醒目」。
+     现在连同「旅游·暖橙」「想去·暖灰」一起，四个类型色都在 model.js 里按新底图重调过
+     （对底图的对比度全部提到 >= 4.4:1）。详见 model.js 的 TYPE_COLORS 上方那段说明。 */
 
   /**
    * 算一条"拱起来"的弧线路径（给 AMap.BezierCurve 用）
