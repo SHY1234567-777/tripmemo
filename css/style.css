@@ -127,6 +127,37 @@
   --radius-xl:   16px;    /* 大卡片、弹窗 */
   --radius-2xl:  24px;    /* 预留：当前还没有这么大的容器 */
   --radius-full: 999px;   /* 胶囊 */
+
+  /* ---------- 阴影 4 档（Day 9 重做 · 建立）----------
+     ⚠️ 这四档原本只在 DESIGN.md 6.2 里写着，:root 里一个都没有 ——
+        实际是 18 处 box-shadow 各写各的（13 种不同值），改一处必漏一处。
+     取值原则：**从已有代码里最常用的原值取**，所以替换后
+        多数地方画面不变（需要重新归类的那几处才微调）。
+     ⚠️ **不是所有 box-shadow 都归这四档** —— 焦点环、inset 暗角、
+        浅色光晕、左侧强调条、方向性抽屉阴影都是"别的东西"，
+        不属"抬升层次"，见 DESIGN.md 6.2 的例外说明。 */
+  --shadow-sm: 0 1px 2px  rgba(58, 51, 43, 0.05);  /* 静止的卡片（几乎看不见，只是"贴"在底上） */
+  --shadow-md: 0 6px 20px rgba(58, 51, 43, 0.13);  /* 卡片悬停（抬起来） */
+  --shadow-lg: 0 8px 26px rgba(58, 51, 43, 0.22);  /* 浮层：下拉、悬停提示 */
+  --shadow-xl: 0 12px 40px rgba(58, 51, 43, 0.28); /* 弹窗 */
+
+  /* ---------- 动效（Day 9 重做 · 建立）----------
+     ⚠️ 原本 `--duration-*` / `--ease-out` 也只在 DESIGN.md 里写着，:root 里没有 ——
+        实际是 6 种硬写秒数散在各处（0.15 秒 13 处、0.18 秒 6 处、0.2 秒 2 处；另有 0.26 / 0.38 / 0.8 秒各 1 处）。
+     取值原则同阴影：**取已有代码里的实际值**，所以替换后画面不变。
+     ⚠️ 不是每个时长都归这三档：**循环动画的周期**（如加载转圈的 0.8s）是"转速"，
+        不是"过渡时长"，不归这一套（见 DESIGN.md 七）。 */
+  --duration-fast:   150ms;  /* 悬停、颜色变化等微交互 */
+  --duration-normal: 180ms;  /* 卡片抬起、边框变化 */
+  --duration-slow:   380ms;  /* 入场动画 */
+  --ease-out: cubic-bezier(0.22, 0.68, 0.36, 1);  /* 默认缓动（减速） */
+  /* ⚠️ `--duration-normal` 原来在文档里写的是 220ms，但代码里**从未出现过 220ms**
+     （实际是 180ms 用了 6 处、200ms 用了 2 处）。2026-09-23 由 shy 拍板：
+     **以代码为准定为 180ms**，DESIGN.md 同步改 —— 理由是"文档应该描述现实"。
+     ⚠️ 另有 2 处**故意不归这套刻度**：
+        ① 加载转圈的 800ms —— 那是"转速"，不是"过渡时长"；
+        ② 抽屉滑入的 260ms —— 时长跟着面板宽度调，硬套 380ms 会显得拖。
+        两者都登记在 DESIGN.md 七。 */
 }
 
 /* ---------- 基础重置 ---------- */
@@ -297,7 +328,7 @@ body::after {
   line-height: 1.4;
   text-align: left;
   cursor: pointer;
-  transition: background 0.15s, color 0.15s;
+  transition: background var(--duration-fast), color var(--duration-fast);
 }
 
 .nav-icon {
@@ -527,7 +558,7 @@ body.is-landing .app-nav {
   letter-spacing: 0.18em;
   padding-left: calc(var(--space-8) + 0.18em);   /* 同上：补掉字距造成的偏移 */
   cursor: pointer;
-  transition: background 0.18s, border-color 0.18s;
+  transition: background var(--duration-normal), border-color var(--duration-normal);
 }
 
 .landing-cta:hover {
@@ -618,13 +649,15 @@ body.is-landing .app-nav {
 /* 左上角工具条：搜索框 + 筛选栏，一起浮在地图上方 */
 .map-toolbar {
   position: absolute;
-  top: 12px;
-  left: 12px;
+  top: var(--space-3);
+  left: var(--space-3);
   z-index: 10;
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
-  max-width: calc(100% - 24px);
+  /* ⚠️ 原来 top/left 是硬写的 12px、这里硬写 24px ——
+     而 12px 就是 --space-3、24px 就是 --space-6，属"同一个值两种写法"（Day 9 重做·第 4 步修） */
+  max-width: calc(100% - var(--space-6));
 }
 
 /* 搜索框外面包一层，让下拉能跟着它定位 */
@@ -671,7 +704,7 @@ body.is-landing .app-nav {
       它里面是一行行**要读的文字**，太透了会跟背后的地图线打架，看不清。 */
 .search-dropdown {
   position: absolute;
-  top: calc(100% + 4px);
+  top: calc(100% + var(--space-1));   /* 4px = --space-1，别硬写 */
   left: 0;
   z-index: 30;
   width: 100%;
@@ -683,7 +716,7 @@ body.is-landing .app-nav {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   background: var(--color-glass-strong);
-  box-shadow: 0 8px 26px rgba(58, 51, 43, 0.22);
+  box-shadow: var(--shadow-lg);
   backdrop-filter: blur(var(--glass-blur));
   -webkit-backdrop-filter: blur(var(--glass-blur));
 }
@@ -732,6 +765,12 @@ body.is-landing .app-nav {
   display: flex;
   align-items: center;
   gap: var(--space-2);
+  /* ⭐ **从结构上保证永不溢出**（见 DESIGN.md 九.3 那条规矩）：
+     flex 子项默认 min-width: auto **拒绝收缩**，而这一行里塞着
+     "输入框 + 两个按钮"。如果容器比它们加起来还窄，不加 wrap 就会横向撑破页面。
+     加了 wrap 之后：**装得下就一行，装不下就换行** —— 不需要去测一个精确的临界宽度
+     （临界值还受浏览器缩放影响，很难测准）。 */
+  flex-wrap: wrap;
 }
 
 .map-search--small {
@@ -748,7 +787,7 @@ body.is-landing .app-nav {
   font-family: inherit;
   font-size: var(--text-sm);
   cursor: pointer;
-  transition: color 0.15s, border-color 0.15s;
+  transition: color var(--duration-fast), border-color var(--duration-fast);
   backdrop-filter: blur(var(--glass-blur));
   -webkit-backdrop-filter: blur(var(--glass-blur));
 }
@@ -804,7 +843,7 @@ body.is-landing .app-nav {
   font-family: inherit;
   font-size: var(--text-sm);
   cursor: pointer;
-  transition: border-color 0.15s, color 0.15s, background 0.15s;
+  transition: border-color var(--duration-fast), color var(--duration-fast), background var(--duration-fast);
 }
 
 .chip:hover {
@@ -868,7 +907,7 @@ body.is-landing .app-nav {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   background: var(--color-glass-strong);
-  box-shadow: 0 4px 20px rgba(58, 51, 43, 0.18);
+  box-shadow: var(--shadow-md);   /* 空状态浮起卡：语义上就是"浮起的卡片"，归 md */
   color: var(--color-text);
   backdrop-filter: blur(var(--glass-blur));
   -webkit-backdrop-filter: blur(var(--glass-blur));
@@ -1073,8 +1112,8 @@ body.is-landing .app-nav {
   background: var(--color-elevated);
   cursor: pointer;
   /* 卡片感的关键：一点点阴影 + 圆角，让它"浮"在底上 */
-  box-shadow: 0 1px 2px rgba(58, 51, 43, 0.05);
-  transition: border-color 0.18s, box-shadow 0.18s, transform 0.18s;
+  box-shadow: var(--shadow-sm);
+  transition: border-color var(--duration-normal), box-shadow var(--duration-normal), transform var(--duration-normal);
 }
 
 /* 卡片左边的小圆点：钉在时间竖线上
@@ -1101,7 +1140,7 @@ body.is-landing .app-nav {
 /* 悬停：整张卡往右挪一点 + 抬起来 —— 这就是"翻阅"的手感 */
 .timeline-card:hover {
   border-color: rgba(181, 118, 46, 0.38);
-  box-shadow: 0 6px 20px rgba(58, 51, 43, 0.13);
+  box-shadow: var(--shadow-md);
   transform: translateX(3px);
 }
 
@@ -1277,13 +1316,13 @@ body.is-landing .app-nav {
   border-radius: var(--radius-xl);
   overflow: hidden;
   background: var(--color-elevated);
-  box-shadow: 0 1px 2px rgba(58, 51, 43, 0.05);
-  transition: border-color 0.18s, box-shadow 0.2s, transform 0.2s;
+  box-shadow: var(--shadow-sm);
+  transition: border-color var(--duration-normal), box-shadow var(--duration-normal), transform var(--duration-normal);   /* 原本 box-shadow / transform 是 200ms，与同行 border-color 的 180ms 不一致，一并统一 */
 }
 
 .city-group:hover {
   border-color: rgba(181, 118, 46, 0.32);
-  box-shadow: 0 8px 24px rgba(58, 51, 43, 0.13);
+  box-shadow: var(--shadow-md);   /* 与 .timeline-card:hover 同一档 —— 同一类交互不该有两个阴影 */
   transform: translateY(-2px);                   /* 抬起来一点，卡片感更强 */
 }
 
@@ -1304,7 +1343,7 @@ body.is-landing .app-nav {
 
 .city-group {
   /* backwards：延迟期间保持 from 状态（透明），不然会先闪现再动 */
-  animation: card-flip-in 0.38s cubic-bezier(0.22, 0.68, 0.36, 1) backwards;
+  animation: card-flip-in var(--duration-slow) var(--ease-out) backwards;
   transform-origin: center top;
 }
 
@@ -1420,7 +1459,7 @@ body.is-landing .app-nav {
   padding: var(--space-3) var(--space-4);
   border-top: 1px solid var(--color-border);
   cursor: pointer;
-  transition: background 0.15s;
+  transition: background var(--duration-fast);
 }
 
 .place-row:hover {
@@ -1539,7 +1578,7 @@ body.is-landing .app-nav {
   background: var(--color-bg);
   border-left: 1px solid var(--color-border);
   box-shadow: -12px 0 40px rgba(58, 51, 43, 0.28);
-  animation: drawer-in 0.26s cubic-bezier(0.22, 0.68, 0.36, 1) backwards;
+  animation: drawer-in 0.26s var(--ease-out) backwards;
 }
 
 /* 从右侧滑入一点 + 淡入。
@@ -1694,7 +1733,7 @@ body.is-landing .app-nav {
   font-family: inherit;
   font-size: var(--text-sm);
   cursor: pointer;
-  transition: color 0.15s, border-color 0.15s;
+  transition: color var(--duration-fast), border-color var(--duration-fast);
 }
 
 .drawer-tab:hover {
@@ -1851,7 +1890,7 @@ body.is-landing .app-nav {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-xl);
   background: var(--color-elevated);
-  box-shadow: 0 12px 40px rgba(58, 51, 43, 0.28);
+  box-shadow: var(--shadow-xl);
   overflow: hidden;
 }
 
@@ -2007,7 +2046,7 @@ body.is-landing .app-nav {
   font-family: inherit;
   font-size: var(--text-sm);
   cursor: pointer;
-  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  transition: background var(--duration-fast), border-color var(--duration-fast), color var(--duration-fast);
 }
 
 .btn:hover {
@@ -2259,4 +2298,22 @@ body.is-landing .app-nav {
   .timeline-year-list {
     padding-left: var(--space-3);
   }
+
+  /* ---------- 地图工具条：窄屏下把横向空间用满 ----------
+     ⚠️ 地图视图原本是**本项目唯一在三档断点里零适配的区域**（Day 9 重做·第 4 步补上）。
+     原来搜索框固定 260px —— 在 375px 屏上右边白白空着 91px；
+     主城市输入框更只有 150px，旁边还挤着两个按钮。 */
+  .map-toolbar {
+    right: var(--space-3);   /* 左右都贴边 = 自然撑满，比只写 max-width 直白 */
+    max-width: none;
+  }
+
+  /* ⚠️ 这一条同时管到 `.map-search--small` —— 那个元素身上也带着 `.map-search` 类，
+     而媒体查询块在文件末尾，同优先级下"后来者胜"，所以不用再为它写一遍。 */
+  .map-search {
+    width: 100%;
+  }
+
+  /* 输入框占满之后，主城市行里那两个按钮会落到第二行 ——
+     这正是基础样式里给 `.map-maincity` 加 `flex-wrap` 的用处。 */
 }
