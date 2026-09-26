@@ -41,6 +41,7 @@
   var elLoading = null;      /* 加载中状态（Day 8） */
   var elError = null;        /* 错误状态（Day 8） */
   var elErrorMsg = null;
+  var elRippleLayer = null;   /* 新点"落位"涟漪的容器（Day 11 重做） */
 
   /* SDK 加载超时时间（毫秒）
      ⚠️ 为什么必须有超时：只有"加载中"没有超时，就是**无限转圈** ——
@@ -273,6 +274,11 @@
       console.log('[TripMemo] 地图被点击：', lng, lat);
       handleMapClick(lng, lat);
     });
+
+    /* 地图一动（拖 / 缩放），已经撒出去的涟漪位置就不对了 → 直接清掉（Day 11 重做）。
+       涟漪只活几百毫秒，正常情况下根本来不及拖；这两行是防"拖到一半看到错位的环"。 */
+    map.on('movestart', clearRipples);
+    map.on('zoomstart', clearRipples);
   }
 
   /** 地图被切到前台时要重算尺寸，否则会显示不全 */
@@ -577,62 +583,94 @@
   }
 
   /** 重画所有点 */
+  /**
+   * 造一个地点的点标（**只造、不加到地图上**）
+   *
+   * ⚠️ 抽出来是因为有两条路都要建点：
+   *    ① 全量重画（renderMarkers）
+   *    ② 新增时只补那一个（addSingleMarker）
+   *    复制两份的话，以后改悬停提示或点击行为**必然漏掉一处**。
+   */
+  function buildMarker(place) {
+    var diameter = Model.dotDiameter(place);
+    var color = Model.TYPE_COLORS[place.type] || Model.TYPE_COLORS.long;
+
+    /* 被选中的城市：描边加粗、颜色变亮，在一堆点里一眼能认出来
+       （比较用规范化城市名，免得"武汉市"和"武汉"对不上） */
+    var highlighted = !!highlightedCity && Model.isSameCity(place.city, highlightedCity);
+
+    /* ⚠️ 描边**不能**再用白色（Day 11 改，原因见文件上方 DOT_STROKE_COLOR 那段说明）：
+       浅色底图上白边会和底图融成一片，还把点的彩色部分啃掉一圈，看着又小又虚。
+       现在普通态用深棕细边（让点立住），高亮态把同一支深棕加粗到 2 倍。 */
+    var marker = new AMap.CircleMarker({
+      center: [place.lng, place.lat],
+      radius: diameter / 2,           /* 高德这里要的是半径 */
+      fillColor: color,
+      fillOpacity: 0.92,
+      strokeColor: DOT_STROKE_COLOR,
+      strokeWeight: highlighted ? DOT_STROKE_WEIGHT_ON : DOT_STROKE_WEIGHT,
+      zIndex: highlighted ? 9999 : diameter,  /* 高亮的点压在最上层 */
+      extData: { placeId: place.id }
+    });
+
+    /* 悬停：显示地点名与停留时长（PRD 验收标准 5 / 31） */
+    marker.on('mouseover', function () {
+      showTooltip(place);
+    });
+
+    /* 鼠标移开：收起提示 */
+    marker.on('mouseout', function () {
+      hideTooltip();
+    });
+
+    /* 点击点：打开「查看态」弹窗 */
+    marker.on('click', function () {
+      lastMarkerClickAt = Date.now();
+      console.log('[TripMemo] 点到了地点：', place.name, place.id);
+      handleMarkerClick(place);
+    });
+
+    return marker;
+  }
+
+  /** 全量重画所有点（先清空再重建） */
   function renderMarkers() {
     if (!map) {
       return;
     }
     clearMarkers();
 
-    var places = Store.filterByType(activeType);
-
-    places.forEach(function (place) {
+    Store.filterByType(activeType).forEach(function (place) {
       if (isNaN(place.lng) || isNaN(place.lat)) {
         return;
       }
-      var diameter = Model.dotDiameter(place);
-      var color = Model.TYPE_COLORS[place.type] || Model.TYPE_COLORS.long;
-
-      /* 被选中的城市：描边加粗、颜色变亮，在一堆点里一眼能认出来
-         （比较用规范化城市名，免得"武汉市"和"武汉"对不上） */
-      var highlighted = !!highlightedCity && Model.isSameCity(place.city, highlightedCity);
-
-      /* ⚠️ 描边**不能**再用白色（Day 11 改，原因见文件上方 DOT_STROKE_COLOR 那段说明）：
-         浅色底图上白边会和底图融成一片，还把点的彩色部分啃掉一圈，看着又小又虚。
-         现在普通态用深棕细边（让点立住），高亮态把同一支深棕加粗到 2 倍。 */
-      var marker = new AMap.CircleMarker({
-        center: [place.lng, place.lat],
-        radius: diameter / 2,           /* 高德这里要的是半径 */
-        fillColor: color,
-        fillOpacity: 0.92,
-        strokeColor: DOT_STROKE_COLOR,
-        strokeWeight: highlighted ? DOT_STROKE_WEIGHT_ON : DOT_STROKE_WEIGHT,
-        zIndex: highlighted ? 9999 : diameter,  /* 高亮的点压在最上层 */
-        extData: { placeId: place.id }
-      });
-
-      /* 悬停：显示地点名与停留时长（PRD 验收标准 5 / 31） */
-      marker.on('mouseover', function () {
-        showTooltip(place);
-      });
-
-      /* 鼠标移开：收起提示 */
-      marker.on('mouseout', function () {
-        hideTooltip();
-      });
-
-      /* 点击点：2c 步骤接入详情弹窗，这里先打印一下 */
-      marker.on('click', function () {
-        lastMarkerClickAt = Date.now();
-        console.log('[TripMemo] 点到了地点：', place.name, place.id);
-        handleMarkerClick(place);
-      });
-
-      markers.push(marker);
+      markers.push(buildMarker(place));
     });
 
     if (markers.length) {
       map.add(markers);
     }
+    updateEmptyState();
+  }
+
+  /**
+   * 只往地图上补一个点 —— **不清空、不重画已有的点**（Day 11 重做）
+   *
+   * 为什么要单独一个：renderMarkers() 是"全清 → 全建"，
+   * 新增时用它会让**其他点整片闪一下**。这里只画新的那一个。
+   * ⚠️ 新点如果不符合当前筛选就不该出现 —— 否则会出现"筛选着旅游，
+   *    却凭空冒出一个长期居住的点"。
+   */
+  function addSingleMarker(place) {
+    if (!map || !place || isNaN(place.lng) || isNaN(place.lat)) {
+      return;
+    }
+    if (activeType && place.type !== activeType) {
+      return;   /* 被当前筛选挡掉了 */
+    }
+    var marker = buildMarker(place);
+    markers.push(marker);
+    map.add(marker);
     updateEmptyState();
   }
 
@@ -743,10 +781,9 @@
    *
    * @param {{lng:number, lat:number}} from 起点（主城市锚点）
    * @param {{lng:number, lat:number}} to   终点（目标城市中心）
-   * @returns {Array} BezierCurve 要的 path：
-   *          [0] = 起点；[1] = [控制点1, 控制点2, 终点]（6 个数）
+   * @returns {{p0:Array, c1:Array, c2:Array, p3:Array}} 四个控制点，每项是 [lng, lat]
    */
-  function arcPath(from, to) {
+  function arcControlPoints(from, to) {
     var latMid = (from.lat + to.lat) / 2;
     /* cos(纬度)：经度方向的缩放系数。乘上它，经度差就近似变成"等距"的差 */
     var kx = Math.cos(latMid * Math.PI / 180);
@@ -762,10 +799,14 @@
     var dy = by - ay;
     var len = Math.sqrt(dx * dx + dy * dy);
 
-    /* 两点重合（理论上不该发生）→ 退回直线路径，不要产生 NaN */
-    if (len === 0) {
-      return [[from.lng, from.lat], [to.lng, to.lat]];
-    }
+      /* 两点重合（理论上不该发生）→ 让两个控制点和端点重合，
+         贝塞尔就退化成一条直线，也不会产生 NaN */
+      if (len === 0) {
+        return {
+          p0: [from.lng, from.lat], c1: [from.lng, from.lat],
+          c2: [to.lng, to.lat],     p3: [to.lng, to.lat]
+        };
+      }
 
     /* 2、垂直单位向量：把 (dx,dy) 转 90°，再乘 ARC_SIDE 决定朝哪边鼓 */
     var px = (-dy / len) * ARC_SIDE;
@@ -783,20 +824,153 @@
       return [cx / kx, cy];
     }
 
-    var c1 = ctrlAt(0.25);
-    var c2 = ctrlAt(0.75);
+    return {
+      p0: [from.lng, from.lat],
+      c1: ctrlAt(0.25),
+      c2: ctrlAt(0.75),
+      p3: [to.lng, to.lat]
+    };
+  }
 
-    /* 5、组装成 BezierCurve 要的格式：
-          第一个元素是起点；第二个元素是「控制点1、控制点2、终点」
-          （高德的 path 是**扁平的坐标数组**，一段最多两个控制点） */
+  /** 组装成 BezierCurve 要的 path 格式（扁平数组，一段最多两个控制点） */
+  function arcPath(from, to) {
+    var cp = arcControlPoints(from, to);
     return [
-      [from.lng, from.lat],
-      [c1[0], c1[1], c2[0], c2[1], to.lng, to.lat]
+      cp.p0,
+      [cp.c1[0], cp.c1[1], cp.c2[0], cp.c2[1], cp.p3[0], cp.p3[1]]
     ];
   }
 
+  /**
+   * 在三次贝塞尔曲线上等分采样出 n+1 个点
+   * 公式：B(t) = (1-t)³·P0 + 3(1-t)²t·C1 + 3(1-t)t²·C2 + t³·P3
+   *
+   * 用途：线的"生长"动画 —— 逐帧把**前 k 个点**连起来，看起来就是从起点画过去。
+   * ⚠️ 为什么不用 BezierCurve 逐帧 setPath：那个方法的可用性没把握；
+   *    Polyline.setPath 是稳的，而且它同样支持 isOutline / borderWeight（"管子"质感不丢）。
+   */
+  function bezierPoints(cp, n) {
+    var pts = [];
+    for (var i = 0; i <= n; i++) {
+      var t = i / n;
+      var u = 1 - t;
+      var a = u * u * u;
+      var b = 3 * u * u * t;
+      var c = 3 * u * t * t;
+      var d = t * t * t;
+      pts.push([
+        a * cp.p0[0] + b * cp.c1[0] + c * cp.c2[0] + d * cp.p3[0],
+        a * cp.p0[1] + b * cp.c1[1] + c * cp.c2[1] + d * cp.p3[1]
+      ]);
+    }
+    return pts;
+  }
+
+  /**
+   * 算出「主城市 → 每个非主城市」的线数据（**只有数字，不含高德对象**）
+   *
+   * ⚠️ 抽出来是为了让"新增时只生长那一条线"（growLineToCity）和这里的全量重画
+   *    用**完全同一套口径** —— 否则筛选、剔除「想去」、主城市不连线这些规则，
+   *    两边各写一遍迟早会走偏。
+   *
+   * @returns {Array<{city:string, lng:number, lat:number, months:number, weight:number}>}
+   */
+  function cityLineData(mainCity) {
+    /* ⚠️ 必须剔除「想去」—— 那是"还没去过"的地方，
+         不该出现在"从锚点出发去过哪"的连线上 */
+    var visited = Store.filterByType(activeType).filter(function (place) {
+      return place.type !== Model.WISHLIST_KEY;
+    });
+
+    var out = [];
+    Model.cityStats(visited).forEach(function (item) {
+      /* 主城市自己的点不连线（验收标准 17） */
+      if (Model.isSameCity(item.city, mainCity.city)) {
+        return;
+      }
+      out.push({
+        city: item.city,
+        lng: item.lng,
+        lat: item.lat,
+        months: item.totalMonths,
+        weight: Model.lineWidthByMonths(item.totalMonths)   /* 线宽 ∝ 累计停留时长（验收标准 18） */
+      });
+    });
+    return out;
+  }
+
+  /**
+   * 造一条"主城市 → 某城市"的线对象
+   * ⚠️ **只造、不加到地图上** —— 由调用方决定什么时候加（全量重画是一起加，单个生长是逐帧加）
+   */
+  function buildCityLine(mainCity, item, useCurve) {
+    /* 线的基础样式（弧线和直线共用）
+       颜色 / 透明度用 ARC_COLOR / ARC_OPACITY，
+       它们是为 fresh 底图重新配过的（见常量区的说明）。 */
+    var lineOptions = {
+      strokeColor: ARC_COLOR,
+      strokeWeight: item.weight,
+      strokeOpacity: ARC_OPACITY,
+      lineJoin: 'round',
+      lineCap: 'round',
+      zIndex: 100
+    };
+
+    var line;
+    if (useCurve) {
+      lineOptions.path = arcPath(mainCity, item);
+      /* 描边：给线镶一圈浅色边，做出"管子"的厚度感 */
+      lineOptions.isOutline = ARC_OUTLINE;
+      lineOptions.outlineColor = ARC_OUTLINE_COLOR;
+      lineOptions.borderWeight = ARC_OUTLINE_WEIGHT;
+      line = new AMap.BezierCurve(lineOptions);
+    } else {
+      lineOptions.path = [
+        [mainCity.lng, mainCity.lat],
+        [item.lng, item.lat]
+      ];
+      line = new AMap.Polyline(lineOptions);
+    }
+
+    /* ⭐ 记住这条线属于哪个城市 —— 新增同城的点时，要靠它找到"那条线"去变粗 */
+    line.__city = item.city;
+    return line;
+  }
+
+  /**
+   * 画（或更新）主城市锚点
+   * @returns {boolean} 该主城市下有没有地点 —— 决定锚点是正常色还是灰色
+   *
+   * ⚠️ 抽出来是为了让"新增的地点就在主城市里"时**只更新锚点**，
+   *    而不是把整张图的点和线重画一遍（验收标准 23：加了第一个地点后灰色锚点要变正常）。
+   * ⚠️ 判断"有没有地点"用的是**全部地点**，不随类型筛选变化 ——
+   *    因为锚点代表的是"这座城市的地位"，跟正在看哪一类地点无关。
+   */
+  function renderAnchor(mainCity) {
+    if (anchorMarker) {
+      map.remove(anchorMarker);
+      anchorMarker = null;
+    }
+
+    var hasPlace = Store.listPlaces().some(function (place) {
+      return Model.isSameCity(place.city, mainCity.city);
+    });
+
+    anchorMarker = new AMap.Marker({
+      position: [mainCity.lng, mainCity.lat],
+      content: '<div class="map-anchor'
+        + (hasPlace ? '' : ' map-anchor--empty')
+        + '">★</div>',
+      offset: new AMap.Pixel(-13, -13),
+      zIndex: 500,
+      title: mainCity.city + (hasPlace ? '（主城市）' : '（主城市 · 该城市还没有地点）')
+    });
+    map.add(anchorMarker);
+    return hasPlace;
+  }
+
   /** 画锚点与连线 */
-  function renderOverlay() {
+  function renderOverlay(staggerMs) {
     if (!map) {
       return;
     }
@@ -808,24 +982,8 @@
       return;
     }
 
-    /* 该主城市下有没有地点 —— 决定锚点是正常色还是灰色（验收标准 22 / 23）
-       注意：这里用「全部地点」判断，不随类型筛选变化，
-            因为锚点代表的是"这个城市的地位"，跟看哪一类地点无关 */
-    var hasPlace = Store.listPlaces().some(function (place) {
-      return Model.isSameCity(place.city, mainCity.city);
-    });
-
-    /* 1、画锚点 */
-    anchorMarker = new AMap.Marker({
-      position: [mainCity.lng, mainCity.lat],
-      content: '<div class="map-anchor'
-        + (hasPlace ? '' : ' map-anchor--empty')
-        + '">★</div>',
-      offset: new AMap.Pixel(-13, -13),
-      zIndex: 500,
-      title: mainCity.city + (hasPlace ? '（主城市）' : '（主城市 · 该城市还没有地点）')
-    });
-    map.add(anchorMarker);
+    /* 1、画锚点（"有没有地点"的判断在 renderAnchor 里） */
+    var hasPlace = renderAnchor(mainCity);
 
     /* 2、主城市还没有地点时不画线（验收标准 22） */
     if (!hasPlace) {
@@ -833,66 +991,329 @@
       return;
     }
 
-    /* 3、按城市聚合后逐个画线（跟地图上看得见的点保持一致）
-       ⚠️ 必须剔除「想去」—— 那是"还没去过"的地方，
-          不该出现在"从锚点出发去过哪"的连线上 */
-    var visited = Store.filterByType(activeType).filter(function (place) {
-      return place.type !== Model.WISHLIST_KEY;
-    });
-    var stats = Model.cityStats(visited);
+    /* 3、逐个画线。数据由 cityLineData() 统一算 ——
+          这样"新增时只生长那一条线"用的是**完全同一套口径**，
+          筛选 / 剔除「想去」/ 主城市不连线的规则不会在两边走偏。 */
 
     /* 画线用哪个类：优先贝塞尔曲线（弧线），拿不到就退回直线
        ⚠️ 为什么要这个兜底：万一是旧版 SDK 里没有 BezierCurve，
-          **不兜底的话 7 条线会全部消失** —— 那比"线是直的"严重得多。
+          **不兜底的话所有线会全部消失** —— 那比"线是直的"严重得多。
           （Day 8 加练 · 步骤③） */
     var useCurve = typeof AMap.BezierCurve === 'function';
     if (!useCurve) {
       console.warn('[TripMemo] 当前高德 SDK 没有 BezierCurve，连线退回直线');
     }
 
-    stats.forEach(function (item) {
-      /* 主城市自己的点不连线（验收标准 17） */
-      if (Model.isSameCity(item.city, mainCity.city)) {
-        return;
-      }
+    cityLineData(mainCity).forEach(function (item) {
+      lines.push(buildCityLine(mainCity, item, useCurve));
+    });
 
-      /* 线的基础样式（弧线和直线共用）
-         颜色 / 透明度用 ARC_COLOR / ARC_OPACITY 两个常量，
-         它们是为 fresh 底图重新配过的（见常量区的说明）。 */
-      var lineOptions = {
+    if (!lines.length) {
+      return;
+    }
+
+    /* ⭐ 线的出现方式（Day 11 重做）：
+       · 不传参数（或传 0）→ 一次性全部画上去 —— **原来的行为，其他场景照旧**
+       · 传了毫秒数 → **逐条依次出现**，每条隔那么久，做出"一根根连起来"的过程感 */
+    var step = staggerMs || 0;
+    if (step <= 0) {
+      map.add(lines);
+    } else {
+      lines.forEach(function (line, i) {
+        setTimeout(function () {
+          /* ⚠️ 万一期间数据又变了，clearOverlay() 会把 lines 换成一个新数组 ——
+             此时这一条属于"过期的线"，**绝不能画回去** */
+          if (lines.indexOf(line) === -1) {
+            return;
+          }
+          map.add(line);
+        }, i * step);
+      });
+    }
+
+    console.log('[TripMemo] 已画 ' + lines.length + ' 条'
+      + (useCurve ? '弧线' : '直线') + '，从「' + mainCity.city + '」出发'
+      + (step > 0 ? '（逐条依次出现，每条隔 ' + step + 'ms）' : ''));
+  }
+
+  /* ------------------------------------------------------------
+     四之四、新增成功后的「归位仪式」（Day 11 重做）
+
+     2026-09-25 由 shy 定的三段式：
+       ① 地图先飞回全国视野
+       ② 空一拍 → 点全部出现（新点同时撒涟漪）
+       ③ 再一拍 → 线一根根依次连起来
+
+     为什么值得这么做：这是"让用户看到自己刚做的事生效"的完整叙事 ——
+       复位把视角交还给他，点出现说明"东西真的记下了"，
+       线连起来说明"它和主城市的关系也建立了"。
+
+     ⚠️ 下面三个常量是**编排节奏**，不是 DESIGN.md 里那套"单个组件的过渡时长" ——
+        它们三个一起决定整段动画的观感，所以要调就一起调。
+     时间轴（默认值）：
+          0ms  开始飞回
+        300ms  飞完
+        600ms  点出现（+ 涟漪）
+        700ms  第 1 条线
+        800ms  第 2 条线 …（每条 +100ms）
+     ------------------------------------------------------------ */
+
+  /* 高德的 setZoomAndCenter 自带过渡，时长由 SDK 定（约 300ms 量级）。
+     ⚠️ 这里**不传 duration 参数**（各版本签名有差异，传错反而会不动），
+        只按"它大约飞 300ms"来排后面的时间轴。 */
+  var CHOREO_FLY_MS = 300;
+  /* 一个"拍" —— 让上一步在画面上立住，再走下一步 */
+  var CHOREO_GAP_MS = 300;
+  /* 线之间的间隔（也用来当"点出现 → 开始连线"的起手间隔） */
+  var CHOREO_LINE_STEP_MS = 100;
+
+  /* 本轮编排挂出去的所有定时器。重来之前必须全部清掉，
+     否则两次编排会交错 —— 连续添加时必踩。 */
+  var choreoTimers = [];
+
+  /* 上一次编排里**还没做完的事**（画点 / 处理线）。
+     ⚠️⚠️ 为什么必须记着它（2026-09-25 板块③ 静态分析查出来的真缺陷）：
+        编排是分段的定时器 —— 画点在 600ms、处理线在 700ms。
+        如果这期间用户**又加了一个点**，clearChoreoTimers() 会把这两个定时器
+        一起清掉，于是上一次那个点**永远画不出来**、那条线也永远不长，
+        **地图和数据就此不一致**。
+        最要命的是：它不报错，只是图上"少东西"，事后极难查。
+     处理原则：**宁可"没有动画"，绝不能"内容缺失"** —— 被打断时立刻补做完。 */
+  var pendingChoreo = null;
+
+  /* 正在"生长"的那条线。中途被打断时要**把它补完整**，不能留半截。 */
+  var growRaf = null;
+  var growingLine = null;
+  var growingPts = null;
+
+  function clearChoreoTimers() {
+    choreoTimers.forEach(function (id) {
+      clearTimeout(id);
+    });
+    choreoTimers = [];
+
+    /* ⚠️ 正在生长的线：停掉动画，但**必须补完整** ——
+       直接停会在地图上留一条半截的断线，那比"没有动画"糟糕得多。 */
+    if (growRaf) {
+      cancelAnimationFrame(growRaf);
+      growRaf = null;
+    }
+    if (growingLine) {
+      try {
+        growingLine.setPath(growingPts);
+      } catch (err) {
+        console.warn('[TripMemo] 收尾生长中的线失败：', err);
+      }
+      growingLine = null;
+      growingPts = null;
+    }
+  }
+
+  /**
+   * 把上一次**没做完的编排立刻补做**
+   *
+   * ⚠️ 这是"连续操作不出错"的关键一着：
+   *    被打断的编排如果只是丢掉，就会出现"数据里有、地图上没有"的鬼状态。
+   *    代价是那一次没有动画（点直接出现、线直接完整）—— 这个交换是划算的。
+   */
+  function settlePendingChoreo() {
+    if (!pendingChoreo) {
+      return;
+    }
+    var p = pendingChoreo;
+    pendingChoreo = null;
+
+    if (!p.markerDone) {
+      addSingleMarker(p.place);
+    }
+    if (!p.lineDone) {
+      growLineToCity(p.place);
+    }
+  }
+
+  /* 生长动画把弧线采样成多少段。60 段已经足够密，肉眼和贝塞尔曲线看不出差别。 */
+  var GROW_SEGMENTS = 60;
+
+  /**
+   * 让一条线**从主城市那头长出来**
+   *
+   * 做法：先把贝塞尔曲线采样成 N 个点，再逐帧把**前 k 个点**连成折线，
+   *      k 从 2 增到 N —— 看起来就像有支笔从主城市一路画过去。
+   *
+   * ⚠️ 用 Polyline 而不是 BezierCurve：逐帧更新得靠 setPath，
+   *    Polyline.setPath 是稳的；而且它同样支持 isOutline / borderWeight，"管子"质感不丢。
+   * ⚠️ 线用的是**经纬度**，不像涟漪那样是屏幕坐标 —— 所以中途拖地图不会错位。
+   */
+  function growLine(mainCity, item) {
+    var pts = bezierPoints(arcControlPoints(mainCity, item), GROW_SEGMENTS);
+    var line = null;
+    try {
+      line = new AMap.Polyline({
+        path: pts.slice(0, 2),        /* 一开始只露一小段 */
         strokeColor: ARC_COLOR,
-        strokeWeight: Model.lineWidthByMonths(item.totalMonths),  /* 线宽 ∝ 累计停留时长（验收标准 18） */
+        strokeWeight: item.weight,
         strokeOpacity: ARC_OPACITY,
         lineJoin: 'round',
         lineCap: 'round',
+        isOutline: ARC_OUTLINE,
+        outlineColor: ARC_OUTLINE_COLOR,
+        borderWeight: ARC_OUTLINE_WEIGHT,
         zIndex: 100
-      };
+      });
+      line.__city = item.city;
+      map.add(line);
+      lines.push(line);
 
-      if (useCurve) {
-        lineOptions.path = arcPath(mainCity, item);
-        /* 描边：给线镶一圈浅色边，做出"管子"的厚度感 */
-        lineOptions.isOutline = ARC_OUTLINE;
-        lineOptions.outlineColor = ARC_OUTLINE_COLOR;
-        lineOptions.borderWeight = ARC_OUTLINE_WEIGHT;
-        lines.push(new AMap.BezierCurve(lineOptions));
-      } else {
-        lineOptions.path = [
-          [mainCity.lng, mainCity.lat],
-          [item.lng, item.lat]
-        ];
-        lines.push(new AMap.Polyline(lineOptions));
+      growingLine = line;
+      growingPts = pts;
+
+      var k = 1;
+      (function step() {
+        if (k >= pts.length) {
+          growingLine = null;
+          growingPts = null;
+          growRaf = null;
+          return;
+        }
+        k++;
+        line.setPath(pts.slice(0, k));
+        growRaf = requestAnimationFrame(step);
+      }());
+    } catch (err) {
+      /* ⚠️ 兜底：生长这条路走不通（老 SDK 没有 setPath 之类）→
+         把整条线**直接**放上去。宁可"不生长"，绝不能"没有线"。 */
+      console.warn('[TripMemo] 线生长失败，改为直接显示整条线：', err);
+      growingLine = null;
+      growingPts = null;
+      growRaf = null;
+      if (line) {
+        var idx = lines.indexOf(line);
+        if (idx !== -1) {
+          lines.splice(idx, 1);
+        }
+        map.remove(line);
+      }
+      var whole = buildCityLine(mainCity, item, true);
+      map.add(whole);
+      lines.push(whole);
+    }
+  }
+
+  /**
+   * 新增成功后，**只处理「新点所在城市」那一条线**
+   *
+   * ⚠️ 其他线一律不动 —— 2026-09-25 他和我的约定：
+   *    新增只该让"新点 ↔ 主城市"这条线出现，而不是把整张图重画一遍。
+   *
+   * 四种情况：
+   *   ① 没设主城市 / 新点是「想去」 → 本来就不该有线，什么都不做（验收标准 21）
+   *   ② 新点就在主城市 → 只可能影响**锚点**（灰→正常，验收标准 23），不产生线
+   *   ③ 该城市**已经有线** → 那条线**瞬间变粗**（累计停留时长变了，线宽要跟上）
+   *   ④ 该城市**还没有线** → 让它**从主城市那头生长出来**
+   */
+  function growLineToCity(place) {
+    if (!map || !place) {
+      return;
+    }
+    var mainCity = Store.getMainCity();
+    if (!mainCity) {
+      return;
+    }
+    if (place.type === Model.WISHLIST_KEY) {
+      return;
+    }
+
+    if (Model.isSameCity(place.city, mainCity.city)) {
+      /* ② 新点就在主城市：锚点可能要从「灰色」变「正常」。
+            这条路径不产生新线，所以只更新锚点、其他一律不动。 */
+      renderAnchor(mainCity);
+      return;
+    }
+
+    /* 用和全量重画**同一套口径**算线数据，再挑出新点所在城市那一条。
+       ⚠️ 新点若被当前筛选挡掉了，这里就找不到它 → 它也不该对线有任何影响。 */
+    var item = null;
+    cityLineData(mainCity).forEach(function (d) {
+      if (Model.isSameCity(d.city, place.city)) {
+        item = d;
       }
     });
-
-    if (lines.length) {
-      map.add(lines);
+    if (!item) {
+      return;
     }
-    console.log('[TripMemo] 已画 ' + lines.length + ' 条'
-      + (useCurve ? '弧线' : '直线') + '，从「' + mainCity.city + '」出发');
+
+    /* ③ 已经有线 → 瞬间变粗（2026-09-25 由 shy 选的方案） */
+    for (var i = 0; i < lines.length; i++) {
+      if (lines[i].__city && Model.isSameCity(lines[i].__city, place.city)) {
+        lines[i].setOptions({ strokeWeight: item.weight });
+        console.log('[TripMemo] 「' + item.city + '」的线加粗到 ' + item.weight);
+        return;
+      }
+    }
+
+    /* ④ 还没有线 → 长出来 */
+    growLine(mainCity, item);
+  }
+
+  /**
+   * 新增成功后的三段式编排（2026-09-25 由 shy 定）
+   * @param {Object} place 刚添加的那条
+   */
+  function playAddChoreography(place) {
+    if (!map || !place) {
+      /* 地图还没准备好（正常流程下不会发生）→ 退回全量重画，保证内容不丢 */
+      refresh();
+      return;
+    }
+    /* ⚠️ 这两个调用的**顺序不能反，也一个都不能省**：
+       ① clearChoreoTimers()   —— 停掉上一轮还在跑的定时器 / 生长动画
+       ② settlePendingChoreo() —— 把上一轮**没做完的**立刻补上
+       少了 ②，快速连加时就会出现"前一个点永远画不出来、它的线永远不长"——
+       而且不报错，只在图上少东西，事后极难查。 */
+    clearChoreoTimers();
+    settlePendingChoreo();
+
+    /* ① 把视角交还全国。
+          ⚠️ 这里**不再清空**已有的点和线 —— 它们原样留着，不做任何重建。
+          ⚠️⚠️ 但有一件事必须清楚（2026-09-25 由 shy 在两个方案里选的）：
+             **地图一缩放，所有锚在地图上的点和线都会跟着平移 / 缩放。**
+             那不是"它们被重画了"，是**地图在动** —— 这是地图的物理行为，
+             代码层面**无法既复位、又让它们不动**。
+             他选了"保留复位"：整张图一起退远，只有新点和新线是**单独**做动作的。
+             要验证"没被重画"，看 Console —— 不该出现「已画 N 条弧线」那句。 */
+    map.setZoomAndCenter(CHINA_ZOOM, CHINA_CENTER);
+
+    /* 记下"这一轮还没做完的事" —— 万一被下一次新增打断，好照这个补做 */
+    pendingChoreo = { place: place, markerDone: false, lineDone: false };
+
+    /* ② 飞完 + 一拍之后：新点出现（+ 涟漪） */
+    choreoTimers.push(setTimeout(function () {
+      addSingleMarker(place);
+      if (pendingChoreo && pendingChoreo.place === place) {
+        pendingChoreo.markerDone = true;
+      }
+      playRipple(place);
+
+      /* ③ 再一拍：让"新点 ↔ 主城市"那条线长出来（或让已有的那条变粗） */
+      choreoTimers.push(setTimeout(function () {
+        growLineToCity(place);
+        if (pendingChoreo && pendingChoreo.place === place) {
+          pendingChoreo.lineDone = true;
+          pendingChoreo = null;   /* 这一轮全部做完了 */
+        }
+      }, CHOREO_LINE_STEP_MS));
+    }, CHOREO_FLY_MS + CHOREO_GAP_MS));
   }
 
   /** 重画地图上的全部内容（点 + 锚点 + 线） */
   function refresh() {
+    /* ⚠️ 先把还没跑完的"归位仪式"撤掉 —— 否则它稍后会把旧的点 / 线又画回画布上 */
+    clearChoreoTimers();
+    /* ⚠️ 这里**不需要**"补做未完成的编排"（见 settlePendingChoreo 的说明）：
+       下面的全量重画会把点、线、锚点一律按当前数据重建，
+       没做完的编排本来就会被覆盖掉。直接丢掉即可，否则反而会多画一遍。
+       （注释里特意不带括号，免得后来扫"函数调用"的脚本把它当成一次真调用。） */
+    pendingChoreo = null;
     renderMarkers();
     renderOverlay();
   }
@@ -991,6 +1412,68 @@
   }
 
   /* ------------------------------------------------------------
+     四之三、新点「落位」涟漪（Day 11 重做）
+
+     为什么要有它：保存成功后，界面上原来只有"弹窗关闭"——
+     而**取消也会关窗**，两者长得一模一样，用户判断不出到底成没成。
+     一圈从新点扩散出去的光环，把答案直接画在**用户刚操作的那个位置**上。
+
+     ⚠️ 它是屏幕坐标：地图一拖动/缩放就对不上了 → 见下面的 clearRipples。
+     ------------------------------------------------------------ */
+
+  /* 兜底清理的宽限时间（毫秒）
+     正常的清理走 animationend；这个只是防"节点泄漏"的安全网。
+     ⚠️ 它**不是**动画时长 —— 动画时长在 CSS 里（--duration-slow = 380ms）。
+        这里取 1 秒是为了留足余量：将来 CSS 那边把时长调长，也不会被它提前摘掉。
+        （同类先例：map.js 里已有的 SDK_TIMEOUT_MS = 15000 也是"超时保护")。 */
+  var RIPPLE_CLEANUP_MS = 1000;
+
+  /**
+   * 在地图上给某个地点撒一圈涟漪
+   * @param {Object} place 刚添加的那条地点
+   */
+  function playRipple(place) {
+    if (!map || !elRippleLayer || !place) {
+      return;
+    }
+    if (isNaN(place.lng) || isNaN(place.lat)) {
+      return;
+    }
+
+    /* 经纬度 → "相对地图容器"的像素坐标。
+       和悬停提示 showTooltip() 用的是同一套写法、同一个坐标系。 */
+    var pos = map.lngLatToContainer([place.lng, place.lat]);
+    if (!pos) {
+      return;
+    }
+
+    var ring = document.createElement('span');
+    ring.className = 'map-ripple';
+    ring.style.left = pos.x + 'px';
+    ring.style.top = pos.y + 'px';
+    elRippleLayer.appendChild(ring);
+
+    var drop = function () {
+      if (ring.parentNode) {
+        ring.parentNode.removeChild(ring);
+      }
+    };
+
+    /* 动画播完就摘掉 —— 别在地图里越堆越多 */
+    ring.addEventListener('animationend', drop);
+    /* ⚠️ 兜底：animationend 不一定来（动画被 prefers-reduced-motion 关掉、
+       或标签页切到后台被节流），没有这一手节点就会永远留在层里 */
+    setTimeout(drop, RIPPLE_CLEANUP_MS);
+  }
+
+  /** 地图一动，之前那些涟漪的位置就不对了 → 全部清掉 */
+  function clearRipples() {
+    if (elRippleLayer) {
+      elRippleLayer.innerHTML = '';
+    }
+  }
+
+  /* ------------------------------------------------------------
      五、新增与查看（都交给详情弹窗处理）
      ------------------------------------------------------------ */
 
@@ -1023,6 +1506,7 @@
     elLoading = document.getElementById('map-loading');
     elError = document.getElementById('map-error');
     elErrorMsg = document.getElementById('map-error-msg');
+    elRippleLayer = document.getElementById('map-ripple-layer');
 
     if (!elCanvas) {
       return;
@@ -1060,8 +1544,18 @@
     });
 
     /* 数据变了就重画（点 + 锚点 + 线） */
-    document.addEventListener('data:change', function () {
-      refresh();
+    document.addEventListener('data:change', function (e) {
+      var info = (e && e.detail) || {};
+
+      /* ⭐ 只在「新增」时走三段式编排：地图归位 → 点出现 → 线逐条连（Day 11 重做）。
+         编辑 / 删除 / 批量替换都走原来的**即时重画** ——
+         那些操作没必要把视角抢回国，涟漪也不该出现
+         （涟漪的语义是"这里多了一个点"；批量替换发的是 action:'unknown'，自然被排除）。 */
+      if (info.action === 'add') {
+        playAddChoreography(info.place);
+      } else {
+        refresh();
+      }
     });
 
     /* 主城市设置变了也要重画（验收标准 20：换主城市后线自动重算） */

@@ -185,16 +185,140 @@
                 在真实项目里的样子。
      ------------------------------------------------------------ */
 
-  /** 把错误显示成页面顶部的一条提示 */
-  function showStoreError(detail) {
+  /* ---------- 顶部提示条的两种形态（Day 11 重做）----------
+     · 成功态（.app-alert--ok，绿）：告知"操作生效了"，**3 秒后自动消失**
+     · 错误态（默认，暖橙）：告知"没保存成功"，**不自动消失**
+
+     为什么一个自动消失、一个不消失：
+       成功是**预期内的结果**，看一眼就够，不该赖在屏幕上；
+       错误是**需要用户知道的事**（可能丢数据），它不走才是对的。
+     ------------------------------------------------------------ */
+
+  var ALERT_OK_HIDE_MS = 3000;
+  var alertTimer = null;
+  var alertKind = null;   /* 当前挂着的那条是 'ok' 还是 'error' */
+
+  /**
+   * 从 CSS 变量读一个毫秒时长
+   * ⭐ 为什么要绕这一下：动画时长在 CSS 里（--duration-normal）。
+   *    如果在 JS 里再写一个 180，就有了**两个来源** ——
+   *    以后改 CSS 忘了改 JS，就会出现"淡出还没播完就被隐藏"这类怪事。
+   *    这正是 DESIGN.md 原则 2（一个值只定义一次）要防的。
+   */
+  function cssDurationMs(name, fallback) {
+    try {
+      var raw = getComputedStyle(document.documentElement).getPropertyValue(name);
+      var n = parseFloat(raw);
+      return isNaN(n) ? fallback : n;
+    } catch (err) {
+      return fallback;
+    }
+  }
+
+  /**
+   * 显示顶部提示条
+   * @param {string} text 要说的话
+   * @param {string} kind 'ok' = 成功 ｜ 其他值 = 错误样式
+   */
+  function showAlert(text, kind) {
     var bar = document.getElementById('app-alert');
     if (!bar) {
       return;
     }
-    var info = detail || {};
-    bar.textContent = '数据出错了（' + (info.scope || '未知环节') + '）：'
-      + (info.message || '原因不明') + '　—— 你的改动可能没有被保存。';
+    /* ⚠️ 错误优先：已经挂着一条错误时，成功提示**不覆盖它**。
+       错误在说"你的改动可能没保存"，成功在说"刚才这步成了" ——
+       后者盖掉前者，会让用户误以为数据没事。
+       （现实里 store:error 只在本地存储读写出问题时才发，很少见。
+         真嫌它碍事，可以给错误条加个「关闭」按钮 —— 那是另一件事。） */
+    if (alertKind === 'error' && kind !== 'error') {
+      return;
+    }
+
+    var isOk = (kind === 'ok');
+    /* 它**之前是不是藏着的** —— 决定要不要重播一次淡入。
+       连续保存时（条子本来就在屏幕上）只换文字、**不重播动画**，
+       否则每存一次就重新淡入一下，看着像在闪。 */
+    var wasHidden = bar.hasAttribute('hidden');
+
+    /* 上一条的自动消失计时还没到就又来一条 → 先取消，
+       否则新提示会被旧计时器提前关掉（连续操作时必踩） */
+    if (alertTimer) {
+      clearTimeout(alertTimer);
+      alertTimer = null;
+    }
+
+    alertKind = kind;
+    bar.textContent = text;
+    /* ⚠️ 用 classList 只切「成功态」这一个类，**不重置整个 className** ——
+       重置会把 is-in 一起抹掉，连续操作时就会闪一下。 */
+    bar.classList.toggle('app-alert--ok', isOk);
     bar.removeAttribute('hidden');
+
+    if (!isOk) {
+      /* 错误态没有出现动画 —— 它需要立刻被看到 */
+      bar.classList.remove('is-in');
+      return;
+    }
+
+    /* ⚠️ 这一行不能省：先让浏览器按**起始态**（透明 + 上移 8px）算一遍样式。
+       否则起始态和结束态会在同一帧里被合并 → transition 根本不播，
+       结果还是"一下子出现"。读一下 offsetWidth 就会强制一次重排，
+       这是触发 CSS transition 的标准做法。 */
+    if (wasHidden) {
+      void bar.offsetWidth;
+    }
+    bar.classList.add('is-in');
+
+    var fadeMs = cssDurationMs('--duration-normal', 180);
+    alertTimer = setTimeout(function () {
+      /* 先开始淡出…… */
+      bar.classList.remove('is-in');
+      alertTimer = setTimeout(function () {
+        /* ……等淡出播完再真正隐藏，否则会"淡到一半突然没了" */
+        bar.setAttribute('hidden', '');
+        alertKind = null;
+        alertTimer = null;
+      }, fadeMs);
+    }, ALERT_OK_HIDE_MS);
+  }
+
+  /**
+   * 数据变了 → 弹一条提示，告诉用户"刚才那个操作生效了"
+   *
+   * ⚠️ 这正是今天要补的缺口：保存成功原来只写了 console.log（用户看不见），
+   *    而"弹窗关闭"不算反馈 —— **取消也会关窗，两者长得一模一样**。
+   * ⚠️ 只认 add / update / remove 三种 action：
+   *    批量替换、恢复备份那种整体操作发的是 'unknown' —— **故意忽略**，
+   *    因为它们不是"某一条地点"的增删改，不该冒充成保存成功。
+   */
+  function showDataChangeAlert(e) {
+    var info = (e && e.detail) || {};
+    var place = info.place;
+    if (!place || !place.name) {
+      return;
+    }
+    if (info.action === 'add') {
+      showAlert('已添加：' + place.name, 'ok');
+    } else if (info.action === 'update') {
+      showAlert('已保存：' + place.name, 'ok');
+    } else if (info.action === 'remove') {
+      showAlert('已删除：' + place.name, 'ok');
+    }
+  }
+
+  /** 把错误显示成页面顶部的一条提示 */
+  function showStoreError(detail) {
+    /* ⚠️ 两条来路的入参形状不同，必须兼容（2026-09-25 修）：
+       ① 事件监听 `addEventListener('store:error', showStoreError)`
+          → 传进来的是 **Event 对象**，真正的载荷挂在 `event.detail` 上；
+       ② `initGlobalErrorWatch()` 的"开局检查"
+          → 直接传 **lastError 裸对象**（{scope, message}）。
+       以前只按 ② 的形状解析，于是走 ① 那条路时 info.scope / info.message 全是 undefined
+       —— 提示条固定显示「未知环节 / 原因不明」，**真实原因全丢了**。
+       这跟今天是同一类毛病：条子挂在那儿，却说不清发生了什么。 */
+    var info = (detail && detail.detail) ? detail.detail : (detail || {});
+    showAlert('数据出错了（' + (info.scope || '未知环节') + '）：'
+      + (info.message || '原因不明') + '　—— 你的改动可能没有被保存。', 'error');
   }
 
   /**
@@ -236,6 +360,8 @@
       sampleBtn.addEventListener('click', handleSampleClick);
     }
     document.addEventListener('store:error', showStoreError);
+    /* 数据变更 → 成功提示（Day 11 重做）。和上面一样，尽早注册。 */
+    document.addEventListener('data:change', showDataChangeAlert);
     initGlobalErrorWatch();
 
     /* 门面页的「开始记录」按钮 → 进地图视图

@@ -57,6 +57,16 @@
   --color-danger:    #c0392b;   /* 删除 / 必填星号 / 表单错误（白底上 5.44） */
   --color-danger-bg: rgba(192, 57, 43, 0.1);
 
+  /* ---------- 成功色（Day 11 重做 · 新增）----------
+     ⚠️ 项目原本**只有 danger、没有成功色**。
+     为什么必须新增：今天的主题正是"让用户能区分成功和失败"——
+       如果成功提示和错误提示长得像，那等于**又制造了一个新的歧义**（自相矛盾）。
+     ⚠️ 选色**刻意避开了四个地点类型色**（#2F5D8A / #1F6157 / #95500E / #635A4E）——
+        因为 DESIGN 原则 1 规定"颜色只表达类型"，成功色不能和类型色撞。
+     对比度：--color-success 压 --color-success-bg = 5.43:1 ✓（14px 正文要求 ≥4.5） */
+  --color-success:    #3B6D11;   /* 成功文字 / 边框 */
+  --color-success-bg: #EAF3DE;   /* 成功提示的底 */
+
   /* ---------- 玻璃拟态（Day 8 加练 · 步骤②）----------
      手法参考 Tooolive/Map-Of-My-Journey 的 `.glass`：
        半透明底 + backdrop-filter 模糊 + 一道顶部内高光 + 外投影
@@ -858,6 +868,53 @@ body.is-landing .app-nav {
   font-weight: 500;
 }
 
+/* ---------- 新点「落位」涟漪（Day 11 重做）----------
+   ⚠️ 为什么用 DOM 层、而不是去改高德的 CircleMarker：
+      涟漪是"一圈扩散出去的光环"。改 setRadius() 要逐帧重绘 canvas，性能一般；
+      叠一层 DOM 用 CSS 动画既流畅，又能**直接吃项目已有的 prefers-reduced-motion 规则**。
+   ⚠️ 代价：位置是 lngLatToContainer() 算出来的**屏幕坐标**，
+      地图一动（拖动 / 缩放）就对不上了 → JS 在 movestart 时把它们全清掉。
+
+   ⭐ 颜色用 --color-accent（主色）而不是成功绿：
+      按 DESIGN.md 3.3，--color-accent 是"**图形**"角色（边框 / 连线 / 类型色点）——
+      涟漪是**画在地图上的图形**，归主色；
+      而绿条是**界面层的反馈**，归成功色。两层分工，不混。 */
+.map-ripple-layer {
+  position: absolute;
+  inset: 0;          /* 与 .map-canvas 完全重合 → 两者共用同一套像素坐标 */
+  z-index: 8;        /* 在地图(0)之上、工具条(10)与悬停提示(20)之下 */
+  overflow: hidden;  /* 涟漪扩散到容器边缘外就别画出去 */
+  /* ⭐ 铁律：铺满容器的浮层必须让出点击，否则整张地图就点不动了 */
+  pointer-events: none;
+}
+
+.map-ripple {
+  position: absolute;
+  /* 图形尺寸，不属"留白"，所以不套 --space-* 刻度（DESIGN.md 5.2 的例外） */
+  width: 56px;
+  height: 56px;
+  /* 负一半的宽高，把圆心挪到 left/top 那个点上。
+     不在这里用 transform 平移，是因为 transform 要留给动画的 scale。 */
+  margin: -28px 0 0 -28px;
+  border: 2px solid var(--color-accent);
+  border-radius: 50%;
+  opacity: 0;                     /* 起始不可见；动画一起来就接管了 */
+  animation: tm-ripple var(--duration-slow) var(--ease-out);
+}
+
+@keyframes tm-ripple {
+  from { transform: scale(0.28); opacity: 0.9; }
+  to   { transform: scale(1);    opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .map-ripple {
+    /* 关掉动画就等于"别出现" —— 别留一圈静止的环杵在那儿 */
+    animation: none;
+    opacity: 0;
+  }
+}
+
 /* 悬停提示：鼠标停在地点上时出现的小标签
    底部用深棕（而非米白）：浅色地图上深色小标签才有"浮起"的层级感，
    也跟奶油色 UI 同属暖色系 */
@@ -1031,6 +1088,60 @@ body.is-landing .app-nav {
   line-height: 1.7;
   box-shadow: 0 2px 10px rgba(58, 51, 43, 0.08);
   /* 这条不设 pointer-events:none —— 用户可能要选中复制错误信息 */
+}
+
+/* ---------- 成功态（Day 11 重做 · 新增）----------
+   ⚠️ 与上面的错误态**必须一眼能分开**。
+      今天的主题正是"让用户能区分成功和失败"—— 如果两者长得像，
+      等于又造了一个新的歧义（跟"弹窗关闭"是同一种毛病）。
+   判据：用户**扫一眼颜色**就知道是成是败，不用读文字。
+
+   ⭐ 形状也刻意不同（2026-09-25 由 shy 定的位置）：
+      · **错误** = 横跨整行 + 顶部贴边 → 它要说"可能丢数据了"，**该显眼**
+      · **成功** = 顶部居中的小长方形 → 它是**预期内的结果**，**该克制**
+
+   ⭐ 出现/消失要有过渡（2026-09-25 他提的："不要一下子出现、一下子消失"）
+      —— 直接切 `hidden` 会像闪了一下，用户来不及注意，反而不像"反馈"。
+   ⭐ 用 transition 而不是 @keyframes：因为**起止时机由 JS 控制**
+      （出现是"保存成功"触发、消失是定时器触发），transition 更好接。
+
+   ⚠️ 居中与位移动画**共用 transform**，所以两边都得写全 `translate(-50%, …)`：
+      只写 `translateY` 会把水平居中丢掉，条子会跳到屏幕右半边去。
+   ⚠️ 三条纪律（都出自 DESIGN.md 第七节）：时长用 token、位移用 --space-*、
+      并且在最下面尊重 prefers-reduced-motion。 */
+.app-alert--ok {
+  top: var(--space-6);
+  left: 50%;
+  right: auto;
+  width: auto;
+  max-width: calc(100% - var(--space-12));
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--color-success);
+  border-radius: var(--radius-md);
+  background: var(--color-success-bg);
+  color: var(--color-success);
+  box-shadow: var(--shadow-md);
+
+  /* 起始态：透明 + 从上方 8px 处 */
+  opacity: 0;
+  transform: translate(-50%, calc(var(--space-2) * -1));
+  transition:
+    opacity var(--duration-normal) var(--ease-out),
+    transform var(--duration-normal) var(--ease-out);
+}
+
+/* JS 在"显示之后"加上这个类 → 过渡到可见态。
+   中间那一次强制重排（见 main.js 的 void bar.offsetWidth）不能省，
+   否则起始态和结束态会在同一帧里被合并，transition 根本不播。 */
+.app-alert--ok.is-in {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-alert--ok {
+    transition: none;
+  }
 }
 
 .app-alert[hidden] {

@@ -80,15 +80,24 @@
   }
 
   /** 把内存缓存写回 localStorage，并广播变更事件 */
-  function persist() {
+  function persist(action, place) {
     try {
       global.localStorage.setItem(KEY_PLACES, JSON.stringify(placesCache));
     } catch (err) {
       reportError('保存地点', err);
     }
-    /* 通知界面刷新 —— 各视图监听到后自己重画 */
+    /* 通知界面刷新 —— 各视图监听到后自己重画。
+       ⚠️ 除了"条数"，还必须告诉外界**发生了什么**（新增/编辑/删除）和**是哪一条**。
+          只播报 count 的话，监听者只知道"数据变了"，给不出准确反馈 ——
+          那等于把"弹窗关闭"那种歧义（成功和取消分不出）原样搬到了事件层。
+       action: 'add' | 'update' | 'remove'
+       place:  刚变动的那条地点（删除时 = 被删掉的那条） */
     document.dispatchEvent(new CustomEvent('data:change', {
-      detail: { count: placesCache.length }
+      detail: {
+        count: placesCache.length,
+        action: action || 'unknown',
+        place: place || null
+      }
     }));
   }
 
@@ -119,7 +128,7 @@
     }
     var place = Model.createPlace(input);
     listPlaces().push(place);
-    persist();
+    persist('add', place);
     return { ok: true, place: place };
   }
 
@@ -135,9 +144,9 @@
     var list = listPlaces();
     for (var i = 0; i < list.length; i++) {
       if (list[i].id === id) {
-        var merged = Model.createPlace(Object.assign({}, list[i], input, { id: id }));
-        list[i] = merged;
-        persist();
+          var merged = Model.createPlace(Object.assign({}, list[i], input, { id: id }));
+          list[i] = merged;
+          persist('update', merged);
         return { ok: true, place: merged };
       }
     }
@@ -148,11 +157,13 @@
   function removePlace(id) {
     var list = listPlaces();
     for (var i = 0; i < list.length; i++) {
-      if (list[i].id === id) {
-        list.splice(i, 1);
-        persist();
-        return true;
-      }
+        if (list[i].id === id) {
+          /* ⚠️ 必须先把它取出来再 splice —— 删掉之后就问不出"是哪条"了 */
+          var removed = list[i];
+          list.splice(i, 1);
+          persist('remove', removed);
+          return true;
+        }
     }
     return false;
   }

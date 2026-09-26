@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>TripMemo · 人生记忆地图</title>
   <!-- 给样式表加版本号，防止浏览器拿旧的缓存（改了 CSS 后把 v 的数字 +1 即可） -->
-  <link rel="stylesheet" href="css/style.css?v=33">
+  <link rel="stylesheet" href="css/style.css?v=41">
 </head>
 <body>
 
@@ -142,6 +142,13 @@
 
       <!-- 地图画布：由高德渲染 -->
       <div class="map-canvas" id="map-canvas"></div>
+
+      <!-- 新点"落位"涟漪的容器（Day 11 重做）
+           ⚠️ 它和 .map-canvas **完全重合**（都是 inset:0），所以两者共用同一套像素坐标 ——
+              高德 lngLatToContainer() 算出来的位置可以直接拿来用，不用再换算。
+           ⚠️ 必须 pointer-events:none（铺满容器的浮层不让出点击 = 地图就点不动了）。
+           ⚠️ 放在 map-canvas **之后**、map-tooltip **之前** —— 靠 DOM 顺序 + z-index 压在地图上、又不盖住悬停提示。 -->
+      <div class="map-ripple-layer" id="map-ripple-layer" aria-hidden="true"></div>
 
       <!-- 悬停提示：鼠标停在地点上时，跟着显示地点名与停留时长 -->
       <div class="map-tooltip" id="map-tooltip" hidden></div>
@@ -304,7 +311,7 @@
 
   <!-- ===== 本地配置：含高德 Key，不提交（模板见 config.example.js）=====
        找不到 config.js 时不会报错，只是地图加载不出来，页面其余部分照常可用 -->
-  <script src="config.js?v=33"
+  <script src="config.js?v=41"
           onerror="console.warn('[TripMemo] 未找到 config.js —— 地图将无法加载。请把 config.example.js 复制为 config.js 并填入 Key 与安全密钥。')"></script>
 
   <!-- ===== 项目脚本：顺序不能乱 =====
@@ -318,14 +325,14 @@
        ⭐ 规则（就一句）：**改完任何 css / js，把这里和上面的数字一起 +1。**
           11 个资源共用同一个编号 —— 多下载几 KB，换"永远不用想哪个该改"，
           对学习阶段来说非常划算。 -->
-  <script src="js/model.js?v=33"></script>
-  <script src="js/mock-data.js?v=33"></script>
-  <script src="js/store.js?v=33"></script>
-  <script src="js/detail.js?v=33"></script>
-  <script src="js/drawer.js?v=33"></script>
-  <script src="js/map.js?v=33"></script>
-  <script src="js/timeline.js?v=33"></script>
-  <script src="js/places.js?v=33"></script>
-  <script src="js/main.js?v=33"></script>
+  <script src="js/model.js?v=41"></script>
+  <script src="js/mock-data.js?v=41"></script>
+  <script src="js/store.js?v=41"></script>
+  <script src="js/detail.js?v=41"></script>
+  <script src="js/drawer.js?v=41"></script>
+  <script src="js/map.js?v=41"></script>
+  <script src="js/timeline.js?v=41"></script>
+  <script src="js/places.js?v=41"></script>
+  <script src="js/main.js?v=41"></script>
 </body>
 </html>
