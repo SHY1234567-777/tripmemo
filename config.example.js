@@ -23,8 +23,9 @@ window.TRIPMEMO_CONFIG = {
 
   /* 地图底图样式（可选）
      ─────────────────────────────────────────────────────
-     留空 或 删掉这一行 → 自动使用官方内置的深色样式
-                          （amap://styles/dark）
+     留空 或 删掉这一行 → 自动用代码里的默认样式
+                          （amap://styles/fresh 草色青）
+                          ⚠️ 默认值写在 js/map.js 的 DEFAULT_MAP_STYLE，不在这里
 
      想自定义配色：
        1. 打开 https://console.amap.com/dev/mapstyle/index
@@ -36,8 +37,8 @@ window.TRIPMEMO_CONFIG = {
        标准      amap://styles/normal
        幻影黑    amap://styles/dark
        月光银    amap://styles/light
-       远山黛    amap://styles/whitesmoke   ← 目前默认用这个（极浅米白）
-       草色青    amap://styles/fresh
+       远山黛    amap://styles/whitesmoke
+       草色青    amap://styles/fresh        ← 目前默认用这个（浅绿米底）
        雅士灰    amap://styles/grey
        涂鸦      amap://styles/graffiti
        马卡龙    amap://styles/macaron
