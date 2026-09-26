@@ -442,6 +442,16 @@
           li.appendChild(nameEl);
           li.appendChild(districtEl);
           li.addEventListener('click', function () { choosePoi(poi); });
+
+          /* ⭐ 鼠标一停到某一条上，就把「键盘高亮」也挪过去（Day 11 重做补）
+             ⚠️ 少了这一条就会出现：**鼠标停在第 3 条、按回车却选了第 1 条** ——
+                因为 activeIndex 还停在上一次键盘操作的位置。
+                鼠标和键盘共用同一个"当前项"，两种输入方式才不会各说各话。 */
+          li.addEventListener('mouseenter', function () {
+            activeIndex = i;
+            syncActive();
+          });
+
           dropdown.appendChild(li);
         });
 

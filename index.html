@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>TripMemo · 人生记忆地图</title>
   <!-- 给样式表加版本号，防止浏览器拿旧的缓存（改了 CSS 后把 v 的数字 +1 即可） -->
-  <link rel="stylesheet" href="css/style.css?v=42">
+  <link rel="stylesheet" href="css/style.css?v=43">
 </head>
 <body>
 
@@ -13,7 +13,21 @@
        宽屏（≥768px）时是贴着左边的竖条，窄屏时自动变回顶部横条。
        两种形态共用同一份 HTML，靠 CSS 媒体查询切换方向。 -->
   <nav class="app-nav">
-    <h1 class="app-title">TripMemo</h1>
+    <!-- ⭐ 站点标题**同时是「回门面页」的入口**（Day 11 重做补）
+        以前门面页是"有进无出"：进去之后没有任何入口能回来，只能刷新页面。
+
+        为什么用标题当入口、而不是在导航里再加一个「首页」按钮：
+          ① 门面页**不在导航体系里** —— 它是"封面"，不是"视图"
+             （上一版就是这么定的，见下面 nav-items 的注释）；
+          ② 网站标题本身就是"回家"的惯例位置；
+          ③ 不往导航栏多塞一项。
+
+        ⚠️ 它**必须是真的 `<button>`**，不能只在 `<h1>` 上挂个 click ——
+           只有真按钮才能被 Tab 走到、能按回车/空格触发，
+           也才吃得到全站那条 `:focus-visible` 规则。 -->
+    <h1 class="app-title">
+      <button type="button" class="app-home" id="nav-home">TripMemo</button>
+    </h1>
 
     <div class="nav-items">
       <!-- ⚠️ Day 11：这里**不再预置 `is-active`** —— 默认首屏改成门面页了，
@@ -38,11 +52,26 @@
       <span class="nav-label" id="btn-sample-label">载入示例数据</span>
     </button>
 
-    <button type="button" class="nav-btn nav-btn--action" id="btn-export">
-      <span class="nav-icon" aria-hidden="true">⬇</span>
-      <span class="nav-label">导出 JSON</span>
-    </button>
-  </nav>
+      <!-- 导入：给「导出 JSON」补上"回程"（Day 11 重做补）
+           ⚠️ 以前只有导出、没有导入 —— 导出的文件等于死在硬盘上回不来，
+              「数据全丢」这个风险其实一直没被真正兜住。 -->
+      <button type="button" class="nav-btn nav-btn--action" id="btn-import">
+        <span class="nav-icon" aria-hidden="true">⬆</span>
+        <span class="nav-label">导入 JSON</span>
+      </button>
+
+      <button type="button" class="nav-btn nav-btn--action" id="btn-export">
+        <span class="nav-icon" aria-hidden="true">⬇</span>
+        <span class="nav-label">导出 JSON</span>
+      </button>
+
+      <!-- 隐藏的文件选择器，由上面的「导入 JSON」按钮转手触发。
+           ⚠️ 用 hidden（display:none）**不影响键盘可用性** ——
+              真正要能被键盘操作的，是那个真按钮；这里只是它去点的对象。
+           ⚠️ accept 只是给系统文件对话框的提示，**不是安全边界**（用户可以选"所有文件"）——
+              真正的把关在 store.js 的 importJSON 里（校验 app 标记）。 -->
+      <input type="file" id="import-file" accept=".json,application/json" hidden>
+    </nav>
 
   <!-- ===== 主区：视图 + 弹窗 ===== -->
   <div class="app-body">
@@ -311,7 +340,7 @@
 
   <!-- ===== 本地配置：含高德 Key，不提交（模板见 config.example.js）=====
        找不到 config.js 时不会报错，只是地图加载不出来，页面其余部分照常可用 -->
-  <script src="config.js?v=42"
+  <script src="config.js?v=43"
           onerror="console.warn('[TripMemo] 未找到 config.js —— 地图将无法加载。请把 config.example.js 复制为 config.js 并填入 Key 与安全密钥。')"></script>
 
   <!-- ===== 项目脚本：顺序不能乱 =====
@@ -325,14 +354,14 @@
        ⭐ 规则（就一句）：**改完任何 css / js，把这里和上面的数字一起 +1。**
           11 个资源共用同一个编号 —— 多下载几 KB，换"永远不用想哪个该改"，
           对学习阶段来说非常划算。 -->
-  <script src="js/model.js?v=42"></script>
-  <script src="js/mock-data.js?v=42"></script>
-  <script src="js/store.js?v=42"></script>
-  <script src="js/detail.js?v=42"></script>
-  <script src="js/drawer.js?v=42"></script>
-  <script src="js/map.js?v=42"></script>
-  <script src="js/timeline.js?v=42"></script>
-  <script src="js/places.js?v=42"></script>
-  <script src="js/main.js?v=42"></script>
+  <script src="js/model.js?v=43"></script>
+  <script src="js/mock-data.js?v=43"></script>
+  <script src="js/store.js?v=43"></script>
+  <script src="js/detail.js?v=43"></script>
+  <script src="js/drawer.js?v=43"></script>
+  <script src="js/map.js?v=43"></script>
+  <script src="js/timeline.js?v=43"></script>
+  <script src="js/places.js?v=43"></script>
+  <script src="js/main.js?v=43"></script>
 </body>
 </html>

@@ -117,6 +117,54 @@
     console.log('[TripMemo] 已导出 ' + count + ' 个地点');
   }
 
+  /**
+   * 「导入 JSON」—— 用户选完文件之后走这里（Day 11 重做补）
+   *
+   * ⚠️ 导入是**整体替换**（和导出的"完整快照"语义对称），
+   *    所以只要现在有数据，就先让用户确认一次 —— 不能默默冲掉。
+   * ⚠️ 确认放在**读文件之前**：让用户在等待之前就决定，
+   *    而不是读完半天才问"要不要覆盖"。
+   * ⚠️ 结果一律走 showAlert（今天刚做的提示条），
+   *    成功=绿色自动消失，失败=橙色留着 —— 和别处的反馈口径一致。
+   */
+  function handleImportFile(e) {
+    var file = e.target.files && e.target.files[0];
+    if (!file) {
+      return;
+    }
+    var Store = window.TripMemoStore;
+    if (!Store || !Store.importJSON) {
+      showAlert('数据层尚未就绪，暂时无法导入。', 'error');
+      return;
+    }
+
+    var current = Store.listPlaces().length;
+    if (current > 0) {
+      var go = window.confirm(
+        '导入会用文件里的内容替换现在的 ' + current + ' 个地点。\n\n'
+        + '继续吗？（想留个底，就先点「导出 JSON」存一份）'
+      );
+      if (!go) {
+        return;
+      }
+    }
+
+    var reader = new FileReader();
+    reader.onerror = function () {
+      showAlert('读文件失败：' + ((reader.error && reader.error.name) || '未知原因'), 'error');
+    };
+    reader.onload = function () {
+      var result = Store.importJSON(String(reader.result));
+      if (!result.ok) {
+        showAlert('导入失败：' + result.reason, 'error');
+        return;
+      }
+      console.log('[TripMemo] 已导入 ' + result.count + ' 个地点');
+      showAlert('已导入 ' + result.count + ' 个地点', 'ok');
+    };
+    reader.readAsText(file);
+  }
+
   /* ------------------------------------------------------------
      示例数据按钮（Day 8）
 
@@ -351,6 +399,23 @@
       exportBtn.addEventListener('click', handleExportClick);
     }
 
+    /* 导入按钮 + 隐藏的文件选择器（Day 11 重做补）
+       ⚠️ 为什么中间非要过一个 <input type="file">：
+          浏览器有安全限制 —— **只有用户亲手点**文件选择框才能选文件，
+          脚本不能自己弹出"打开文件"对话框。所以路径是：
+            点真按钮 → 脚本去 click() 那个隐藏 input → 用户选文件 → change
+       ⚠️ 每次点完都把 input.value 清空：否则**连着两次选同一个文件**
+          不会触发 change（值没变），第二次毫无反应。 */
+    var importBtn = document.getElementById('btn-import');
+    var importFile = document.getElementById('import-file');
+    if (importBtn && importFile) {
+      importBtn.addEventListener('click', function () {
+        importFile.value = '';
+        importFile.click();
+      });
+      importFile.addEventListener('change', handleImportFile);
+    }
+
     /* ---- 示例数据按钮（Day 8）----
        ⚠️ 错误提示的监听必须**尽早注册**：数据层出错时会广播
           `store:error`，如果监听装晚了，早期错误就漏掉了。
@@ -363,6 +428,17 @@
     /* 数据变更 → 成功提示（Day 11 重做）。和上面一样，尽早注册。 */
     document.addEventListener('data:change', showDataChangeAlert);
     initGlobalErrorWatch();
+
+    /* 站点标题 → 回门面页（Day 11 重做补）
+       以前门面页"有进无出"：进去之后没有任何入口能回来，只能刷新页面。
+       ⚠️ 这里不用额外写键盘处理 —— 它是真 <button>，
+          Tab / 回车 / 空格都是浏览器自带行为，不需要我们接管。 */
+    var homeBtn = document.getElementById('nav-home');
+    if (homeBtn) {
+      homeBtn.addEventListener('click', function () {
+        switchView('landing');
+      });
+    }
 
     /* 门面页的「开始记录」按钮 → 进地图视图
        ⚠️ 用 switchView 而不是给个 <a href>：这是单页应用，

@@ -295,6 +295,30 @@ body::after {
   white-space: nowrap;
 }
 
+/* ⭐ 标题本身 = 「回门面页」的入口（Day 11 重做补）
+   ⚠️ 它是个真 `<button>`（为了能被 Tab 走到、能按回车/空格触发），
+      所以必须先把它"洗成"标题该有的样子 —— 按钮默认带边框、背景和自己的字体，
+      不清掉的话它长得完全不像标题。
+   ⚠️ 再用 hover / :focus-visible 让"它能点"这件事**看得出来** ——
+      否则一个长得像标题、却能点的东西，谁也发现不了。
+   （键盘焦点环和按下反馈走全站那条分组规则，见文件下方「交互状态」一节。） */
+.app-home {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;            /* 继承 .app-title 的字号 / 字重 / 字体 */
+  color: inherit;
+  letter-spacing: inherit;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  transition: color var(--duration-fast) var(--ease-out);
+}
+
+.app-home:hover {
+  color: var(--color-accent-text);
+}
+
 /* 方框里的缩写标记（对应参考图的 M 方块） */
 .app-title::before {
   content: 'TM';
@@ -815,7 +839,12 @@ body.is-landing .app-nav {
   width: 26px;
   height: 26px;
   border-radius: 50%;
-  background: var(--color-accent);
+  /* ⚠️ 底用 --color-accent-fill，不是 --color-accent（Day 11 重做修）：
+     这里是"**填充底 + 浅色内容**"的组合，而 --color-accent 是给**图形 / 边框**用的 ——
+     它的明度在浅底图上画线刚好，但当成底色去托浅字就不够，实测只有 3.61:1。
+     换成 --color-accent-fill（同一支色、明度更低）后是 **4.79:1** ✓
+     （这正是"主色必须拆成三个变量"那条规矩的用处：同一个颜色当边框和当底，需要的明度天生不同。） */
+  background: var(--color-accent-fill);
   box-shadow: 0 0 0 3px rgba(250, 247, 242, 0.95), 0 1px 8px rgba(58, 51, 43, 0.4);
   color: var(--color-on-accent);
   font-size: var(--text-sm);
@@ -2225,6 +2254,7 @@ body.is-landing .app-nav {
 .chip:focus-visible,
 .mini-btn:focus-visible,
 .nav-btn:focus-visible,
+.app-home:focus-visible,
 .modal-close:focus-visible,
 .place-row:focus-visible,
 .timeline-card:focus-visible,
@@ -2244,6 +2274,7 @@ body.is-landing .app-nav {
 .chip:active,
 .mini-btn:active,
 .nav-btn:active,
+.app-home:active,
 .modal-close:active {
   /* 按钮类：往下沉 1px —— 最省事也最直观的"按下去了"信号 */
   transform: translateY(1px);

@@ -277,6 +277,56 @@
     URL.revokeObjectURL(url);
   }
 
+  /**
+   * 导入一份之前导出的 JSON（**整体替换**当前数据）
+   *
+   * ⭐ 为什么必须补它（Day 11 重做）：
+   *    原来只有导出、没有导入 —— 导出的文件等于死在硬盘上，回不来。
+   *    而 TECH_DESIGN 里写着「数据全丢（PRD 已用导出 JSON 兜底）」——
+   *    **只有出口没有入口，那句话是兜不住底的**。补上这一半，它才真的成立。
+   *    （上面 exportJSON 的注释其实早就写了"否则导入回来会丢掉锚点设置"，
+   *      说明当初就想到了导入，只是一直没做。）
+   *
+   * ⚠️ 语义是**替换**，不是追加 —— 和导出对称（导出的是完整快照）。
+   *    所以调用方**必须先让用户确认**，它会覆盖现有数据。
+   * ⚠️ 校验 app 标记：随手选个别的 JSON 不会把现有地点冲掉。
+   *
+   * @param {string|Object} raw 文件内容（字符串）或已解析的对象
+   * @returns {{ok: boolean, count?: number, reason?: string}}
+   */
+  function importJSON(raw) {
+    var data = raw;
+    if (typeof raw === 'string') {
+      try {
+        data = JSON.parse(raw);
+      } catch (err) {
+        return { ok: false, reason: '不是合法的 JSON 文件' };
+      }
+    }
+    if (!data || typeof data !== 'object') {
+      return { ok: false, reason: '文件内容不是一个对象' };
+    }
+    /* ⚠️ 先认"是不是我们导出的"（exportJSON 里写了 app: 'TripMemo'）。
+       不校验的话，随手选个别的 JSON 也会把现有地点清空。 */
+    if (data.app !== 'TripMemo') {
+      return { ok: false, reason: '不是 TripMemo 导出的文件（缺少 app 标记）' };
+    }
+    if (!Array.isArray(data.places)) {
+      return { ok: false, reason: '文件里没有 places 列表' };
+    }
+
+    /* 走 replaceAllPlaces → 内部会过一遍 Model.createPlace 规范化，
+       所以旧版本导出的、字段不全的数据也能安全读进来 */
+    replaceAllPlaces(data.places);
+
+    /* 主城市也一起恢复。⚠️ 老文件可能没这个字段 → 保持现状，不算失败 */
+    if (data.mainCity && data.mainCity.city) {
+      setMainCity(data.mainCity);
+    }
+
+    return { ok: true, count: data.places.length };
+  }
+
   /* ------------------------------------------------------------
      五、示例数据（Day 8）
 
@@ -412,6 +462,7 @@
     setMainCity: setMainCity,
     exportJSON: exportJSON,
     downloadJSON: downloadJSON,
+    importJSON: importJSON,     /* Day 11 重做：给「导出」补上回程 */
     /* Day 8 新增 */
     isSampleLoaded: isSampleLoaded,
     loadSampleData: loadSampleData,

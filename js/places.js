@@ -213,19 +213,25 @@
       fill.style.width = Math.round(barRatio(totalMonths) * 100) + '%';
       bar.appendChild(fill);
 
+      /* ⚠️ totalMonths 为 0 有**两种**情况，必须分开（Day 11 重做修）：
+         ① 一个起始时间都没填 → 真·未填
+         ② 填了，但加起来不足 1 个月（比如只填了一个点、起止落在同一个月）
+         以前这两种都显示「未填时长」—— 第 ② 种是**在骗人**：用户明明填了。
+         判据：这座城市里有没有**任何一个**点填了 startMonth。 */
+      var hasAnyMonth = group.places.some(function (place) {
+        return !!place.startMonth;
+      });
+
       var timeText = monthsLabel(totalMonths);
+      var timeSpan = document.createElement('span');
+      timeSpan.className = 'city-months';
       if (timeText) {
-        var timeLabel = document.createElement('span');
-        timeLabel.className = 'city-months';
-        timeLabel.textContent = timeText;
-        sub.appendChild(timeLabel);
+        timeSpan.textContent = timeText;
       } else {
-        /* 一个时长都没填（整座城市都是"想去"之类）→ 不显示"0 个月"这种废话 */
-        var blank = document.createElement('span');
-        blank.className = 'city-months';
-        blank.textContent = '未填时长';
-        sub.appendChild(blank);
+        /* 显示"0 个月"没意义 —— 要么说"不足 1 个月"，要么老实说没填 */
+        timeSpan.textContent = hasAnyMonth ? '不足 1 个月' : '未填时长';
       }
+      sub.appendChild(timeSpan);
       sub.appendChild(bar);
 
       head.appendChild(sub);
