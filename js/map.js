@@ -36,6 +36,7 @@
   /* 地图视图的 DOM */
   var elCanvas = null;
   var elEmpty = null;
+  var elEmptyMsg = null;   /* 空状态里那句话 —— 要按情况改文字（Day 12 补） */
   var elFilterBar = null;
   var elTooltip = null;
   var elLoading = null;      /* 加载中状态（Day 8） */
@@ -545,18 +546,45 @@
     /* 「全部」+ 四个类型 */
     var options = [{ key: '', label: '全部' }].concat(Model.PLACE_TYPES);
 
-    options.forEach(function (opt) {
+    options.forEach(function (opt, index) {
       var btn = document.createElement('button');
       btn.type = 'button';
-      btn.className = 'chip' + (opt.key === activeType ? ' is-active' : '');
+
+      /* ⭐ 视觉状态和读屏状态**从同一个 isActive 派生**（Day 12 修复）——
+         不要各写一遍。DESIGN.md 8.3 的教训：
+         "一个状态分两处各写一半，必然漏一边。" */
+      var isActive = (opt.key === activeType);
+      btn.className = 'chip' + (isActive ? ' is-active' : '');
       btn.textContent = opt.label;
+      btn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+
+      /* 给"回焦点"用：重建后靠它认出刚才点的是哪一个。
+         用索引而不是 key —— 「全部」的 key 是空串，做 CSS 选择器不好写。 */
+      btn.dataset.typeIndex = String(index);
+
       btn.addEventListener('click', function () {
         activeType = opt.key;
         renderFilterBar();
+        /* ⭐ 上面那行会把旧按钮**从 DOM 里删掉** → 焦点掉回 <body>，
+           键盘用户按完 Enter 就得从页面开头重新 Tab 一遍。
+           所以重建之后**把焦点还给同一个类型的那个 chip**。
+           （鼠标点击不会因此多冒一个焦点环 —— `:focus-visible` 只在键盘路径生效。） */
+        focusFilterChip(index);
         refresh();   /* 点和线一起重画（线的粗细跟着筛选后的城市算） */
       });
       elFilterBar.appendChild(btn);
     });
+  }
+
+  /** 重建筛选栏之后，把焦点还给第 index 个 chip */
+  function focusFilterChip(index) {
+    if (!elFilterBar) {
+      return;
+    }
+    var target = elFilterBar.querySelector('[data-type-index="' + index + '"]');
+    if (target) {
+      target.focus();
+    }
   }
 
   /* ------------------------------------------------------------
@@ -584,15 +612,35 @@
       elEmpty.setAttribute('hidden', '');
       return;
     }
-    /* 一个地点都没有时，才显示空状态 */
+    /* ⭐ 空状态有**两种**，必须分开说（Day 12 修复）
+       ① 一个地点都没有          → 引导他去添加
+       ② 有地点、但当前筛选下为 0 → 说清是"被筛掉了"，不是"没了"
+       ⚠️ 原先只判断 ①，于是筛出空结果时地图一片空白、一个字都没有 ——
+          用户会以为**数据丢了**。这正是清单要求测的「无结果」那种情况。 */
+    var visible = Store.filterByType(activeType).length;
+
     if (total === 0) {
+      setEmptyMessage('还没有记录。点地图上任意位置，开始记下第一个地方。');
+      elEmpty.removeAttribute('hidden');
+    } else if (visible === 0) {
+      /* ⚠️ 用 Model.typeLabel，**不要在这儿另写一个**（Day 12 修复）
+         本文件 L1462 早就在调它了，而我加空状态时又写了个 typeLabelOf ——
+         同一个值两种写法，违反原则 2（"改的时候会漏一个"）。
+         ⭐ 这正是 skill 第五类第 3 条查出来的：「这个值是不是已经在某处定义过？」 */
+      setEmptyMessage('「' + Model.typeLabel(activeType) + '」还没有地点。换个类型看看。');
       elEmpty.removeAttribute('hidden');
     } else {
       elEmpty.setAttribute('hidden', '');
     }
   }
 
-  /** 重画所有点 */
+  /** 改空状态里那句话（元素缺失就静默跳过，别让它变成新的崩溃点） */
+  function setEmptyMessage(text) {
+    if (elEmptyMsg) {
+      elEmptyMsg.textContent = text;
+    }
+  }
+
   /**
    * 造一个地点的点标（**只造、不加到地图上**）
    *
@@ -1511,6 +1559,7 @@
   function init() {
     elCanvas = document.getElementById('map-canvas');
     elEmpty = document.getElementById('map-empty');
+    elEmptyMsg = document.getElementById('map-empty-msg');
     elFilterBar = document.getElementById('map-filter');
     elTooltip = document.getElementById('map-tooltip');
     elLoading = document.getElementById('map-loading');

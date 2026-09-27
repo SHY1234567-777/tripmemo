@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>TripMemo · 人生记忆地图</title>
   <!-- 给样式表加版本号，防止浏览器拿旧的缓存（改了 CSS 后把 v 的数字 +1 即可） -->
-  <link rel="stylesheet" href="css/style.css?v=43">
+  <link rel="stylesheet" href="css/style.css?v=45">
 </head>
 <body>
 
@@ -165,8 +165,12 @@
           <button type="button" class="mini-btn" id="main-city-clear">清除</button>
         </div>
 
-        <!-- 类型筛选栏：全部 / 长期居住 / 短期停留 / 旅游 / 想去 -->
-        <div class="map-filter" id="map-filter"></div>
+        <!-- 类型筛选栏：全部 / 长期居住 / 短期停留 / 旅游 / 想去（Day 12 补 aria）
+           ⭐ role="group" + aria-label：读屏走到这一排按钮时，
+              才知道它们是"一组用来筛地点类型的开关" —— 否则只是一串孤立的按钮。
+           （同页面的搜索框早就写了 aria-autocomplete / aria-expanded 等，
+             这里原先一处都没有 —— 不是不会做，是漏了。） -->
+      <div class="map-filter" id="map-filter" role="group" aria-label="按地点类型筛选"></div>
       </div>
 
       <!-- 地图画布：由高德渲染 -->
@@ -204,9 +208,14 @@
         </p>
       </div>
 
-      <!-- 【状态 3：空】一个地点都没有时显示（有地点后由 JS 隐藏） -->
+      <!-- 【状态 3：空】没有可显示的地点时出现（文字由 JS 按情况改写，见 updateEmptyState）
+           ⚠️ 注意这里是**两种**情况共用一块元素：
+              ① 一个地点都没有      → 「还没有记录…」（引导添加）
+              ② 有地点但筛选后为 0  → 「「长期居住」还没有地点…」（Day 12 补）
+              原先只有 ①，于是筛出空结果时地图一片空白、一个字都没有，
+              用户会以为**数据丢了**。 -->
       <div class="view-empty view-empty--overlay" id="map-empty">
-        <p>还没有记录。点地图上任意位置，开始记下第一个地方。</p>
+        <p id="map-empty-msg">还没有记录。点地图上任意位置，开始记下第一个地方。</p>
       </div>
     </section>
 
@@ -340,7 +349,7 @@
 
   <!-- ===== 本地配置：含高德 Key，不提交（模板见 config.example.js）=====
        找不到 config.js 时不会报错，只是地图加载不出来，页面其余部分照常可用 -->
-  <script src="config.js?v=43"
+  <script src="config.js?v=45"
           onerror="console.warn('[TripMemo] 未找到 config.js —— 地图将无法加载。请把 config.example.js 复制为 config.js 并填入 Key 与安全密钥。')"></script>
 
   <!-- ===== 项目脚本：顺序不能乱 =====
@@ -354,14 +363,14 @@
        ⭐ 规则（就一句）：**改完任何 css / js，把这里和上面的数字一起 +1。**
           11 个资源共用同一个编号 —— 多下载几 KB，换"永远不用想哪个该改"，
           对学习阶段来说非常划算。 -->
-  <script src="js/model.js?v=43"></script>
-  <script src="js/mock-data.js?v=43"></script>
-  <script src="js/store.js?v=43"></script>
-  <script src="js/detail.js?v=43"></script>
-  <script src="js/drawer.js?v=43"></script>
-  <script src="js/map.js?v=43"></script>
-  <script src="js/timeline.js?v=43"></script>
-  <script src="js/places.js?v=43"></script>
-  <script src="js/main.js?v=43"></script>
+  <script src="js/model.js?v=45"></script>
+  <script src="js/mock-data.js?v=45"></script>
+  <script src="js/store.js?v=45"></script>
+  <script src="js/detail.js?v=45"></script>
+  <script src="js/drawer.js?v=45"></script>
+  <script src="js/map.js?v=45"></script>
+  <script src="js/timeline.js?v=45"></script>
+  <script src="js/places.js?v=45"></script>
+  <script src="js/main.js?v=45"></script>
 </body>
 </html>
