@@ -20,6 +20,10 @@
 
   var elList = null;
   var elEmpty = null;
+  var elLoading = null;    /* 加载中（Day 13） */
+  var elError = null;      /* 错误（Day 13） */
+  var elErrorMsg = null;
+  var viewState = null;    /* 四态逻辑的句柄 —— 实现在 js/view-state.js，两个视图共用 */
 
   /* 时长占比条的换算上限：停留满 10 年（120 个月）= 满格
      ⚠️ 别借 Model.LINE_MAX —— 那是「线宽像素上限（8px）」，不是月数，
@@ -139,22 +143,31 @@
   /* ------------------------------------------------------------
      三、渲染
      ------------------------------------------------------------ */
+  /** 取数据 → 画 → 按结果进四种状态之一（四态逻辑在 js/view-state.js 一处收尾） */
   function render() {
-    if (!elList) {
+    if (!elList || !viewState) {
       return;
     }
+    viewState.renderWithStates(paint);
+  }
 
-    var places = Store.listPlaces();
-    var isEmpty = places.length === 0;
+  /**
+   * 只在**读成功**时被调用 —— 自己决定画"空"还是"正常"
+   * ⚠️ 和 timeline 的差别：地点列表**不剔除「想去」** ——
+   *    它是"我记过哪些地方"的全集，「想去」也算记过。
+   * @param {{ok: boolean, places: Array}} result
+   * @param {function(string)} showState 由 view-state.js 给的（'empty' | 'ok'）
+   */
+  function paint(result, showState) {
+    var places = result.places;
 
-    elEmpty.hidden = !isEmpty;
-    elList.hidden = isEmpty;
-
-    if (isEmpty) {
+    if (places.length === 0) {
       elList.innerHTML = '';
+      showState('empty');
       return;
     }
 
+    showState('ok');
     elList.innerHTML = '';
 
     groupByCity(places).forEach(function (group, index) {
@@ -321,11 +334,33 @@
   function init() {
     elList = document.getElementById('places-list');
     elEmpty = document.getElementById('places-empty');
+    elLoading = document.getElementById('places-loading');
+    elError = document.getElementById('places-error');
+    elErrorMsg = document.getElementById('places-error-msg');
+
+    /* 四态逻辑（空/加载/错误/正常）交给共用模块 —— 两个视图只有这一处实现 */
+    viewState = global.TripMemoViewState.attach({
+      list: elList,
+      empty: elEmpty,
+      loading: elLoading,
+      error: elError,
+      errorMsg: elErrorMsg
+    });
     if (!elList) {
       return;
     }
 
     document.addEventListener('data:change', render);
+
+    /* ⭐ 切到本视图时也重画一次（Day 13）——
+       理由和代价与 timeline.js 那边完全一样：不加这句，
+       「加载中」永远在视图还藏着的时候闪过，用户一次都看不到。
+       ⚠️ 只认自己的视图名。 */
+    document.addEventListener('view:change', function (e) {
+      if (e.detail && e.detail.view === 'places') {
+        render();
+      }
+    });
 
     render();
   }

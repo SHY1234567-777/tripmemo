@@ -52,10 +52,27 @@
      ------------------------------------------------------------ */
 
   /** 从 localStorage 读出全部地点；第一次读会缓存 */
-  function listPlaces() {
+  /**
+   * 读地点数据，并**如实报告"这一次读"的结果**（Day 13）
+   *
+   * ⚠️ 为什么需要它：原来读失败时 `placesCache` 会被设成 `[]`，
+   *    上层看到的是"空数组"—— **和"真的没数据"长得一模一样**，
+   *    于是"读失败"被显示成「还没有记录」，把用户往错的方向引。
+   *
+   * ⚠️ 为什么**不能**拿 `getLastError()` 当判据：它报的是"**历史上最近一次**错"，
+   *    可能是很久以前"保存失败"留下的 —— **不是"这次读失败"**。
+   *    拿它判断会误报：昨天保存失败过一次，今天打开列表就显示"错误"。
+   *    ⭐ **"这次读失败"必须由"这次读"自己报告。**
+   *
+   * ⭐ 逻辑只有这一处 —— `listPlaces()` 是它的薄封装（别在两处各写一遍）。
+   *
+   * @returns {{ok: boolean, places: Array, reason: string}}
+   */
+  function readPlacesResult() {
     if (placesCache !== null) {
-      return placesCache;
+      return { ok: true, places: placesCache, reason: '' };   /* 缓存命中 → 一定成功 */
     }
+
     var raw = null;
     try {
       raw = global.localStorage.getItem(KEY_PLACES);
@@ -63,20 +80,28 @@
       /* 浏览器禁用了 localStorage（隐私模式等） */
       reportError('读取地点', err);
       placesCache = [];
-      return placesCache;
+      return { ok: false, places: [], reason: '读不到浏览器里的数据（可能被隐私模式挡住了）' };
     }
+
     if (!raw) {
       placesCache = [];
-      return placesCache;
+      return { ok: true, places: [], reason: '' };   /* ⭐ "没有数据" ≠ "失败" */
     }
+
     try {
       var parsed = JSON.parse(raw);
       placesCache = Array.isArray(parsed) ? parsed : [];
+      return { ok: true, places: placesCache, reason: '' };
     } catch (err) {
       reportError('解析地点数据', err);
       placesCache = [];
+      return { ok: false, places: [], reason: '数据格式坏了，读不出来' };
     }
-    return placesCache;
+  }
+
+  /** 取全部地点（薄封装 —— 只想拿数据、不关心失败原因时用它） */
+  function listPlaces() {
+    return readPlacesResult().places;
   }
 
   /** 把内存缓存写回 localStorage，并广播变更事件 */
@@ -453,6 +478,7 @@
      ------------------------------------------------------------ */
   global.TripMemoStore = {
     listPlaces: listPlaces,
+    readPlacesResult: readPlacesResult,   /* Day 13：能如实报告"这次读失败"，给视图的四种状态用 */
     getPlace: getPlace,
     addPlace: addPlace,
     updatePlace: updatePlace,

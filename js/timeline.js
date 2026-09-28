@@ -34,6 +34,10 @@
 
   var elList = null;
   var elEmpty = null;
+  var elLoading = null;    /* 加载中（Day 13） */
+  var elError = null;      /* 错误（Day 13） */
+  var elErrorMsg = null;
+  var viewState = null;    /* 四态逻辑的句柄 —— 实现在 js/view-state.js，两个视图共用 */
 
   /* ------------------------------------------------------------
      一、小工具
@@ -244,32 +248,42 @@
     return card;
   }
 
+  /** 取数据 → 画 → 按结果进四种状态之一（四态逻辑在 js/view-state.js 一处收尾） */
   function render() {
-    if (!elList) {
+    if (!elList || !viewState) {
       return;
     }
+    viewState.renderWithStates(paint);
+  }
 
-    /* 1、取出全部地点，剔除「想去」 */
-    var places = Store.listPlaces().filter(function (place) {
+  /**
+   * 只在**读成功**时被调用 —— 自己决定画"空"还是"正常"
+   * ⚠️ "读失败 → 错误态"不在这里：那是 view-state.js 的职责（两个视图只有那一处实现）。
+   * @param {{ok: boolean, places: Array}} result
+   * @param {function(string)} showState 由 view-state.js 给的（'empty' | 'ok'）
+   */
+  function paint(result, showState) {
+    /* 剔除「想去」：时间轴讲的是"去过哪"，还没去的地方不该出现在这儿 */
+    var places = result.places.filter(function (place) {
       return place.type !== Model.WISHLIST_KEY;
     });
 
-    /* 2、按停留开始时间倒序；没填开始时间的排到最后 */
+    /* 一个都没有 → 空态 */
+    if (places.length === 0) {
+      elList.innerHTML = '';
+      showState('empty');
+      return;
+    }
+
+    /* 有数据 → 正常态。按停留开始时间倒序，没填开始时间的排到最后 */
     places.sort(function (a, b) {
       return sortKey(b).localeCompare(sortKey(a));
     });
 
-    /* 3、空状态切换 */
-    var isEmpty = places.length === 0;
-    elEmpty.hidden = !isEmpty;
-    elList.hidden = isEmpty;
-
+    showState('ok');
     elList.innerHTML = '';
-    if (isEmpty) {
-      return;
-    }
 
-    /* 4、按年分组，每年一组：一条时间竖线 + 年份节点 + 该年的卡片 */
+    /* 按年分组，每年一组：一条时间竖线 + 年份节点 + 该年的卡片 */
     groupByYear(places).forEach(function (group) {
       var section = document.createElement('section');
       section.className = 'timeline-year';
@@ -297,12 +311,40 @@
   function init() {
     elList = document.getElementById('timeline-list');
     elEmpty = document.getElementById('timeline-empty');
+    elLoading = document.getElementById('timeline-loading');
+    elError = document.getElementById('timeline-error');
+    elErrorMsg = document.getElementById('timeline-error-msg');
+
+    /* 四态逻辑（空/加载/错误/正常）交给共用模块 —— 两个视图只有这一处实现 */
+    viewState = global.TripMemoViewState.attach({
+      list: elList,
+      empty: elEmpty,
+      loading: elLoading,
+      error: elError,
+      errorMsg: elErrorMsg
+    });
     if (!elList) {
       return;
     }
 
     /* 数据变了就重画 */
     document.addEventListener('data:change', render);
+
+    /* ⭐ 切到本视图时也重画一次（Day 13）
+       ⚠️ 为什么需要：原先 render() 只在 init() 和 data:change 时跑 ——
+          **点导航切过来时不会重渲染**，于是「加载中」永远在"视图还藏着"的时候闪过，
+          用户一次都看不到它（四种状态里就少了一种能被看到的）。
+       ⭐ 有先例：地图就是靠 view:change 在切过去时重算尺寸的（map.js 的 resizeMap）——
+          视图从隐藏变可见，正是该刷一遍的时机。
+       ⚠️ 只在**切到本视图**时刷，不是任意切换都刷（所以要判断 e.detail.view）。
+       ℹ️ 代价：每次切过来会先显示约 0.2 秒的加载态。这是刻意的 ——
+          那 0.2 秒是"防闪烁"的下限（见 model.js 的 UI_MIN_LOADING_MS），
+          而且它比"什么都没有、然后突然出现"更让人安心。 */
+    document.addEventListener('view:change', function (e) {
+      if (e.detail && e.detail.view === 'timeline') {
+        render();
+      }
+    });
 
     render();
   }

@@ -59,7 +59,53 @@
     window.TripMemoMap.init();
   }
 
-  function switchView(name) {
+  /**
+   * 把当前视图反映到地址栏的 hash 上（Day 13）
+   *
+   * ⭐ 三条规矩 —— 都是"不这么做就会出 bug"的形状，别自作聪明改：
+   *   ① **门面页不写 hash**：它是"没有视图"的那一屏，URL 该是干净的；
+   *   ② **hash 已经对了就什么都不做**：否则每切一次都堆一条历史记录；
+   *   ③ ⚠️ **由 hashchange 引起的切换，绝不再写 hash** ——
+   *      否则「后退 → 触发切换 → 又写一条历史」→ **后退键永远退不完**（经典 bug）。
+   *
+   * ⚠️ 用 `history.pushState` 而**不是** `location.hash = ...`：
+   *    前者**不会触发 `hashchange`**，所以天然没有"自己触发自己"的循环。
+   * ⚠️ `pushState` 在 `file://` 下会抛异常（浏览器安全限制）——
+   *    所以必须包住：**视图切换本身绝不该因为"地址栏同步失败"而整个坏掉**。
+   */
+  function syncHash(name, fromHash) {
+    if (fromHash) {
+      return;                                  /* 规矩 ③ */
+    }
+    var want = (name === DEFAULT_VIEW) ? '' : ('#' + name);
+    if (location.hash === want) {
+      return;                                  /* 规矩 ② */
+    }
+    try {
+      history.pushState(null, '', want || (location.pathname + location.search));
+    } catch (err) {
+      console.warn('[TripMemo] 地址栏同步失败（在 file:// 下打开会这样），视图本身不受影响：', err);
+    }
+  }
+
+  /**
+   * 从地址栏 hash 读出"该显示哪个视图"（Day 13）
+   * 认不出来就回默认视图 —— **不发散，永远给一个能用的答案**
+   */
+  function readHashView() {
+    var key = location.hash.replace(/^#/, '');
+    if (!key) {
+      return DEFAULT_VIEW;                     /* 没有 hash → 门面页 */
+    }
+    return VIEW_IDS[key] ? key : DEFAULT_VIEW;  /* 未知 hash → 也回门面页 */
+  }
+
+  /**
+   * 切换视图（唯一的入口 —— 导航、门面页按钮、地址栏、后退键，全走这里）
+   * @param {string} name     视图名（VIEW_IDS 的键）
+   * @param {boolean} fromHash 这次切换是不是"地址栏变化"引起的
+   */
+  function switchView(name, fromHash) {
     if (!VIEW_IDS[name]) {
       return;
     }
@@ -79,9 +125,21 @@
       }
     });
 
-    // 2、导航按钮：同步高亮状态
+    // 2、导航按钮：同步高亮状态 + 读屏状态（Day 13）
     document.querySelectorAll('.nav-btn[data-view]').forEach(function (btn) {
-      btn.classList.toggle('is-active', btn.dataset.view === name);
+      /* ⭐ 视觉状态和读屏状态**从同一个 isCurrent 派生** —— 不要各写一遍。
+         DESIGN.md 8.3 的教训："一个状态分两处各写一半，必然漏一边。"
+         （Day 12 的筛选栏 chip 就是这么改的：is-active 和 aria-pressed 同源。）
+         ⭐ `aria-current="page"` 是**导航**的标准做法 ——
+            读屏会念出"当前页"，用户才知道自己在哪一块。
+         ⚠️ 门面页不在导航里 → 没有按钮匹配 → 所有按钮的 aria-current 都会被清掉 ✓ 正确。 */
+      var isCurrent = (btn.dataset.view === name);
+      btn.classList.toggle('is-active', isCurrent);
+      if (isCurrent) {
+        btn.setAttribute('aria-current', 'page');
+      } else {
+        btn.removeAttribute('aria-current');
+      }
     });
 
     /* 3、如果目标就是地图，这时候才去初始化它。
@@ -96,6 +154,11 @@
     document.dispatchEvent(new CustomEvent('view:change', {
       detail: { view: name }
     }));
+
+    /* 5、把这次切换记到地址栏上（Day 13）
+          ⚠️ 放在**最后**：万一它失败（比如 file:// 下 pushState 抛异常），
+             前面的视图切换也已经完成了 —— 不能让它拖垮主流程。 */
+    syncHash(name, fromHash);
   }
 
   /**
@@ -450,8 +513,29 @@
       });
     }
 
-    // 显示默认视图（Day 11 起是门面页）
-    switchView(DEFAULT_VIEW);
+    /* 显示视图：**先看地址栏**（Day 13）——
+       这样刷新后停在原来那个视图，链接也能直接分享给别人。
+       ⚠️ fromHash=true：初始视图本来就"来自地址栏"，不该再写一条历史 ——
+          否则每刷新一次就多一条记录，后退键要按好几下才出得去。 */
+    switchView(readHashView(), true);
+
+    /* ⚠️ 地址栏里挂着一个认不出来的视图名（比如别人发来的 #xxx）→ 把它清掉。
+       不清的话，地址栏会一直挂着一个和画面不符的 hash，看着就像坏了。 */
+    if (location.hash && !VIEW_IDS[location.hash.replace(/^#/, '')]) {
+      try {
+        history.replaceState(null, '', location.pathname + location.search);
+      } catch (err) {
+        console.warn('[TripMemo] 清掉无效 hash 失败：', err);
+      }
+      console.log('[TripMemo] 地址栏里的视图名认不出来，已回到默认视图');
+    }
+
+    /* 用户按「后退 / 前进」或直接改地址栏 → 跟着切视图（Day 13）
+       ⚠️ 传 fromHash=true，**绝不再写 hash** ——
+          否则会出现"后退永远退不完"（每次后退又压一条新历史）。 */
+    window.addEventListener('hashchange', function () {
+      switchView(readHashView(), true);
+    });
 
     // 初始化地点详情弹窗（三态）
     if (window.TripMemoDetail) {

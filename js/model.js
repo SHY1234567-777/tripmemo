@@ -158,6 +158,14 @@
   var LINE_MIN = 1.5;      /* 最小线宽（像素） */
   var LINE_MAX = 8;        /* 最大线宽（像素） */
 
+  /* 「加载中」状态的**最小显示时长**（毫秒）—— Day 13
+     ⚠️ 它**不是**"为了让人看见而故意拖慢"，而是**防闪烁**：
+        本地读数据只要几毫秒，加载态一闪而过 —— 视觉上是一次抖动，比不显示还糟。
+        （行业常规做法：给加载态一个最小显示时长，观感才稳。）
+     ⭐ 放在这里是因为**时间轴和地点列表两个视图都要用它** ——
+        各写一份就是"同一个值两种写法"，正是原则 2 要防的。 */
+  var UI_MIN_LOADING_MS = 220;
+
   /**
    * @param {number} months 该城市的累计停留月数
    * @returns {number} 线宽（像素）
@@ -321,6 +329,7 @@
     DOT_MAX: DOT_MAX,
     LINE_MIN: LINE_MIN,
     LINE_MAX: LINE_MAX,
+    UI_MIN_LOADING_MS: UI_MIN_LOADING_MS,
     parseMonth: parseMonth,
     monthsOfStay: monthsOfStay,
     stayLabel: stayLabel,

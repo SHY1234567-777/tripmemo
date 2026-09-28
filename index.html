@@ -5,14 +5,18 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>TripMemo · 人生记忆地图</title>
   <!-- 给样式表加版本号，防止浏览器拿旧的缓存（改了 CSS 后把 v 的数字 +1 即可） -->
-  <link rel="stylesheet" href="css/style.css?v=45">
+  <link rel="stylesheet" href="css/style.css?v=50">
 </head>
 <body>
 
   <!-- ===== 左侧导航栏：切换视图 + 导出 =====
        宽屏（≥768px）时是贴着左边的竖条，窄屏时自动变回顶部横条。
        两种形态共用同一份 HTML，靠 CSS 媒体查询切换方向。 -->
-  <nav class="app-nav">
+  <!-- ⭐ aria-label="主导航"（Day 13）：
+       <nav> 本身就是原生语义，读屏已经知道"这是导航区"——
+       这里加标签是为了**说清它是"主导航"**（页内可能还有别的导航区），
+       也顺便让"这是一组视图切换入口"这件事有明确的名字。 -->
+  <nav class="app-nav" aria-label="主导航">
     <!-- ⭐ 站点标题**同时是「回门面页」的入口**（Day 11 重做补）
         以前门面页是"有进无出"：进去之后没有任何入口能回来，只能刷新页面。
 
@@ -221,10 +225,34 @@
 
     <!-- 视图 2：时间轴 -->
     <section class="view" id="view-timeline">
-      <!-- 卡片列表：由 js/timeline.js 渲染 -->
+      <!-- 【状态 1：加载】数据还没取回来时显示（Day 13 补）
+           ⚠️ 为什么两个列表也要有它：现在取数据是同步的，但**将来接云数据就是异步的** ——
+              先把状态机搭好，那时只换数据源，页面逻辑一行都不用改。
+           （加载态的"最小显示时长"见 model.js 的 UI_MIN_LOADING_MS ——
+             那**不是故意拖慢，是防闪烁**：本地读只要几毫秒，一闪而过是抖动，比不显示还糟。） -->
+      <div class="view-state" id="timeline-loading" hidden>
+        <span class="view-state-spinner" aria-hidden="true"></span>
+        <p>时间轴加载中……</p>
+      </div>
+
+      <!-- 【状态 2：错误】读数据失败时显示（Day 13 补）
+           ⚠️ 为什么必须和"空状态"分开（和地图那边同一个道理）：
+              空状态 = "你还没记东西"（用户自己能解决）；
+              错误   = "环境出问题了"（用户解决不了，得知道原因）。
+              复用空状态元素，等于**把错误伪装成"没数据"** —— 那是把用户往错的方向引。 -->
+      <div class="view-state view-state--error" id="timeline-error" hidden>
+        <p class="view-state-title">时间轴没能显示</p>
+        <p class="view-state-msg" id="timeline-error-msg"></p>
+        <p class="view-state-hint">
+          数据存在你自己的浏览器里。可能是被隐私模式挡住了，或者数据格式坏了 ——
+          按 F12 看 Console 有更详细的原因。
+        </p>
+      </div>
+
+      <!-- 【状态 3：正常】卡片列表：由 js/timeline.js 渲染 -->
       <div class="panel" id="timeline-list" hidden></div>
 
-      <!-- 空状态：一个地点都没有时显示 -->
+      <!-- 【状态 4：空】一个地点都没有时显示 -->
       <div class="view-empty" id="timeline-empty">
         <p>还没有记录。先去地图上添加一个地点。</p>
       </div>
@@ -232,10 +260,26 @@
 
     <!-- 视图 3：地点列表 -->
     <section class="view" id="view-places">
-      <!-- 按城市分组的列表：由 js/places.js 渲染 -->
+      <!-- 【状态 1：加载】—— 同时间轴，理由见那边 -->
+      <div class="view-state" id="places-loading" hidden>
+        <span class="view-state-spinner" aria-hidden="true"></span>
+        <p>地点列表加载中……</p>
+      </div>
+
+      <!-- 【状态 2：错误】—— 同时间轴。⚠️ 不能复用空状态：那是把错误伪装成"没数据" -->
+      <div class="view-state view-state--error" id="places-error" hidden>
+        <p class="view-state-title">地点列表没能显示</p>
+        <p class="view-state-msg" id="places-error-msg"></p>
+        <p class="view-state-hint">
+          数据存在你自己的浏览器里。可能是被隐私模式挡住了，或者数据格式坏了 ——
+          按 F12 看 Console 有更详细的原因。
+        </p>
+      </div>
+
+      <!-- 【状态 3：正常】按城市分组的列表：由 js/places.js 渲染 -->
       <div class="panel" id="places-list" hidden></div>
 
-      <!-- 空状态 -->
+      <!-- 【状态 4：空】 -->
       <div class="view-empty" id="places-empty">
         <p>还没有记录。先去地图上添加一个地点。</p>
       </div>
@@ -349,7 +393,7 @@
 
   <!-- ===== 本地配置：含高德 Key，不提交（模板见 config.example.js）=====
        找不到 config.js 时不会报错，只是地图加载不出来，页面其余部分照常可用 -->
-  <script src="config.js?v=45"
+  <script src="config.js?v=50"
           onerror="console.warn('[TripMemo] 未找到 config.js —— 地图将无法加载。请把 config.example.js 复制为 config.js 并填入 Key 与安全密钥。')"></script>
 
   <!-- ===== 项目脚本：顺序不能乱 =====
@@ -363,14 +407,20 @@
        ⭐ 规则（就一句）：**改完任何 css / js，把这里和上面的数字一起 +1。**
           11 个资源共用同一个编号 —— 多下载几 KB，换"永远不用想哪个该改"，
           对学习阶段来说非常划算。 -->
-  <script src="js/model.js?v=45"></script>
-  <script src="js/mock-data.js?v=45"></script>
-  <script src="js/store.js?v=45"></script>
-  <script src="js/detail.js?v=45"></script>
-  <script src="js/drawer.js?v=45"></script>
-  <script src="js/map.js?v=45"></script>
-  <script src="js/timeline.js?v=45"></script>
-  <script src="js/places.js?v=45"></script>
-  <script src="js/main.js?v=45"></script>
+  <script src="js/model.js?v=50"></script>
+  <script src="js/mock-data.js?v=50"></script>
+  <script src="js/store.js?v=50"></script>
+
+  <!-- 四态逻辑（空 / 加载 / 错误 / 正常）的**唯一实现** —— 两个列表视图共用（Day 13）
+       ⚠️ 必须排在 timeline.js / places.js 之前：它们在 init() 里就要用它。
+       ⭐ 为什么单独一个文件、而不是在两个视图里各写一份：
+          那就是"同一个逻辑两种写法"，改的时候必然漏一个（原则 2）。 -->
+  <script src="js/view-state.js?v=50"></script>
+  <script src="js/detail.js?v=50"></script>
+  <script src="js/drawer.js?v=50"></script>
+  <script src="js/map.js?v=50"></script>
+  <script src="js/timeline.js?v=50"></script>
+  <script src="js/places.js?v=50"></script>
+  <script src="js/main.js?v=50"></script>
 </body>
 </html>
