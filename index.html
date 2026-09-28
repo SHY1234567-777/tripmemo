@@ -5,7 +5,19 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>TripMemo · 人生记忆地图</title>
   <!-- 给样式表加版本号，防止浏览器拿旧的缓存（改了 CSS 后把 v 的数字 +1 即可） -->
-  <link rel="stylesheet" href="css/style.css?v=50">
+  <!-- ⭐ 手账改版的字体（2026-09-28 美术重设计）
+       ⚠️ 这是本项目的**第一个外部网络依赖**。三条保底：
+         ① 用**国内镜像** —— Google Fonts 直连在武汉很可能超时；
+         ② `display=swap` —— 字体没到之前先用系统字体显示，**不白屏**；
+         ③ `--font-serif` / `--font-hand` 的字体栈里**都带系统兜底**
+            （宋体 → Songti SC → SimSun；手写 → Xingkai SC → KaiTi），
+            加载失败时退化成系统字体，**版式不会塌**。
+       ⚠️ 如果这个镜像不通：换 fonts.font.im / gstatic.loli.net，
+          或把字体下载到 assets/ 本地引用（代价是体积）。 -->
+  <link rel="preconnect" href="https://fonts.loli.net" crossorigin>
+  <link rel="stylesheet"
+        href="https://fonts.loli.net/css2?family=Noto+Serif+SC:wght@600;700&family=Ma+Shan+Zheng&display=swap">
+  <link rel="stylesheet" href="css/style.css?v=56">
 </head>
 <body>
 
@@ -393,7 +405,7 @@
 
   <!-- ===== 本地配置：含高德 Key，不提交（模板见 config.example.js）=====
        找不到 config.js 时不会报错，只是地图加载不出来，页面其余部分照常可用 -->
-  <script src="config.js?v=50"
+  <script src="config.js?v=56"
           onerror="console.warn('[TripMemo] 未找到 config.js —— 地图将无法加载。请把 config.example.js 复制为 config.js 并填入 Key 与安全密钥。')"></script>
 
   <!-- ===== 项目脚本：顺序不能乱 =====
@@ -407,20 +419,20 @@
        ⭐ 规则（就一句）：**改完任何 css / js，把这里和上面的数字一起 +1。**
           11 个资源共用同一个编号 —— 多下载几 KB，换"永远不用想哪个该改"，
           对学习阶段来说非常划算。 -->
-  <script src="js/model.js?v=50"></script>
-  <script src="js/mock-data.js?v=50"></script>
-  <script src="js/store.js?v=50"></script>
+  <script src="js/model.js?v=56"></script>
+  <script src="js/mock-data.js?v=56"></script>
+  <script src="js/store.js?v=56"></script>
 
   <!-- 四态逻辑（空 / 加载 / 错误 / 正常）的**唯一实现** —— 两个列表视图共用（Day 13）
        ⚠️ 必须排在 timeline.js / places.js 之前：它们在 init() 里就要用它。
        ⭐ 为什么单独一个文件、而不是在两个视图里各写一份：
           那就是"同一个逻辑两种写法"，改的时候必然漏一个（原则 2）。 -->
-  <script src="js/view-state.js?v=50"></script>
-  <script src="js/detail.js?v=50"></script>
-  <script src="js/drawer.js?v=50"></script>
-  <script src="js/map.js?v=50"></script>
-  <script src="js/timeline.js?v=50"></script>
-  <script src="js/places.js?v=50"></script>
-  <script src="js/main.js?v=50"></script>
+  <script src="js/view-state.js?v=56"></script>
+  <script src="js/detail.js?v=56"></script>
+  <script src="js/drawer.js?v=56"></script>
+  <script src="js/map.js?v=56"></script>
+  <script src="js/timeline.js?v=56"></script>
+  <script src="js/places.js?v=56"></script>
+  <script src="js/main.js?v=56"></script>
 </body>
 </html>

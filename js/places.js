@@ -92,6 +92,7 @@
     var thumb = document.createElement('div');
     thumb.className = 'place-thumb';
 
+    /* ⚠️ 有照片就贴照片 —— 这条分支**保留**（将来加了上传功能，数据一变就自动生效） */
     var first = (place.images && place.images.length) ? place.images[0] : '';
     if (first) {
       var img = document.createElement('img');
@@ -102,11 +103,63 @@
       return thumb;
     }
 
-    var hint = document.createElement('span');
-    hint.className = 'place-thumb-hint';
-    hint.textContent = '暂无';
-    thumb.appendChild(hint);
+    /* ⭐ 没照片 → **按名字算出的双色渐变 + 首字水印**（2026-09-28 美术改版）
+       ⚠️ 改版前这里是个灰底斜纹框 + 「暂无」两个字。
+          客户明确要求"禁止出现灰底暂无照片" —— 那是**把"缺东西"摆在脸上**，
+          而手账的意思恰恰相反：**没照片，也该像一页好看的纸**。
+       ⭐ 外观按名字算（Model.thumbVariant），**同一个地名永远同一套配色** ——
+          而且每次重画都稳定（不用随机数，否则切一次视图就变一次）。
+       ⚠️ 首字走 data-initial、由 CSS 的 ::after 渲染 —— 纯 CSS 读不到 JS 的字符串。 */
+    thumb.classList.add('ph-' + Model.thumbVariant(place.name));
+    thumb.setAttribute('data-initial', Model.initialOf(place.name));
     return thumb;
+  }
+
+  /**
+   * 封面标题区（2026-09-28 美术改版）
+   * 「手账封面」= 宋体大标题 + 手写体一行统计 + 手绘波浪分隔线
+   *
+   * @param {Array} groups groupByCity 的结果（用来数"几座城市"）
+   * @param {Array} places 全部地点（用来数"几段时光"）
+   * @returns {HTMLElement}
+   */
+  function makeHero(groups, places) {
+    var hero = document.createElement('header');
+    hero.className = 'places-hero';
+
+    var title = document.createElement('h2');
+    title.className = 'places-hero-title';
+    title.textContent = '地点列表';
+
+    /* 「走过 N 座城市 · 留下 M 段时光」
+       ⚠️ 整句放进**一个文本节点**（不用多个 span 拼）——
+          手写体对字距敏感，拆成多个节点会在接缝处冒出奇怪的间距。 */
+    var stat = document.createElement('p');
+    stat.className = 'places-hero-stat';
+    stat.textContent = '走过 ' + groups.length + ' 座城市 · 留下 ' + places.length + ' 段时光';
+
+    /* 手绘波浪分隔线：**内联 SVG**，颜色走 `currentColor` ——
+       CSS 那边给 `.places-hero-rule` 写了 `color: var(--color-accent)`，
+       所以它跟着 token 走，不是写死的色值（原则 2）。
+       ⚠️ `preserveAspectRatio="none"` 让波浪横向拉伸填满，不用平铺重复。 */
+    var rule = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    rule.setAttribute('class', 'places-hero-rule');
+    rule.setAttribute('viewBox', '0 0 240 8');
+    rule.setAttribute('preserveAspectRatio', 'none');
+    rule.setAttribute('aria-hidden', 'true');
+
+    var wave = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    wave.setAttribute('d', 'M0 4 Q15 0 30 4 T60 4 T90 4 T120 4 T150 4 T180 4 T210 4 T240 4');
+    wave.setAttribute('fill', 'none');
+    wave.setAttribute('stroke', 'currentColor');
+    wave.setAttribute('stroke-width', '2');
+    wave.setAttribute('stroke-linecap', 'round');
+    rule.appendChild(wave);
+
+    hero.appendChild(title);
+    hero.appendChild(stat);
+    hero.appendChild(rule);
+    return hero;
   }
 
   /**
@@ -167,10 +220,19 @@
       return;
     }
 
+    var groups = groupByCity(places);   /* 只算一次 —— 封面的统计和下面的卡片都要用 */
+
     showState('ok');
     elList.innerHTML = '';
 
-    groupByCity(places).forEach(function (group, index) {
+    /* ⭐ 封面标题区（2026-09-28 美术改版）——
+       ⚠️ 它是 #places-list 的第一个子元素，而 #places-list 是 CSS Grid：
+          所以 CSS 里必须 `grid-column: 1 / -1` 跨满整行，否则会缩在第一格里。
+       ⚠️ 它只在**正常态**里出现（就是这儿）——
+          加载 / 空 / 错误态下不该有封面（封面说"走过 N 座城市"，可这时候没数据）。 */
+    elList.appendChild(makeHero(groups, places));
+
+    groups.forEach(function (group, index) {
       /* 用浏览器原生的 details/summary 实现"展开 / 收起"，
          不用自己写状态管理 —— 少写代码，少出 bug */
       var box = document.createElement('details');
@@ -196,6 +258,13 @@
 
       var head = document.createElement('summary');
       head.className = 'city-head';
+
+      /* ⭐ 拍立得的"照片区"就是 `.city-head::before`，它需要两样东西（2026-09-28 美术改版）：
+         ① 配色方案编号 → 类名 `ph-0` ~ `ph-5`（CSS 里六套渐变，全部由 token 派生）
+         ② 首字 → `data-initial`（CSS 用 `attr()` 读出来当水印）
+         ⭐ 两样都按**城市名**算 —— 所以同一座城市永远同一套外观，切视图也不会变。 */
+      head.classList.add('ph-' + Model.thumbVariant(group.city));
+      head.setAttribute('data-initial', Model.initialOf(group.city));
 
       var name = document.createElement('span');
       name.className = 'city-name';

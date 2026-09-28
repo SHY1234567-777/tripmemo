@@ -10,47 +10,79 @@
      会自动跟着变浅色 */
   color-scheme: light;
 
-  /* 暖色主题色板：奶油米白 + 深棕灰文字，像纸张/日记本的质感。
-     分「背景 / 面板 / 浮起」三层，靠明度拉开层次。
-     ⚠️ 这套色是 Day 8 定下的最终主题（此前试过深色，已弃用） */
-  --color-bg:         #faf7f2;   /* 页面底色（奶油米白） */
-  --color-surface:    #f4efe6;   /* 侧栏 / 面板（略深一点的米） */
-  --color-elevated:   #ffffff;   /* 浮起层：弹窗 / 下拉（最亮） */
-  --color-hover:      #ffffff;   /* 有底色的元素上的悬停高亮 */
-  --color-input:      #fdfcfa;   /* 输入框 / 按钮底（在白弹窗里要能看出边界） */
-  --color-text:       #3a332b;   /* 主文字（深棕灰，不用纯黑） */
+  /* ⭐ 2026-09-28 手账改版：「旅行手账 × 时光相册」主题。
+     底色从「奶油米白 + 白卡」换成「暖米白 + 卡纸色」；主色从琥珀换成墨棕；新增砖红/灰绿。
+     ⚠️ 完整色板与对比度实测见 DESIGN.md 三节。 */
+  --color-bg:         #F7F2E9;   /* 页面底色（暖米白） */
+  --color-surface:    #F1E8D8;   /* 侧栏 / 面板 / 卡片头（略深一档 —— 派生值） */
+  --color-elevated:   #FBF7EF;   /* 浮起层：弹窗 / 下拉 / 卡片主体（卡纸色） */
+  --color-hover:      #FFFFFF;   /* 有底色的元素上的悬停高亮 */
+  --color-input:      #FDFBF6;   /* 输入框 / 按钮底（在弹窗里要能看出边界） */
+  --color-text:       #3D3428;   /* 主文字（深棕灰，不用纯黑）｜10.95 / 11.42 / 10.04 */
   /* 次要文字（暖灰）。
-     ⚠️ 原值 #8a7f72 的对比度是 3.67 / 3.42 / 3.92 —— **低于 WCAG AA 正文要求的 4.5**，
-        而它偏偏被用在 19 处、其中 12 处字号 ≤13px。
-        ⭐ 小字比大字**更**需要对比度（不是更不需要），所以必须压深，
-           不能靠"看着淡一点更像次要信息"来定色。
-        压到 #746a5d 后：页面底 4.96 / 面板 4.63 / 浮起白 5.30。
-     ⚠️ 但它**不能压在 --color-nav-active（选中胶囊 #ece2d2）上** —— 那里只有 4.13，
-        那个底色上要用 --color-accent-text。（完整矩阵见 DESIGN.md 3.2） */
-  --color-text-weak:  #746a5d;
-  --color-border:     rgba(58, 51, 43, 0.12);  /* 分隔线（半透明深棕） */
+     ⚠️ 换了底色之后**必须重测** —— 4.5:1 是硬线，不能沿用旧结论。
+        压到 #6B6153 后：页面底 5.44 / 面板 5.68 / 卡片 5.14（玻璃底·底图通道 200）。
+     ⭐ 顺带解决了一个旧问题：旧值压在 --color-nav-active 上只有 4.13（**曾被明令禁止**），
+        新值是 **4.74** → 那条禁令已解除（DESIGN.md 3.2 已更新）。 */
+  --color-text-weak:  #6B6153;
+  --color-border:     rgba(61, 52, 40, 0.12);  /* 分隔线（半透明深棕，跟着新文字色走） */
   /* ⚠️ 时间轴竖线**不能**复用 --color-border ——
-     它 alpha 只有 .12，画成 1px 的细线在奶油底上**肉眼几乎看不见**
-     （2026-09-19 他截图反馈）。装饰性的细线需要单独一档颜色。 */
-  --color-timeline-line: rgba(58, 51, 43, 0.2);
+     它 alpha 只有 .12，画成 1px 的细线在暖纸底上**肉眼几乎看不见**
+     （2026-09-19 他截图反馈）。装饰性的细线需要单独一档颜色。
+     ⭐ 手账改版后它成了「墨棕虚点线」的颜色（见时间轴一节）。 */
+  --color-timeline-line: rgba(91, 70, 54, 0.38);
   /* ---------- 主色：⚠️ 它有三个角色，必须用三个变量 ----------
      ⭐ 一个颜色当"边框"和当"文字"，需要的明度**天生不同** ——
         这是"设计系统"和"一堆散颜色"的分水岭。
 
-       · 图形（边框 / 线 / 占比条）：#b5762e 这个明度正好，再深就显得重；
-       · 文字：#b5762e 只有 2.93~3.75，**选中胶囊上仅 2.93** → 必须压深到 #8a531c（最差 4.91）；
-       · 填充底（上面要压浅色文字）：#b5762e 只有 3.61，而且**换成纯白也只有 3.75**
-         → 靠"把文字提亮"救不动，**只能把底色压到 #9c6325**（4.79）。
+     ⭐ 手账改版：主色从琥珀 #b5762e 换成**墨棕 #5B4636**。
+        墨棕足够深，所以它**当图形和当文字都达标**（7.93 / 8.28）——
+        ⚠️ 下面 `--color-accent` 与 `--color-accent-text` **同值是有意的，不是漏改**：
+        变量仍然分开，是因为**角色不同、将来可能再分叉**（琥珀那次就是证据）。
+        填充底单独压到 #4E3A2C，让上面的浅字有 10.00。
 
      ⚠️ 所以：图形用 --color-accent，文字用 --color-accent-text，填充底用 --color-accent-fill。
         用错角色必然有一处不达标。（完整实测矩阵见 DESIGN.md 3.3） */
-  --color-accent:            #b5762e;   /* 图形：边框 / 占比条 / 连线 / 色点 */
-  --color-accent-text:       #8a531c;   /* 文字：主色文字（最差 4.91） */
-  --color-accent-fill:       #9c6325;   /* 填充底：主按钮底（压浅字 4.79） */
-  --color-accent-fill-hover: #8a531c;   /* 主按钮悬停（压浅字 6.06） */
-  --color-accent-bg:  rgba(181, 118, 46, 0.12);   /* 主色浅底 */
-  --color-nav-active: #ece2d2;   /* 侧栏选中项底色 */
-  --color-on-accent:  #fffaf3;   /* 主色**填充底**上的文字色（浅色） */
+  --color-accent:            #5B4636;   /* 图形：边框 / 占比条 / 连线 / 色点（7.93） */
+  --color-accent-text:       #5B4636;   /* 文字：主色文字（8.28）—— 与上一行同值是有意的 */
+  --color-accent-fill:       #4E3A2C;   /* 填充底：主按钮底（压浅字 10.00） */
+  --color-accent-fill-hover: #42301F;   /* 主按钮悬停（压浅字 11.74） */
+  --color-accent-bg:  rgba(91, 70, 54, 0.10);   /* 主色浅底 */
+  --color-nav-active: #EDE2D2;   /* 侧栏选中项底色 */
+  --color-on-accent:  #FBF7EF;   /* 主色**填充底**上的文字色（卡纸色） */
+
+  /* ---------- 强调色：砖红（手账的「邮戳 / 印章」色）----------
+     ⚠️ 它同样有三个角色，理由和主色一模一样：
+        原色 #C0523F 当文字只有 4.17 / 4.35 —— **差一点点，只够大号字**；
+        压到 #AD4A39 才在三种底上都过 4.5（4.94 / 5.15 / **4.53**）。
+        **邮戳底**再单独压到 #A94837，让上面的浅字有 5.36。 */
+  --color-stamp:      #C0523F;   /* 图形 / 边框（邮戳描边、装饰线）—— 不承载正文 */
+  --color-stamp-text: #AD4A39;   /* 砖红当文字时（最差 4.53） */
+  --color-stamp-fill: #A94837;   /* 邮戳填充底（压浅字 5.36） */
+
+  /* ---------- 辅助色：灰绿（手账的「标签 / 胶带」色）----------
+     ⚠️ #7A8B6F 只有 3.28 —— **只能当材质**（贴纸底、印章描边），**不能当文字**。
+     ⚠️⚠️ **而且半透明底上不能读它**：胶带底 rgba(122,139,111,.20) 叠在卡纸上之后，
+        灰绿字只剩 **3.94**（不达标）——
+        ⭐ 所以**标签里的文字一律用 --color-text**（压上去 9.26），
+           灰绿只负责"这是一张胶带"这个材质。（这和"玻璃底"是同一类坑。） */
+  --color-tag:        #7A8B6F;   /* 材质：胶带底 / 印章描边 */
+  --color-tag-text:   #5F6C57;   /* 灰绿当文字时（5.00 / 5.21 / 4.58）—— 极少用 */
+  --color-tag-bg:     rgba(122, 139, 111, 0.20);   /* washi tape 半透明底 */
+
+  /* ---------- 手账纸面装饰（2026-09-28 美术改版）----------
+     ⚠️ 这两个**不是颜色角色**，是"纸面上的印刷痕迹" ——
+        所以它们故意做得极淡（6~7%）：目标是"隐约觉得纸上有格子"，
+        而不是"看见一堆线"。⚠️ 想调浓就改这两个值，**别在用到的地方硬写 rgba**。 */
+  --color-grid-line: rgba(91, 70, 54, 0.06);    /* 横格线（像横线笔记本） */
+  --color-bind-edge: rgba(122, 139, 111, 0.09); /* 装订边（本子左侧那条色边） */
+
+  /* ---------- 字体栈（手账改版新增）----------
+     ⚠️ 每个栈都**必须带系统兜底** —— 外部字体加载失败时退化成系统字体，
+        **版式不能塌**。这是"引入外部字体"的底线（见 index.html 的注释）。 */
+  --font-body:  system-ui, -apple-system, "Microsoft YaHei", "PingFang SC", sans-serif;
+  --font-serif: "Noto Serif SC", "Songti SC", "STSong", "SimSun", serif;
+  --font-hand:  "Ma Shan Zheng", "Long Cang", "Xingkai SC", "KaiTi", "STKaiti", cursive;
 
   /* ---------- 功能色 ----------
      原来是直接写死的 #c0392b（4 处），现已收进变量，改一处全站生效。 */
@@ -85,7 +117,7 @@
   --color-glass-strong: rgba(255, 255, 255, 0.82);  /* 玻璃底·强（下拉这类要看清文字） */
   --color-glass-sheen:  rgba(255, 255, 255, 0.55);  /* 顶部内高光：做出"玻璃有一层厚度" */
   --glass-blur:         16px;
-  --glass-shadow:       0 2px 10px rgba(58, 51, 43, 0.14),
+  --glass-shadow:       0 2px 10px rgba(61, 52, 40, 0.14),
                         inset 0 1px 0 var(--color-glass-sheen);
 
   --nav-width: 189px;   /* 参考图实测：1260px 视口下侧栏占 189px */
@@ -111,6 +143,15 @@
         界面里最高只到 --text-2xl（28px），这一档只给"整屏一屏"的场景用。
         混进界面阶梯，会诱导以后在卡片里也用 40px。 */
   --text-display: 40px;
+  /* 2026-09-28 美术改版新增：**章节标题**档（时间轴年份 / 地点列表封面标题）。
+     手账主题要求"年份做成超大章节标题"（原话 48px+），而最高档 --text-display 是
+     "只准门面页"的 40px —— 于是照 4.2 的老规矩再加一档：
+       ① 是刻度盘里的一档（40 → 48，差 8px，远大于"相邻至少差 2px"的下限）；
+       ② ⚠️ **限定用途**：只准 `.timeline-year-label` 和 `.places-hero-title`。
+     ⚠️ 它和 --text-display **互不替代**：40 给"一屏只有一个词"的门面，48 给"章节标题"。
+        两者都**不得进入卡片正文**。
+     ⚠️ ≤767px 必须降级到 --text-2xl，否则撑破（照抄 .landing-title 的做法）。 */
+  --text-chapter: 48px;
   --icon-size:    16px;   /* 导航图标 */
   --icon-size-lg: 18px;   /* 导航图标（手机端放大，便于点按） */
 
@@ -146,10 +187,10 @@
      ⚠️ **不是所有 box-shadow 都归这四档** —— 焦点环、inset 暗角、
         浅色光晕、左侧强调条、方向性抽屉阴影都是"别的东西"，
         不属"抬升层次"，见 DESIGN.md 6.2 的例外说明。 */
-  --shadow-sm: 0 1px 2px  rgba(58, 51, 43, 0.05);  /* 静止的卡片（几乎看不见，只是"贴"在底上） */
-  --shadow-md: 0 6px 20px rgba(58, 51, 43, 0.13);  /* 卡片悬停（抬起来） */
-  --shadow-lg: 0 8px 26px rgba(58, 51, 43, 0.22);  /* 浮层：下拉、悬停提示 */
-  --shadow-xl: 0 12px 40px rgba(58, 51, 43, 0.28); /* 弹窗 */
+  --shadow-sm: 0 1px 2px  rgba(61, 52, 40, 0.05);  /* 静止的卡片（几乎看不见，只是"贴"在底上） */
+  --shadow-md: 0 6px 20px rgba(61, 52, 40, 0.13);  /* 卡片悬停（抬起来） */
+  --shadow-lg: 0 8px 26px rgba(61, 52, 40, 0.22);  /* 浮层：下拉、悬停提示 */
+  --shadow-xl: 0 12px 40px rgba(61, 52, 40, 0.28); /* 弹窗 */
 
   /* ---------- 动效（Day 9 重做 · 建立）----------
      ⚠️ 原本 `--duration-*` / `--ease-out` 也只在 DESIGN.md 里写着，:root 里没有 ——
@@ -160,6 +201,10 @@
   --duration-fast:   150ms;  /* 悬停、颜色变化等微交互 */
   --duration-normal: 180ms;  /* 卡片抬起、边框变化 */
   --duration-slow:   380ms;  /* 入场动画 */
+  /* 2026-09-28 美术改版新增两档 —— ⚠️ 按 DESIGN.md 七的判据，它们**不属于"层级"**，
+     而是"某件事本身的节奏"；但因为**全站复用、必须统一**，所以仍进变量、单独成档。 */
+  --duration-page:   400ms;  /* 翻页过渡（视图切换时的淡入 + 轻微上移） */
+  --duration-draw:   600ms;  /* 时间轴竖线「随滚动绘制」 */
   --ease-out: cubic-bezier(0.22, 0.68, 0.36, 1);  /* 默认缓动（减速） */
   /* ⚠️ `--duration-normal` 原来在文档里写的是 220ms，但代码里**从未出现过 220ms**
      （实际是 180ms 用了 6 处、200ms 用了 2 处）。2026-09-23 由 shy 拍板：
@@ -188,7 +233,7 @@ body {
      窄屏时由媒体查询改回 column（见文件末尾） */
   flex-direction: row;
   color: var(--color-text);
-  font-family: system-ui, -apple-system, "Microsoft YaHei", "PingFang SC", sans-serif;
+  font-family: var(--font-body);   /* ⚠️ 顺序和以前**完全一样**，只是收进了变量（手账改版） */
   font-size: var(--text-base);
   line-height: 1.7;
 
@@ -204,7 +249,7 @@ body {
   background-color: var(--color-bg);
   background-image:
     radial-gradient(130% 78% at 50% -12%,
-      rgba(181, 118, 46, 0.055) 0%, rgba(181, 118, 46, 0) 62%),
+      rgba(91, 70, 54, 0.055) 0%, rgba(91, 70, 54, 0) 62%),
     radial-gradient(120% 74% at 50% 112%,
       rgba(138, 127, 114, 0.08) 0%, rgba(138, 127, 114, 0) 60%);
 }
@@ -258,12 +303,12 @@ body::after {
 ::-webkit-scrollbar-thumb {
   border: 2px solid transparent;
   border-radius: var(--radius-full);
-  background: rgba(58, 51, 43, 0.18);
+  background: rgba(61, 52, 40, 0.18);
   background-clip: padding-box;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(58, 51, 43, 0.3);
+  background: rgba(61, 52, 40, 0.3);
   background-clip: padding-box;
 }
 
@@ -328,9 +373,12 @@ body::after {
   justify-content: center;
   width: 30px;
   height: 30px;
-  border: 1px solid rgba(181, 118, 46, 0.45);
+  border: 1px solid rgba(192, 82, 63, 0.45);   /* 砖红（邮戳色）—— 手账改版换的 */
   border-radius: var(--radius-md);
-  background: rgba(181, 118, 46, 0.14);
+  background: rgba(192, 82, 63, 0.14);
+  /* ⚠️ 文字仍用墨棕（--color-accent-text），**不能**改成砖红字：
+     砖红字压在砖红浅底上只有 3.83（12px 小字不达标），墨棕压上去是 6.15 ✅。
+     这正是"底用强调色、字用主色"该有的分工。 */
   color: var(--color-accent-text);
   font-size: var(--text-xs);
   font-weight: 700;
@@ -363,6 +411,12 @@ body::after {
   text-align: left;
   cursor: pointer;
   transition: background var(--duration-fast), color var(--duration-fast);
+  /* ⭐ 下面两条是给"选中项的手绘色块"用的（2026-09-28 手账改版）——
+     `isolation: isolate` 给按钮建一个**新的层叠上下文**，
+     这样 `::before` 的 `z-index: -1` 只会沉到"按钮自己的内容"下面，
+     **不会**沉到侧栏背景后面去（不写的话某些浏览器上就看不见了）。 */
+  position: relative;
+  isolation: isolate;
 }
 
 .nav-icon {
@@ -382,11 +436,41 @@ body::after {
   color: var(--color-text);
 }
 
-/* 当前视图：整行圆角胶囊底 + 主色文字（参考图的选中样式） */
+/* ⭐ 当前视图 = **手绘感高亮色块**（2026-09-28 手账改版）
+   ⚠️ **为什么用 `::before` 垫一块、而不是直接改 `background`**：
+      直接铺背景只能得到一个规规矩矩的圆角矩形 —— 那是"UI 控件"的样子；
+      手账里的"划重点"应该是**不规则的、稍微歪的**一块。
+   ⚠️⚠️ **绝对不能用 `clip-path` 做这个形状** —— `.nav-btn` 在焦点分组里，
+      而 `clip-path` 会把 `:focus-visible` 的 `outline` **一起裁掉**，
+      键盘用户就彻底看不到自己在哪了。所以这里改用"不对称的四个圆角 + 一点旋转"。
+   ⚠️ `background: transparent` 是**必须**的：`.nav-btn:hover` 会铺 `--color-hover`（白），
+      不在这儿顶掉它的话，悬停时那片白会把 `::before`（z-index:-1）**整个盖住**，
+      手绘块就凭空消失 —— 而这种"只在悬停时才坏"的 bug 最难发现。 */
 .nav-btn.is-active {
-  background: var(--color-nav-active);
+  background: transparent;      /* ⚠️ 交给下面的 ::before，别再直接铺背景 */
   color: var(--color-accent-text);
   font-weight: 500;
+}
+
+.nav-btn.is-active::before {
+  content: '';
+  position: absolute;
+  inset: 2px -3px 2px -2px;     /* 四边不等 → "多涂出去一点"的手感 */
+  z-index: -1;                  /* ⚠️ 只在按钮内部下沉（靠 .nav-btn 的 isolation）*/
+  /* ⚠️ 四个角各不相同 —— 这就是"手绘感"的来源；改成规整的圆角就变回普通控件了 */
+  border-radius: 12px 8px 14px 6px;
+  background: var(--color-nav-active);
+  transform: rotate(-0.5deg);
+  pointer-events: none;
+}
+
+/* 悬停时让它**加深**，而不是被白底盖掉（见上面那条注释） */
+.nav-btn.is-active:hover {
+  background: transparent;
+}
+
+.nav-btn.is-active:hover::before {
+  background: var(--color-accent-bg);
 }
 
 /* 「导出 JSON」是全局动作，推到最底部跟视图切换区分开 */
@@ -427,6 +511,39 @@ body::after {
 
 .view.is-active {
   display: block;
+  /* ⭐ 翻页过渡（2026-09-28 手账改版）：切换视图时淡入 + 轻微上移
+     ⚠️ 纯 CSS，**没有动 `main.js` 的时序** —— 视图切换仍然由 `switchView` 一手负责。
+     ⚠️ 和"加载态"不会打架：`view:change` 会触发重新渲染（加载态 220ms），
+        而这里是 400ms 淡入 —— 观感是"一边淡入、一边把加载态换成内容"，不会白屏。
+     ⚠️ `both` 不能省：它在**动画开始前**保持 from（透明），否则从透明起步那一下会闪出实色。
+     ⚠️ **地图必须排除"位移"**：`transform` 会新建 containing block，
+        而 `ensureMapInited()` 恰好在同一个 tick 里跑（高德要靠容器算尺寸）。
+        所以地图只做淡入、不做位移 —— 保险优先，见下面那条。 */
+  animation: page-turn-in var(--duration-page) var(--ease-out) both;
+}
+
+@keyframes page-turn-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* ⚠️ 地图：只淡入，**不动位置**（理由见上）
+   ⭐ 选择器带 id，权重(1,0,0)天然高过 `.view.is-active` 的(0,2,0)，所以这份一定生效。 */
+#view-map.is-active {
+  animation: page-fade-in var(--duration-page) var(--ease-out) both;
+}
+
+@keyframes page-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* ⚠️ 尊重「减少动态效果」：连淡入一起关掉 —— 直接出现，不闪不晃 */
+@media (prefers-reduced-motion: reduce) {
+  .view.is-active,
+  #view-map.is-active {
+    animation: none;
+  }
 }
 
 /* ---------- 空状态 ---------- */
@@ -495,7 +612,7 @@ body.is-landing .app-nav {
   background-image:
     linear-gradient(rgba(30, 22, 15, 0.55), rgba(30, 22, 15, 0.74)),
     radial-gradient(120% 90% at 50% 6%,
-      rgba(181, 118, 46, 0.38) 0%, rgba(181, 118, 46, 0) 62%),
+      rgba(91, 70, 54, 0.38) 0%, rgba(91, 70, 54, 0) 62%),
     url('../assets/landing-bg.jpg');
   background-size: cover, cover, cover;
   background-position: center, center, center;
@@ -507,7 +624,7 @@ body.is-landing .app-nav {
   content: '';
   position: absolute;
   inset: var(--space-4);
-  border: 1px solid rgba(255, 250, 243, 0.32);
+  border: 1px solid rgba(251, 247, 239, 0.32);
   /* ⚠️ 铁律：铺满容器的浮层必须让出点击，否则按钮点不动 */
   pointer-events: none;
 }
@@ -521,14 +638,14 @@ body.is-landing .app-nav {
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid rgba(255, 250, 243, 0.5);
+  border: 1px solid rgba(251, 247, 239, 0.5);
   border-radius: 50%;
   /* 圈内一点点中心高光 + 圈外一圈很淡的辉光：
      压在照片上时，这两样能让徽标"浮"起来，不至于糊进背景。
      ⚠️ 都很淡（.10 / .08）—— 压照片的装饰只经得起这么点，再多就脏。 */
   background: radial-gradient(circle at 50% 50%,
-    rgba(255, 250, 243, 0.10) 0%, rgba(255, 250, 243, 0) 70%);
-  box-shadow: 0 0 24px rgba(255, 250, 243, 0.08);
+    rgba(251, 247, 239, 0.10) 0%, rgba(251, 247, 239, 0) 70%);
+  box-shadow: 0 0 24px rgba(251, 247, 239, 0.08);
 }
 
 .landing-mark-svg {
@@ -545,7 +662,7 @@ body.is-landing .app-nav {
   left: 50%;
   width: 1px;
   height: var(--space-6);
-  background: rgba(255, 250, 243, 0.32);
+  background: rgba(251, 247, 239, 0.32);
 }
 
 /* ---------- 大标题 ----------
@@ -567,7 +684,7 @@ body.is-landing .app-nav {
   height: 1px;
   margin: 0;
   border: 0;
-  background: rgba(255, 250, 243, 0.32);
+  background: rgba(251, 247, 239, 0.32);
 }
 
 /* ---------- 一行小字 ---------- */
@@ -583,7 +700,7 @@ body.is-landing .app-nav {
 .landing-cta {
   margin-top: var(--space-2);
   padding: var(--space-3) var(--space-8);
-  border: 1px solid rgba(255, 250, 243, 0.5);
+  border: 1px solid rgba(251, 247, 239, 0.5);
   border-radius: var(--radius-sm);
   background: transparent;
   color: inherit;
@@ -597,7 +714,7 @@ body.is-landing .app-nav {
 
 .landing-cta:hover {
   border-color: var(--color-on-accent);
-  background: rgba(255, 250, 243, 0.14);
+  background: rgba(251, 247, 239, 0.14);
 }
 
 /* 键盘焦点环（Day 9 立下的规矩，新组件也要守） */
@@ -619,7 +736,7 @@ body.is-landing .app-nav {
   margin: 0;
   /* ⚠️ 它是小字，压在照片上 —— 小字比大字**更**需要对比度，
       所以这里用 .78 而不是 .6（Day 9 那条教训）。 */
-  color: rgba(255, 250, 243, 0.78);
+  color: rgba(251, 247, 239, 0.78);
   font-size: var(--text-xs);
   letter-spacing: 0.08em;
 }
@@ -721,9 +838,11 @@ body.is-landing .app-nav {
   color: var(--color-text-weak);
   /* ⚠️ 这里**故意不设 opacity**。
      原来写的是 opacity: 0.7，看着"更淡更像个提示"，
-     但它会把 --color-text-weak 的有效对比度从 5.30 **拉到 2.89**（低于 4.5）。
-     ⭐ "弱"应该由**颜色本身**表达（#746a5d 已经比正文 #3a332b 淡），
-        不能靠再叠一层半透明 —— 那是把可读性直接乘掉。 */
+     但它会把 --color-text-weak 的有效对比度从 5.14 **拉到 2.85**（低于 4.5）。
+     ⭐ "弱"应该由**颜色本身**表达（#6B6153 已经比正文 #3D3428 淡），
+        不能靠再叠一层半透明 —— 那是把可读性直接乘掉。
+     ⚠️ 这两个数字随「手账改版」更新过（旧值是 5.30 → 2.89）——
+        换了色值就必须重算，别让注释烂在这儿。 */
 }
 
 .map-search:focus {
@@ -845,7 +964,7 @@ body.is-landing .app-nav {
      换成 --color-accent-fill（同一支色、明度更低）后是 **4.79:1** ✓
      （这正是"主色必须拆成三个变量"那条规矩的用处：同一个颜色当边框和当底，需要的明度天生不同。） */
   background: var(--color-accent-fill);
-  box-shadow: 0 0 0 3px rgba(250, 247, 242, 0.95), 0 1px 8px rgba(58, 51, 43, 0.4);
+  box-shadow: 0 0 0 3px rgba(247, 242, 233, 0.95), 0 1px 8px rgba(61, 52, 40, 0.4);
   color: var(--color-on-accent);
   font-size: var(--text-sm);
   line-height: 1;
@@ -952,13 +1071,16 @@ body.is-landing .app-nav {
   z-index: 20;
   padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-md);
-  background: rgba(58, 51, 43, 0.93);
-  color: #faf7f2;
+  background: rgba(61, 52, 40, 0.93);
+  /* ⚠️ 手账改版：原来是硬写旧页面底色的值 #faf7f2。
+     现在改用 --color-on-accent —— 它的语义正是"**深底上的浅字**"，
+     而且比新底色（#F7F2E9，9.00）还高一点：**9.39**（14px 正文要求 4.5）。 */
+  color: var(--color-on-accent);
   font-family: inherit;
   font-size: var(--text-sm);
   line-height: 1.4;
   white-space: nowrap;
-  box-shadow: 0 2px 10px rgba(58, 51, 43, 0.25);
+  box-shadow: 0 2px 10px rgba(61, 52, 40, 0.25);
   /* 深色标签也用玻璃，但**底色故意保持高不透明** ——
      它是要读的文字，透出来会跟地图的点/线混在一起。
      加模糊的作用只是让边缘那一圈背后的地图柔化，标签本身就是清晰的一块。 */
@@ -1074,7 +1196,7 @@ body.is-landing .app-nav {
       （Tooolive 项目在"播放回忆"时也是同样的取舍：
         它把 .veil 从渐变换成近实色 #020817c7，让注意力集中在内容上） */
 .view-state--error {
-  background: rgba(250, 247, 242, 0.94);
+  background: rgba(247, 242, 233, 0.94);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
 }
@@ -1087,7 +1209,7 @@ body.is-landing .app-nav {
 
 .view-state--error .view-state-msg {
   padding: var(--space-3) var(--space-4);
-  border: 1px solid rgba(181, 118, 46, 0.35);
+  border: 1px solid rgba(91, 70, 54, 0.35);
   border-radius: var(--radius-lg);
   background: var(--color-accent-bg);
   color: var(--color-text);
@@ -1110,12 +1232,12 @@ body.is-landing .app-nav {
   right: 0;
   z-index: 30;
   padding: var(--space-3) var(--space-4);
-  border-bottom: 1px solid rgba(181, 118, 46, 0.35);
+  border-bottom: 1px solid rgba(91, 70, 54, 0.35);
   background: #fdf3e3;
   color: var(--color-text);
   font-size: var(--text-sm);
   line-height: 1.7;
-  box-shadow: 0 2px 10px rgba(58, 51, 43, 0.08);
+  box-shadow: 0 2px 10px rgba(61, 52, 40, 0.08);
   /* 这条不设 pointer-events:none —— 用户可能要选中复制错误信息 */
 }
 
@@ -1193,6 +1315,29 @@ body.is-landing .app-nav {
 /* 面板放宽一点：卡片是横向的，太窄会挤 */
 #timeline-list {
   max-width: 760px;
+
+  /* ⭐ 2026-09-28 手账改版：给这一页铺上「纸面」——
+     底下是横格线、左边是本子的装订边。
+     ⭐ 这一步同时解决了"内容窄、两侧空"：空白不再是"没东西"，而是"一张摊开的横线纸"。
+     ⚠️ 两个装饰都是 `background-image` 叠加，**不用伪元素** ——
+        伪元素得算 z-index（`-1` 会被祖先的背景盖住，容易翻车），叠背景简单又不会出错。
+     ⚠️ 颜色走 `--color-grid-line` / `--color-bind-edge` 两个 token，**不在这儿硬写 rgba**。
+     ⚠️ 装订边宽 `--space-6`（24px，落 4px 网格），和面板左内边距同一档 ——
+        所以它正好落在"内容开始之前"的位置。 */
+  min-height: 100%;               /* ⚠️ 内容短时也要把这个"本子"撑满，否则装订边只有半截 */
+  background-image:
+    /* 装订边：左侧一条极淡的竖带 */
+    linear-gradient(to right,
+      var(--color-bind-edge) 0,
+      var(--color-bind-edge) var(--space-6),
+      transparent var(--space-6)),
+    /* 横格线：每 32px 一条 1px 的线（32 落 4px 网格） */
+    repeating-linear-gradient(to bottom,
+      transparent 0 31px,
+      var(--color-grid-line) 31px 32px);
+  background-repeat: no-repeat, repeat;
+  /* ⚠️ 横格线从"第一行文字的位置"开始，不然格子会和文字错开半格 */
+  background-position: 0 0, 0 var(--space-6);
 }
 
 /* 一个年份 = 一个分组 */
@@ -1200,18 +1345,40 @@ body.is-landing .app-nav {
   margin-bottom: var(--space-8);
 }
 
-/* 年份标题：大号 + 弱色，作为"时间锚点" */
+/* 年份标题 = 手账的「章节标题」（2026-09-28 手账改版）
+   ⚠️ 48px（`--text-chapter`）—— 这一档在 DESIGN 4.2 里**只准两处**，这是其中一处。
+   ⚠️ 用宋体（`--font-serif`）不是黑体：手账的"章节"该是印刷字的样子。 */
 .timeline-year-label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
   margin: 0 0 var(--space-4);
   padding-bottom: var(--space-2);
   border-bottom: 1px solid var(--color-border);
-  color: var(--color-text-weak);
-  font-size: var(--text-xl);
-  font-weight: 600;
-  letter-spacing: 0.6px;
+  color: var(--color-text);
+  font-family: var(--font-serif);
+  font-size: var(--text-chapter);
+  font-weight: 700;
+  letter-spacing: 0.04em;
 }
 
-/* 该年份下的卡片列表：左侧画一条时间竖线 */
+/* ⭐ 年份旁边那枚「灰色小印章」（纯装饰）
+   ⚠️ 和邮戳同一个手法：**SVG 只当形状（mask），颜色走 `background`** ——
+      反过来在 SVG 里填色的话会写死色值，而且 data-URI 读不到 CSS 变量。
+   ⭐ 用灰绿（`--color-tag`）—— 它的定位就是"材质"，不承载文字。 */
+.timeline-year-label::after {
+  content: '';
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--color-tag);
+  opacity: 0.5;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='22' fill='%23000'/%3E%3Ccircle cx='32' cy='32' r='26' fill='none' stroke='%23000' stroke-width='5' stroke-dasharray='2 3'/%3E%3C/svg%3E") center / 100% 100% no-repeat;
+          mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='22' fill='%23000'/%3E%3Ccircle cx='32' cy='32' r='26' fill='none' stroke='%23000' stroke-width='5' stroke-dasharray='2 3'/%3E%3C/svg%3E") center / 100% 100% no-repeat;
+}
+
+/* 该年份下的卡片列表：左侧是"走过的路线" */
 .timeline-year-list {
   position: relative;
   display: flex;
@@ -1220,56 +1387,62 @@ body.is-landing .app-nav {
   padding-left: var(--space-5);
 }
 
-/* 时间竖线：贯穿这一年的所有卡片
-   ⚠️ 对齐算法（改尺寸时一起改，不然线和小圆点会错开）：
-     · 卡片左边缘距列表左边 = padding-left 20px
-     · 小圆点用 `left: -20px` → 圆点盒子正好从列表的 0px 开始
-     · 圆点 10px 宽 → 圆心在 5px
-     · 所以竖线要「宽 2px + left 4px」→ 占 4~6px，中心也在 5px ✅
-   ⚠️ 注意全局是 `box-sizing: border-box`：
-     圆点写 width:10px 时，**这 10px 已经包含 2px 边框了**，
-     实际直径就是 10px（不是 10+2+2）。算对齐时别多加边框。 */
+/* ⭐ 时间竖线 → **墨棕圆点虚线**（像地图上走过的路线）2026-09-28 手账改版
+   ⚠️ 对齐算法（改尺寸时三个一起改，不然线和小圆点会错开）：
+     · 卡片左边缘距列表左边 = padding-left **20px**
+     · 小圆点用 `left: -20px` → 圆点盒子正好从列表的 **0px** 开始
+     · 圆点 10px 宽 → **圆心在 5px**
+     · 所以这条虚点带要「宽 6px + left 2px」→ 占 2~8px，**中心也在 5px** ✅
+   ⚠️ 原来是 `width: 2px` 的实线；现在用 `radial-gradient` 重复出圆点。
+   ⚠️ 全局是 `box-sizing: border-box`：圆点写 `width:10px` 时这 10px **已经含边框**。
+   ⭐ 这一层是"**淡墨**"（每个点都浅）—— 上面 `.timeline-card::after` 会把滚过的那几段**
+      **点亮**，两层叠起来就是"路线在随滚动往下画"。 */
 .timeline-year-list::before {
   content: '';
   position: absolute;
   top: 6px;
   bottom: 6px;
-  left: 4px;
-  width: 2px;
-  border-radius: var(--radius-full);
-  background: var(--color-timeline-line);
+  left: 2px;
+  width: 6px;
+  background: radial-gradient(circle, var(--color-timeline-line) 1.6px, transparent 1.7px) 3px 0 / 6px 10px repeat-y;
+  opacity: 0.55;
 }
 
-/* 一张地点卡片：左边图片位 + 右边文字（Day 8 重做成"真卡片"） */
+/* 一张地点卡片 → **日记页**（2026-09-28 手账改版）
+   ⚠️ `--tilt` 是"这张纸歪多少度"；**所有用到 transform 的地方都必须带上它** ——
+      静止 / 入场 / hover 三处，漏一处就会"回正"或者"跳一下"。 */
 .timeline-card {
+  --tilt: 0deg;
   position: relative;
   display: flex;                    /* 两栏：图在左，字在右 */
   align-items: stretch;
   gap: var(--space-4);
-  padding: var(--space-3);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+  border: 0;                        /* 日记页靠阴影立住，不描边 */
+  border-radius: var(--radius-md);
   background: var(--color-elevated);
   cursor: pointer;
-  /* 卡片感的关键：一点点阴影 + 圆角，让它"浮"在底上 */
   box-shadow: var(--shadow-sm);
-  transition: border-color var(--duration-normal), box-shadow var(--duration-normal), transform var(--duration-normal);
+  transform: rotate(var(--tilt));
+  transition: box-shadow var(--duration-normal), transform var(--duration-normal);
 }
 
-/* 卡片左边的小圆点：钉在时间竖线上
-   （Day 8.5 修：7px → 10px，原来太小、几乎看不出是个圆点）
-   边框用页面底色，做出"圆点把竖线咬断一截"的效果。
+/* ⭐ 相邻卡片**交替倾斜 ±1.5°**，营造"一叠纸"的翻阅感
+   ⚠️ 这个 1.5° 是**原始需求指定的**（"相邻卡片交替轻微左倾/右倾"那条写的就是 ±1.5°）。
+   ⚠️ 用 `:nth-child` 而不是随机数：**稳定** —— 切视图 / 数据变化后角度不变。
+   ⚠️ 幅度别再加了：再大就会让卡片边缘的"路线"和圆点看起来歪出竖线。 */
+.timeline-card:nth-child(odd)  { --tilt: -1.5deg; }
+.timeline-card:nth-child(even) { --tilt:  1.5deg; }
 
-   ⚠️ Day 9：`left` 用 calc 从 --space-5 反推，**不再写死 -20px**。
-      为什么：圆点必须永远落在列表的 0px 处，而那是靠
-      「列表的 padding-left」把它推过去的 —— 两个值天生耦合。
-      以前靠注释提醒"改一个要改另一个"，现在把依赖直接写进 CSS，
-      **改 --space-5 时圆点会自动跟上，不可能再错开。** */
+/* 卡片左边的小圆点：它是"这条路线上的一个站点"
+   ⚠️ `left` 用 calc 从 --space-5 反推，**不再写死 -20px**（Day 9 改的）：
+      圆点必须永远落在列表的 0px 处，而那是靠"列表的 padding-left"把它推过去的 ——
+      两个值天生耦合，所以把依赖直接写进 CSS：**改 --space-5 时圆点自动跟上**。 */
 .timeline-card::before {
   content: '';
   position: absolute;
   top: 22px;
-  left: calc(-1 * var(--space-5));   /* = -20px，与 .timeline-year-list 的 padding-left 同一档 */
+  left: calc(-1 * var(--space-5));   /* = -20px，与 .timeline-year-list 的 padding-left 同档 */
   width: 10px;
   height: 10px;
   border: 2px solid var(--color-bg);
@@ -1277,38 +1450,87 @@ body.is-landing .app-nav {
   background: var(--color-accent);
 }
 
-/* 悬停：整张卡往右挪一点 + 抬起来 —— 这就是"翻阅"的手感 */
+/* ⭐ 卡片旁边那一小段「墨色虚线」——滚进视口时点亮（2026-09-28 手账改版）
+   一串卡片陆续点亮之后，看上去就是**路线被一段段画下去**。
+   ⚠️ `pointer-events: none`：它是纯装饰，不能抢走卡片的点击。 */
+.timeline-card::after {
+  content: '';
+  position: absolute;
+  top: calc(-1 * var(--space-3));
+  bottom: calc(-1 * var(--space-3));
+  left: calc(-1 * var(--space-5) + 2px);   /* 和竖线同心（都落在列表的 5px） */
+  width: 6px;
+  background: radial-gradient(circle, var(--color-accent) 1.9px, transparent 2px) 3px 0 / 6px 10px repeat-y;
+  opacity: 0;
+  transition: opacity var(--duration-draw) linear;
+  pointer-events: none;
+}
+
+.timeline-card.is-in::after {
+  opacity: 1;
+}
+
+/* ⭐ 入场：从下方 20px 淡入（2026-09-28 手账改版）
+   ⚠️⚠️ 初始态（透明 + 下移）**必须包在 `no-preference` 里** ——
+      否则"系统关了动画"时，元素会**永久停在透明状态，内容直接消失**。
+      这是所有 `translateY` 类入场动画最容易踩的坑（内容不见了，还不报错）。 */
+@media (prefers-reduced-motion: no-preference) {
+  .timeline-card {
+    opacity: 0;
+    transform: rotate(var(--tilt)) translateY(20px);
+  }
+  .timeline-card.is-in {
+    opacity: 1;
+    transform: rotate(var(--tilt)) translateY(0);
+    transition: opacity var(--duration-slow) var(--ease-out),
+                transform var(--duration-slow) var(--ease-out),
+                box-shadow var(--duration-normal);
+  }
+}
+
+/* 悬停：像纸一样**微微抬起**（倾斜角要保持住）
+   ⚠️ 这条**必须排在上面那个 @media 之后** ——
+      两者优先级相同（都是 0,2,0），后定义的才赢；放前面的话 hover 就永远不生效了。
+   ⚠️ 必须显式写 `rotate(var(--tilt))`：只写 translateY 会把它"回正"。 */
 .timeline-card:hover {
-  border-color: rgba(181, 118, 46, 0.38);
   box-shadow: var(--shadow-md);
-  transform: translateX(3px);
+  transform: rotate(var(--tilt)) translateY(-3px);
 }
 
 /* ---------- 卡片左侧：图片位（为后续图片功能预留） ---------- */
 .timeline-thumb {
-  flex: 0 0 88px;                   /* 固定宽，不被文字挤扁 */
-  width: 88px;
-  height: 88px;
+  /* ⚠️ 宽 120px，**高度由 4:3 算出来**（= 90px）——
+      这个比例是**原始需求指定的**（"左侧 4:3 拍立得照片区"）。
+      原来这里是 88×88 的正方形，那是"缩略图"的比例，不是"照片"的比例。 */
+  flex: 0 0 120px;
+  width: 120px;
+  aspect-ratio: 4 / 3;              /* ⚠️ 所以下面**不能再写 height**，写了就把它顶掉了 */
   display: flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
   border-radius: var(--radius-md);
-  /* 用斜纹底表示"这里将来会有一张照片"，比纯色块更能说明意图 */
-  background:
-    repeating-linear-gradient(
-      45deg,
-      rgba(181, 118, 46, 0.07) 0 6px,
-      rgba(181, 118, 46, 0.02) 6px 12px
-    ),
-    var(--color-surface);
-  border: 1px dashed rgba(181, 118, 46, 0.28);
+  /* ⭐ 2026-09-28 手账改版：从「灰底斜纹 + 虚线框 + 暂无照片」改成**淡渐变**。
+     ⚠️ 客户明确要求"禁止出现灰底暂无照片" —— 那块斜纹是把"缺东西"摆在脸上；
+        手账的意思恰恰相反：**没照片，也该像一块好看的纸**。
+     ⚠️ 虚线和斜纹一并去掉：那是"占位符"的语言，不是"照片"的语言。
+     ⚠️ 渐变用 `.ph-N` **公共类**（由 JS 加），和地点列表共用同一套配色 ——
+        两边各写一份就是"同一个值两种写法"。 */
+  border: 0;
+  background-color: var(--color-surface);        /* color-mix 不被支持时的兜底 */
+  background-image: linear-gradient(135deg, var(--ph-a), var(--ph-b));
+  color: var(--color-accent-text);
+  font-family: var(--font-serif);
+  font-size: var(--text-2xl);
+  font-weight: 700;
+  user-select: none;
 }
 
-.timeline-thumb-hint {
-  color: var(--color-text-weak);
-  font-size: var(--text-xs);
-  letter-spacing: 0.5px;
+/* ⭐ 首字水印。
+   ⚠️ 选择器用 `[data-initial]` —— JS **只在"没有照片"的分支**里设这个属性，
+      所以有真照片时**不会**在人家照片上压一个字。 */
+.timeline-thumb[data-initial]::after {
+  content: attr(data-initial);
 }
 
 /* 有图时：图铺满整个框 */
@@ -1348,11 +1570,22 @@ body.is-landing .app-nav {
 }
 
 /* 停留起始时间（头部右侧的小字） */
+/* ⭐ 日期 → 邮戳样式（2026-09-28 手账改版）
+   ⚠️ 它原来是行内小字（12px）。
+   ⚠️ 改成邮戳之后：底用 `--color-stamp-fill`、字用 `--color-on-accent` ——
+      这两个凑一起是 **5.36:1**，所以 12px 本来也达标；
+      升到 14px 纯粹是**为了像一枚邮戳**（12px 的章，里面的字看不清）。
+   ⚠️ 布局一点没动：它还在 `.timeline-head` 里跟地点名并排，只换了皮。 */
 .timeline-when {
   flex: 0 0 auto;
-  color: var(--color-text-weak);
-  font-size: var(--text-xs);
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-full);
+  background: var(--color-stamp-fill);
+  color: var(--color-on-accent);
+  font-size: var(--text-sm);
+  line-height: 1.4;
   white-space: nowrap;
+  transform: rotate(-6deg);          /* 盖章随手一按的那种角度 */
 }
 
 /* 元信息行：色点 + 城市 ｜ 类型 ｜ 时长 */
@@ -1384,26 +1617,54 @@ body.is-landing .app-nav {
   white-space: nowrap;
 }
 
+/* ⭐ 描述 → 像日记摘抄：**首行用手写体、字号稍大**（2026-09-28 手账改版）
+   ⚠️ `::first-line` 只能吃到字体相关的那几个属性（字体/字号/颜色/行高），
+      **改不了布局** —— 所以这里用"首行换个字体"这种轻量做法，不动 DOM 结构。
+   ⚠️ 字号只能从刻度盘上取：正文 14px → 首行升到 16px（`--text-base`）。
+      **不能更大** —— 那会越过正文层级（DESIGN 4.2 一共就 8 档）。 */
 .timeline-note {
   margin: 0 0 var(--space-2);
   font-size: var(--text-sm);
   line-height: 1.7;
 }
 
-/* 标签 */
+.timeline-note::first-line {
+  font-family: var(--font-hand);
+  font-size: var(--text-base);
+  color: var(--color-text);
+}
+
+/* ⭐ 标签 → washi tape 贴纸（2026-09-28 手账改版）
+   ⚠️⚠️ **胶带里的字必须用 `--color-text`，不能换成灰绿** ——
+      胶带底是**半透明**的（`--color-tag-bg`），叠在卡片上之后实际底色是 `#E1E1D5`；
+      灰绿字压在那上面只有 **3.94**（不达标），正文色压上去是 **9.26** ✅。
+      ⭐ 灰绿只负责"这是一张胶带"这个**材质**，不承担文字。
+      （⚠️ 这是「半透明底上读文字」的第三个坑 —— 前两个是玻璃底、邮戳底。）
+   ⚠️ 两端"撕裂"用 `clip-path`（纯形状，不涉及颜色合规）：左右用 0% / 2% 交替的锯齿。
+      ⚠️ 所以**内边距要给够**，不然撕边会把字削掉一圈。
+   ⭐ 好消息：`.tag` 不在任何 `:focus-visible` 分组里，`clip-path` 裁不到焦点环。 */
 .tag-row {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2);
   margin: 0;
 }
+
 .tag {
-  padding: var(--space-1) var(--space-2);
-  border-radius: var(--radius-full);
-  background: var(--color-accent-bg);
-  color: var(--color-accent-text);
+  padding: var(--space-1) var(--space-3);   /* 横向给够 —— 撕边会吃掉边缘一圈 */
+  border-radius: 0;                          /* 胶带不是胶囊 */
+  background: var(--color-tag-bg);
+  color: var(--color-text);                  /* ⚠️ 正文色，理由见上 */
   font-size: var(--text-xs);
+  transform: rotate(var(--tape-rot, 0deg));
+  -webkit-clip-path: polygon(2% 0, 98% 0, 100% 18%, 98% 36%, 100% 54%, 98% 72%, 100% 100%, 2% 100%, 0 72%, 2% 54%, 0 36%, 2% 18%);
+          clip-path: polygon(2% 0, 98% 0, 100% 18%, 98% 36%, 100% 54%, 98% 72%, 100% 100%, 2% 100%, 0 72%, 2% 54%, 0 36%, 2% 18%);
 }
+
+/* 每三张一个循环的轻微旋转 —— 同样是"稳定的伪随机"，不用随机数 */
+.tag:nth-child(3n+1) { --tape-rot: -1.2deg; }
+.tag:nth-child(3n+2) { --tape-rot:  0.8deg; }
+.tag:nth-child(3n+3) { --tape-rot: -0.5deg; }
 
 /* ============================================================
    地点列表 · 卡片网格（Day 8 步骤 4）
@@ -1449,121 +1710,290 @@ body.is-landing .app-nav {
   padding-top: var(--space-1);
 }
 
-/* 一张城市卡片 */
+/* ---------- ⭐ 封面标题区（2026-09-28 手账改版）----------
+   「手账封面」= 宋体大标题 + 手写体一行统计 + 手绘波浪分隔线。
+   ⚠️ `grid-column: 1 / -1` 是必须的 —— `#places-list` 是 CSS Grid，
+      不写这一句，封面会缩在**第一个格子**里（320px 宽），而不是横跨整行。
+   ⚠️ 它只在**正常态**出现（见 places.js 的 paint）——
+      空 / 加载 / 错误态下不该有封面：封面写着"走过 N 座城市"，可那时候并没有数据。 */
+.places-hero {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-1) var(--space-4);
+}
+
+/* 大标题：宋体 + 章节档。⚠️ 48px 这一档在 DESIGN 4.2 里**只准两处**，这是其中一处 */
+.places-hero-title {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: var(--text-chapter);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--color-text);
+}
+
+/* 一行统计：手写体。
+   ⚠️ 颜色用 `--color-text-weak` 而**不能更浅** —— 手写体笔画细，对比度不够会糊。
+      （新值在卡片底上是 5.68 ✅；但手写体的"实际观感"还是等他真机看一眼再说。） */
+.places-hero-stat {
+  margin: 0;
+  font-family: var(--font-hand);
+  font-size: var(--text-lg);
+  color: var(--color-text-weak);
+}
+
+/* 手绘波浪分隔线：**内联 SVG**，颜色走 `currentColor` ——
+   所以这里给 `color` 就行，**不用碰 SVG 里的 stroke**（那样就把色值写死了）。
+   ⚠️ `align-self: stretch` 必须写：父级是 `align-items: flex-start`，
+      不写的话这条线会退化成"内容宽"（SVG 没有内容宽 → 直接塌成 0）。 */
+.places-hero-rule {
+  align-self: stretch;
+  height: 8px;
+  color: var(--color-accent);
+}
+
+/* ⚠️ 窄屏：48px 会撑破，降到 `--text-2xl`（照抄门面页 `.landing-title` 的降级做法） */
+@media (max-width: 767px) {
+  .places-hero-title {
+    font-size: var(--text-2xl);
+  }
+}
+
+/* 一张城市卡片 —— 2026-09-28 手账改版：做成**拍立得**
+   ⚠️ 拍立得的三个特征，一个都不能少：
+      ① 相纸是**亮的**（比页面底亮）→ 用 --color-elevated
+      ② **下边框明显比上/左/右厚** —— 那是"照片下面留白写字"的位置
+      ③ 有**厚度感**的投影（一叠相纸放在桌上的感觉），所以直接上 --shadow-md
+   ⚠️ `--tilt` 是"这张照片歪多少度"，由下面 :nth-of-type 的伪随机周期给。
+      **所有用到 transform 的地方（静止 / hover / 入场动画）都必须带上它** ——
+      漏一处就会"一 hover 啪地回正"或者"动画一结束跳一下"。 */
 .city-group {
+  --tilt: 0deg;
   margin-bottom: 0;                              /* 间距交给 #places-list 的 gap */
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-xl);
+  border-bottom: 12px solid var(--color-elevated);   /* ⭐ 拍立得的下留白（落 4px 网格） */
+  border-radius: var(--radius-md);               /* 相纸是小圆角；原来的 xl(16px) 太圆了 */
   overflow: hidden;
   background: var(--color-elevated);
-  box-shadow: var(--shadow-sm);
-  transition: border-color var(--duration-normal), box-shadow var(--duration-normal), transform var(--duration-normal);   /* 原本 box-shadow / transform 是 200ms，与同行 border-color 的 180ms 不一致，一并统一 */
+  box-shadow: var(--shadow-md);                  /* 相纸是有厚度的，比 sm 重一档 */
+  transform: rotate(var(--tilt));                /* ⭐ 每张歪一点点 */
+  transition: border-color var(--duration-normal), box-shadow var(--duration-normal), transform var(--duration-normal);
 }
 
+/* hover：像从桌上把这张照片**拿起来** —— 回正 + 上移 + 阴影加深 */
 .city-group:hover {
-  border-color: rgba(181, 118, 46, 0.32);
-  box-shadow: var(--shadow-md);   /* 与 .timeline-card:hover 同一档 —— 同一类交互不该有两个阴影 */
-  transform: translateY(-2px);                   /* 抬起来一点，卡片感更强 */
+  border-color: rgba(91, 70, 54, 0.32);
+  box-shadow: var(--shadow-lg);
+  transform: rotate(0deg) translateY(-4px);      /* ⚠️ 必须显式写 rotate(0deg)：只写 translateY 的话旋转不会归零 */
 }
 
-/* ---------- 入场动画：卡片像翻页一样，一张接一张落进来 ----------
+/* ⭐ 伪随机倾斜（2026-09-28 手账改版）
+   ⚠️ 为什么不用 Math.random()：每次 renderWithStates 都会重画 DOM，
+      用随机数的话**每切一次视图，所有卡片的角度的都变一次** —— 看着像页面在抖。
+      这里用 6 步周期循环：**周期(6) ≠ 网格列数**，错位之后视觉上就读作"随机"。
+   ⚠️ 用 `:nth-of-type` **不是** `:nth-child` ——
+      `#places-list` 的第一个子元素是**封面标题区**（`<header>`），
+      用 nth-child 会把它算作第 1 个，导致所有卡片整体错位一格。 */
+.city-group:nth-of-type(6n+1) { --tilt: -1.8deg; }
+.city-group:nth-of-type(6n+2) { --tilt:  0.9deg; }
+.city-group:nth-of-type(6n+3) { --tilt: -0.4deg; }
+.city-group:nth-of-type(6n+4) { --tilt:  1.6deg; }
+.city-group:nth-of-type(6n+5) { --tilt: -1.2deg; }
+.city-group:nth-of-type(6n+6) { --tilt:  1.9deg; }
+
+/* ⭐ 网格的「微小纵向错落」（2026-09-28 手账改版）
+   ⚠️ 只推 `margin-top`，而且**必须落在 4px 网格上**（DESIGN 5.2）。
+   ⚠️ 它和 `align-items: start` 不冲突 —— 后者管"卡片在自己格子里怎么对齐"，
+      前者只是把卡片在格子内往下推。 */
+.city-group:nth-of-type(3n+2) { margin-top: var(--space-4); }
+.city-group:nth-of-type(3n+3) { margin-top: var(--space-2); }
+
+/* ---------- 入场动画：卡片像照片一样，一张张"放"到桌上 ----------
    做法：CSS 关键帧负责"怎么动"，JS 负责"隔多久动"（给每张卡设 animation-delay）。
    为什么用延迟而不是滚动监听：滚动监听要绑 scroll 事件、算位置、处理抖动，
-   代码量大且容易掉帧；这里用纯粹的 CSS 时间差，零 JS 运行时开销。 */
-@keyframes card-flip-in {
+   代码量大且容易掉帧；这里用纯粹的 CSS 时间差，零 JS 运行时开销。
+   ⚠️ 名字从 `card-flip-in` 改成 `card-drop-in`：动作从"翻页"变成了"落下"，
+      名字要跟得上。改名时已确认全仓库只有定义 + 使用两处。 */
+@keyframes card-drop-in {
   from {
     opacity: 0;
-    transform: translateY(14px) rotateX(-8deg);
+    transform: rotate(var(--tilt, 0deg)) translateY(16px);   /* ⚠️ 带 --tilt，否则动画一结束会跳 */
   }
   to {
     opacity: 1;
-    transform: translateY(0) rotateX(0);
+    transform: rotate(var(--tilt, 0deg)) translateY(0);
   }
 }
 
 .city-group {
   /* backwards：延迟期间保持 from 状态（透明），不然会先闪现再动 */
-  animation: card-flip-in var(--duration-slow) var(--ease-out) backwards;
+  animation: card-drop-in var(--duration-slow) var(--ease-out) backwards;
   transform-origin: center top;
 }
 
-/* ⚠️ 尊重系统的「减少动态效果」设置（无障碍，也是好习惯） */
+/* ⚠️ 尊重系统的「减少动态效果」设置（无障碍，也是好习惯）
+   ⚠️ 这里连**倾斜和上浮**也一起收掉 —— 它们是"动态感"的一部分，
+      而且位移对前庭敏感的人不友好。 */
 @media (prefers-reduced-motion: reduce) {
   .city-group {
     animation: none;
+    transform: none;
+  }
+  .city-group:hover {
+    transform: translateY(-2px);
   }
 }
 
 /* 城市头部（details 的 summary）
-   ⚠️ 布局演进记录（Day 8）：
-   第一版用 `position:absolute; right:14px` 把「收起 ▴」钉在右上角，
-   结果和同样在右上角的「N 个地点」胶囊**叠在一起**（他截图反馈）。
-   现在改成**正常文档流**：第一行是「城市名 + 胶囊 + 箭头」，第二行是时长条。
-   谁也不会压谁 —— 能用布局解决的，就别用定位。 */
+   ⚠️ 布局演进记录：
+     · **Day 8**：第一版用 `position:absolute; right:14px` 把「收起 ▴」钉在右上角，
+       结果和同样在右上角的「N 个地点」**叠在一起**（他截图反馈）。
+       于是改成了正常文档流的三列布局。
+     · **2026-09-28 手账改版**：再改成 `grid-template-areas` 的**四行**
+       （照片 / 名字+邮戳 / 时长条 / 展开）。
+   ⭐ 但 Day 8 那条教训**依然成立**：**能用布局解决的，就别用定位** ——
+      所以这次的邮戳走的是 "grid 格位 + `justify-self: end`"，
+      **不是** `position: absolute`。 */
+/* ---------- 城市卡头（2026-09-28 手账改版：拍立得 + 邮戳）----------
+   ⚠️ 布局从"三列一行"改成"四行"：
+        ① 照片区（跨两列）　② 城市名 + 邮戳
+        ③ 时长条（跨两列）　④ 「展开」开关（跨两列）
+      用 grid-template-areas 写出来 —— 比数 grid-column / grid-row 好读，也难改错。
+   ⚠️ 背景透明：整个卡片的"白相纸"在 .city-group 上，这一层不该再盖一个色。 */
 .city-head {
-  display: grid;                              /* 两行，谁也别挤谁 */
-  grid-template-columns: 1fr auto auto;       /* 城市名(可缩) | 胶囊 | 箭头 */
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-areas:
+    'photo  photo'
+    'name   count'
+    'sub    sub'
+    'toggle toggle';
   align-items: center;
-  gap: var(--space-1) var(--space-3);
-  padding: var(--space-4) var(--space-4) var(--space-3);
-  background: var(--color-surface);
+  gap: var(--space-2) var(--space-3);
+  padding: var(--space-3);
+  background: transparent;
   cursor: pointer;
   list-style: none;
 }
 
-/* 去掉浏览器默认的小三角，改用下面的自定义箭头 */
+/* 去掉浏览器默认的小三角，改用下面的自定义「展开」 */
 .city-head::-webkit-details-marker {
   display: none;
 }
 
-/* 自定义展开/收起箭头：第三列，自动靠右 */
+/* ---------- ⭐ 照片区 = `.city-head::before`（拍立得的上半张）----------
+   ⭐ 为什么用伪元素、不新增 DOM 节点：
+      DOM 是 JS 造的，多一个节点就要多改一处 JS；而这块**纯装饰**，
+      `::before` 能直接吃到父元素上的 `data-initial` 和 `ph-N` 类 —— **JS 只需加两个属性**。
+   ⚠️ 4:3 用 `aspect-ratio`（本项目第一次用）—— 比 `padding-top` 百分比那套好读得多。
+   ⚠️ 首字水印**只能用 `--text-2xl`（28px）**，不能用 `--text-chapter` ——
+      48px 那档在 DESIGN 4.2 里被**限定给"两处章节标题"**，拿来做装饰就破坏了自己定的规矩。
+   ⚠️ 渐变的颜色先给一层 `background-color` 兜底：老浏览器不支持 `color-mix()` 时，
+      至少是**一块纯色**，而不是透明（透明会让白字看不见）。 */
+.city-head::before {
+  content: attr(data-initial);        /* ⭐ 水印的"字"来自 JS 写的 data-initial */
+  grid-area: photo;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 4 / 3;
+  border-radius: var(--radius-md);
+  background-color: var(--color-surface);                                  /* 兜底 */
+  background-image: linear-gradient(135deg, var(--ph-a), var(--ph-b));     /* 六套之一 */
+  color: var(--color-accent-text);    /* 墨棕字压在浅色渐变上（最浅那种也够 7+） */
+  font-family: var(--font-serif);
+  font-size: var(--text-2xl);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  user-select: none;
+}
+
+/* ⭐ 六套配色：**公共规则**（2026-09-28 手账改版）
+   ⚠️ 刻意不写成 `.city-head.ph-0` 这种"带宿主的选择器" ——
+      因为**时间轴的图位和地点列表的图位都要用它**，给每个宿主各写一份，
+      就是"同一个值两种写法"（原则 2），改配色时必漏一处。
+      写成独立类之后：**任何元素带上 `ph-N` 就能用**，配色只有这一处。
+   ⭐ 全部由 token 派生（`color-mix` 混合主色/强调色/辅助色）—— 换主题自动跟着变。
+   ⚠️ 只动 `--ph-a` / `--ph-b` 两个变量，"配方"和"用法"各在一处。 */
+.ph-0 { --ph-a: color-mix(in srgb, var(--color-stamp) 18%, var(--color-elevated)); --ph-b: color-mix(in srgb, var(--color-accent) 20%, var(--color-elevated)); }
+.ph-1 { --ph-a: color-mix(in srgb, var(--color-accent) 22%, var(--color-elevated)); --ph-b: color-mix(in srgb, var(--color-tag) 24%, var(--color-elevated)); }
+.ph-2 { --ph-a: color-mix(in srgb, var(--color-tag) 20%, var(--color-elevated)); --ph-b: color-mix(in srgb, var(--color-stamp) 16%, var(--color-elevated)); }
+.ph-3 { --ph-a: color-mix(in srgb, var(--color-stamp) 22%, var(--color-elevated)); --ph-b: color-mix(in srgb, var(--color-tag) 18%, var(--color-elevated)); }
+.ph-4 { --ph-a: color-mix(in srgb, var(--color-accent) 16%, var(--color-elevated)); --ph-b: color-mix(in srgb, var(--color-stamp) 22%, var(--color-elevated)); }
+.ph-5 { --ph-a: color-mix(in srgb, var(--color-tag) 26%, var(--color-elevated)); --ph-b: color-mix(in srgb, var(--color-accent) 18%, var(--color-elevated)); }
+
+/* ---------- 「展开 / 收起」：手写体小字 + 手绘下划线 ---------- */
 .city-head::after {
-  content: '展开 ▾';
-  grid-column: 3;
-  grid-row: 1;
-  min-width: 44px;                            /* 「展开 ▾」/「收起 ▴」都放得下 */
-  text-align: right;
+  content: '展开';
+  grid-area: toggle;
+  justify-self: start;
+  padding-bottom: 2px;
+  /* 手绘下划线用"装饰细线"那一档 —— 它不能复用 --color-border（alpha 只有 .12，看不见） */
+  border-bottom: 1px solid var(--color-timeline-line);
   color: var(--color-text-weak);
-  font-size: var(--text-xs);
+  font-family: var(--font-hand);
+  font-size: var(--text-base);     /* 手写体要够大才看得出笔锋；14px 会糊成一团 */
+  line-height: 1.2;
   white-space: nowrap;
 }
 
 .city-group[open] .city-head::after {
-  content: '收起 ▴';
+  content: '收起';
 }
 
-/* 城市名：第一列，可以压缩，压不下就省略号 */
+/* ---------- 城市名：**手写体**（2026-09-28 手账改版）
+   ⚠️ 这一条按**原始需求**来的：原话是"下方**手写体**城市名 + 小字时长"。
+   ⚠️ 所以字重必须是 **400**（不是 600）—— 手写体的笔画本身就粗，
+      再叠一个 600 会被浏览器"合成加粗"，笔画糊成一团（中文字体大多数没有真正的 600）。
+   ⚠️ 它仍用 `--text-lg`（18px）；手写体比同号黑体看着小，觉得不够大可以往上一档。 */
 .city-name {
-  grid-column: 1;
-  grid-row: 1;
+  grid-area: name;
   min-width: 0;
+  font-family: var(--font-hand);
   font-size: var(--text-lg);
-  font-weight: 600;
+  font-weight: 400;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-/* 地点数：第二列，做成小胶囊 */
+/* ---------- ⭐ 地点数 = 砖红锯齿邮戳 ----------
+   ⚠️ 锯齿怎么来的：**`mask` + data-URI SVG** —— SVG **只负责形状**，
+      颜色来自 `background`，所以颜色照样走 token。
+      （反过来在 SVG 里填色的话，会写死色值，而且 data-URI 读不到 CSS 变量。）
+   ⚠️ 保留 `border-radius: 50%` 兜底：万一浏览器不认 mask，至少还是个圆。
+   ⚠️ data-URI 里 `#` 必须写成 `%23`、`<` `>` 写成 `%3C` `%3E`，否则整条声明作废。 */
 .city-count {
-  grid-column: 2;
-  grid-row: 1;
-  padding: var(--space-1) var(--space-2);
-  border-radius: var(--radius-full);
-  background: var(--color-accent-bg);
-  color: var(--color-accent-text);
+  grid-area: count;
+  align-self: center;
+  justify-self: end;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  padding: var(--space-1);
+  border-radius: 50%;
+  background: var(--color-stamp-fill);
+  color: var(--color-on-accent);   /* 浅字压邮戳底：5.36 ✅ */
   font-size: var(--text-xs);
-  white-space: nowrap;
+  font-weight: 600;
+  line-height: 1.1;
+  text-align: center;
+  transform: rotate(-8deg);        /* 盖章的那种随手一按 */
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='23' fill='%23000'/%3E%3Ccircle cx='32' cy='32' r='27' fill='none' stroke='%23000' stroke-width='6' stroke-dasharray='2.4 3.6'/%3E%3C/svg%3E") center / 100% 100% no-repeat;
+          mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='23' fill='%23000'/%3E%3Ccircle cx='32' cy='32' r='27' fill='none' stroke='%23000' stroke-width='6' stroke-dasharray='2.4 3.6'/%3E%3C/svg%3E") center / 100% 100% no-repeat;
 }
 
-/* 第二行：总停留时长 + 时长占比条（跨 3 列，占满整行） */
+/* ---------- 第二行：总停留时长 + 手绘时长条（跨满整行）---------- */
 .city-sub {
-  grid-column: 1 / -1;
-  grid-row: 2;
+  grid-area: sub;
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  margin-top: var(--space-1);
   color: var(--color-text-weak);
   font-size: var(--text-xs);
 }
@@ -1574,21 +2004,26 @@ body.is-landing .app-nav {
   white-space: nowrap;
 }
 
-/* 时长占比条：宽度由 JS 按 lineWidthByMonths 换算后内联写入 */
+/* ---------- ⭐ 时长条：手绘不规则线条 ----------
+   ⚠️ **JS 一行没改** —— 它照旧写 `fill.style.width = N + '%'`。
+      这里只是把"直尺画的条"换成"手画的线"：`mask` 挂在**父级**上，
+      会把子元素（.city-bar-fill）一起裁进笔触形状里。
+   ⚠️ 所以**必须去掉 `overflow: hidden`** —— 它和 mask 会互相打架。 */
 .city-bar {
   flex: 1 1 auto;
-  height: 3px;
-  border-radius: var(--radius-full);
-  background: var(--color-border);
-  overflow: hidden;
+  height: 6px;
+  border-radius: 0;                 /* 手绘线不该是胶囊 */
+  background: var(--color-timeline-line);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 8' preserveAspectRatio='none'%3E%3Cpath d='M0 5 C20 2 40 7 60 4 S100 2 120 5 S160 7 200 3' fill='none' stroke='%23000' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E") 0 0 / 100% 100% no-repeat;
+          mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 8' preserveAspectRatio='none'%3E%3Cpath d='M0 5 C20 2 40 7 60 4 S100 2 120 5 S160 7 200 3' fill='none' stroke='%23000' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E") 0 0 / 100% 100% no-repeat;
 }
 
 .city-bar-fill {
   display: block;
   height: 100%;
-  border-radius: var(--radius-full);
+  border-radius: 0;
+  /* 原来是主色 + opacity .55（"淡淡的"）；手账改版改成实色墨棕 —— 更像墨迹 */
   background: var(--color-accent);
-  opacity: 0.55;
 }
 
 /* 城市下的每个地点：左边图片位 + 右边文字（甲方案：图挂在地点上） */
@@ -1616,21 +2051,26 @@ body.is-landing .app-nav {
   justify-content: center;
   overflow: hidden;
   border-radius: var(--radius-md);
-  border: 1px dashed rgba(181, 118, 46, 0.28);
-  /* 和时间轴一样用斜纹底表示"这里将来有图"，保持两处视觉一致 */
-  background:
-    repeating-linear-gradient(
-      45deg,
-      rgba(181, 118, 46, 0.07) 0 6px,
-      rgba(181, 118, 46, 0.02) 6px 12px
-    ),
-    var(--color-surface);
+  /* ⭐ 2026-09-28 手账改版：从「灰底斜纹 + 虚线框」改成**淡渐变**。
+     ⚠️ 原来那块斜纹底上写着「暂无」—— 那是把"缺东西"摆在脸上；
+        手账的意思恰恰相反：**没照片，也该像一块好看的纸**。
+     ⚠️ 虚线框一并去掉了：虚线是"占位符"的语言，不是"照片"的语言。 */
+  border: 0;
+  background-color: var(--color-surface);        /* color-mix 不被支持时的兜底 */
+  background-image: linear-gradient(135deg, var(--ph-a), var(--ph-b));
+  color: var(--color-accent-text);               /* 墨棕压浅色渐变：最深那档也够 7+ */
+  font-family: var(--font-serif);
+  font-size: var(--text-base);
+  font-weight: 700;
+  user-select: none;
 }
 
-.place-thumb-hint {
-  color: var(--color-text-weak);
-  font-size: var(--text-xs);
-  letter-spacing: 0.5px;
+/* ⭐ 首字水印。
+   ⚠️ 选择器用 `[data-initial]` 而**不是** `.place-thumb::after` ——
+      JS 只在"**没有照片**"的分支里设这个属性，所以**有真照片时不会出现水印**，
+      不会平白在人家照片上压一个字。 */
+.place-thumb[data-initial]::after {
+  content: attr(data-initial);
 }
 
 .place-thumb-img {
@@ -1702,7 +2142,7 @@ body.is-landing .app-nav {
   position: absolute;
   inset: 0;
   /* 暖棕遮罩，不用纯黑（和原弹窗一致：纯黑压暖色底会显脏） */
-  background: rgba(58, 51, 43, 0.45);
+  background: rgba(61, 52, 40, 0.45);
   /* ⚠️ 这里**不能**设 pointer-events: none —— 它要能被点（点它就是关闭） */
 }
 
@@ -1717,7 +2157,7 @@ body.is-landing .app-nav {
   overflow-y: auto;
   background: var(--color-bg);
   border-left: 1px solid var(--color-border);
-  box-shadow: -12px 0 40px rgba(58, 51, 43, 0.28);
+  box-shadow: -12px 0 40px rgba(61, 52, 40, 0.28);
   animation: drawer-in 0.26s var(--ease-out) backwards;
 }
 
@@ -1753,7 +2193,7 @@ body.is-landing .app-nav {
   padding: var(--space-6);
   background:
     radial-gradient(120% 120% at 15% 0%,
-      rgba(181, 118, 46, 0.22) 0%, rgba(181, 118, 46, 0) 62%),
+      rgba(91, 70, 54, 0.22) 0%, rgba(91, 70, 54, 0) 62%),
     var(--color-surface);
   border-bottom: 1px solid var(--color-border);
 }
@@ -1940,13 +2380,13 @@ body.is-landing .app-nav {
   justify-content: center;
   min-height: 240px;
   padding: var(--space-5);
-  border: 1px dashed rgba(181, 118, 46, 0.28);
+  border: 1px dashed rgba(91, 70, 54, 0.28);
   border-radius: var(--radius-lg);
   background:
     repeating-linear-gradient(
       45deg,
-      rgba(181, 118, 46, 0.07) 0 6px,
-      rgba(181, 118, 46, 0.02) 6px 12px
+      rgba(91, 70, 54, 0.07) 0 6px,
+      rgba(91, 70, 54, 0.02) 6px 12px
     ),
     var(--color-surface);
   color: var(--color-text-weak);
@@ -2015,7 +2455,7 @@ body.is-landing .app-nav {
   justify-content: center;
   padding: var(--space-6);
   /* 遮罩用暖棕而非纯黑：纯黑压暖色底会显脏 */
-  background: rgba(58, 51, 43, 0.45);
+  background: rgba(61, 52, 40, 0.45);
 }
 
 /* 弹窗主体
@@ -2282,7 +2722,7 @@ body.is-landing .app-nav {
 
 /* 卡片 / 列表行是整块的，往下沉会显得抖，改用"边界加深" */
 .timeline-card:active {
-  border-color: rgba(181, 118, 46, 0.55);
+  border-color: rgba(91, 70, 54, 0.55);
 }
 
 .place-row:active {
@@ -2386,9 +2826,10 @@ body.is-landing .app-nav {
    这里把图片位缩小成 64px，仍然并排；再窄（<560px）改成上下堆叠。 */
 @media (max-width: 767px) {
   .timeline-thumb {
-    flex: 0 0 64px;
-    width: 64px;
-    height: 64px;
+    flex: 0 0 96px;
+    width: 96px;
+    /* ⚠️ **不写 height** —— 比例交给基础规则里的 `aspect-ratio: 4 / 3` 管，
+       写了 height 就把它顶掉了（4:3 会失效，又变回固定方块）。 */
   }
 
   .timeline-card {
@@ -2396,11 +2837,31 @@ body.is-landing .app-nav {
     padding: var(--space-3);
   }
 
-  /* 地点网格：一列就够，卡片占满宽度 */
-  #places-list {
-    grid-template-columns: 1fr;
+    /* ⭐ 年份 48px 在窄屏会撑破 —— 降到 --text-2xl
+       （照抄门面页 .landing-title 的降级做法；DESIGN 4.2 对 --text-chapter 就是这么要求的） */
+    .timeline-year-label {
+      font-size: var(--text-2xl);
+    }
+
+    /* ⚠️ 窄屏内容本来就窄，装订边收窄一档（24px → 12px），别挤占书写区。
+       ⚠️ 只重写 `background-image` —— `background-position` 管的是"格线从哪垂直起算"，
+          和装订边宽度无关，不用重复写。 */
+    #timeline-list {
+      background-image:
+        linear-gradient(to right,
+          var(--color-bind-edge) 0,
+          var(--color-bind-edge) var(--space-3),
+          transparent var(--space-3)),
+        repeating-linear-gradient(to bottom,
+          transparent 0 31px,
+          var(--color-grid-line) 31px 32px);
+    }
+
+    /* 地点网格：一列就够，卡片占满宽度 */
+    #places-list {
+      grid-template-columns: 1fr;
+    }
   }
-}
 
 /* 手机屏幕（<560px）：只留图标，文字标签藏起来，给内容区让位 */
 @media (max-width: 559px) {
@@ -2427,9 +2888,10 @@ body.is-landing .app-nav {
   }
 
   .timeline-thumb {
-    flex: 0 0 96px;
-    width: 100%;
-    height: 96px;
+    flex: 0 0 auto;
+    width: 100%;                   /* 堆叠后通栏 */
+    /* ⚠️ **不写 height** —— 保持基础规则里的 `aspect-ratio: 4 / 3`
+       （"4:3 拍立得照片区"是原始需求指定的比例）。 */
   }
 
   /* 堆叠后左边没地方放圆点了，藏掉，竖线保留 */

@@ -27,10 +27,9 @@
   var NO_YEAR_KEY = '__none__';
   var NO_YEAR_LABEL = '时间未填';
 
-  /* 图片位：目前 PRD 第六章第 10 项 images 只留了字段未实现，
-     所以这里画一个空的占位框。等 Day 8-28 的图片功能做完，
-     只要把 paintThumb() 改成真的 <img> 即可，卡片结构不用动。 */
-  var THUMB_EMPTY_TEXT = '暂无照片';
+  /* ⚠️ 2026-09-28 手账改版：原来的 `THUMB_EMPTY_TEXT = '暂无照片'` **已删除** ——
+     图片位不再画"暂无"占位框，改成"按名字算的渐变 + 首字水印"，那句话本身没人用了。
+     （常量留着不用 = 注释和代码不一致，那正是这个项目记过的坑。） */
 
   var elList = null;
   var elEmpty = null;
@@ -38,6 +37,7 @@
   var elError = null;      /* 错误（Day 13） */
   var elErrorMsg = null;
   var viewState = null;    /* 四态逻辑的句柄 —— 实现在 js/view-state.js，两个视图共用 */
+  var io = null;           /* 滚动揭示用的 IntersectionObserver（2026-09-28 美术改版） */
 
   /* ------------------------------------------------------------
      一、小工具
@@ -85,7 +85,7 @@
     var thumb = document.createElement('div');
     thumb.className = 'timeline-thumb';
 
-    /* 已经存了图片的（未来）→ 画图；现在数据里 images 都是空数组 → 画占位 */
+    /* 有照片就贴照片（这条分支**保留** —— 将来加了上传，数据一变就自动生效） */
     var first = (place.images && place.images.length) ? place.images[0] : '';
     if (first) {
       var img = document.createElement('img');
@@ -96,10 +96,13 @@
       return thumb;
     }
 
-    var hint = document.createElement('span');
-    hint.className = 'timeline-thumb-hint';
-    hint.textContent = THUMB_EMPTY_TEXT;
-    thumb.appendChild(hint);
+    /* ⭐ 没照片 → **按名字算的双色渐变 + 首字水印**（2026-09-28 手账改版）
+       ⚠️ 和 `places.js` 的 `makeThumb` 是**同一套做法**（共用 `Model.thumbVariant` /
+          `Model.initialOf` 和 CSS 里的 `.ph-N` 公共类）——
+          两边各写一套配色，就是"同一个值两种写法"（原则 2）。
+       ⚠️ 原来这里是灰底斜纹框 + 「暂无照片」；客户明确要求"禁止出现灰底暂无照片"。 */
+    thumb.classList.add('ph-' + Model.thumbVariant(place.name));
+    thumb.setAttribute('data-initial', Model.initialOf(place.name));
     return thumb;
   }
 
@@ -263,6 +266,13 @@
    * @param {function(string)} showState 由 view-state.js 给的（'empty' | 'ok'）
    */
   function paint(result, showState) {
+    /* ⚠️ 先把上一轮的观察撤掉 —— 数据变"空"时下面会提前 return，
+       不在这儿撤的话，旧观察器会一直挂在一批已经不在文档里的节点上。 */
+    if (io) {
+      io.disconnect();
+      io = null;
+    }
+
     /* 剔除「想去」：时间轴讲的是"去过哪"，还没去的地方不该出现在这儿 */
     var places = result.places.filter(function (place) {
       return place.type !== Model.WISHLIST_KEY;
@@ -302,6 +312,54 @@
       section.appendChild(label);
       section.appendChild(list);
       elList.appendChild(section);
+    });
+
+    /* ⭐ 装"进视口就点亮"的观察（2026-09-28 手账改版） */
+    watchCardsInView();
+  }
+
+  /**
+   * 给当前所有卡片装上「滚进视口 → 淡入 + 点亮它旁边那段墨色虚点线」的观察
+   * （2026-09-28 手账改版）
+   *
+   * ⚠️ 两个经典坑，都在这里躲掉了：
+   *   ① **`root` 必须是 `#view-timeline`，不是 `window`** ——
+   *      滚动容器是这个 view（它 `overflow: auto`），window 根本没在滚。
+   *      拿 window 当 root，观察**永远不触发**（而且不报错，最难查的那种）。
+   *   ② **每次重画前必须 `disconnect()`** —— 切视图 / 数据一变都会重建 DOM，
+   *      不撤旧的话监听器一份份累积：内存泄漏，而且旧回调还在改已经不在文档里的节点。
+   */
+  function watchCardsInView() {
+    var root = document.getElementById('view-timeline');
+    var cards = elList ? elList.querySelectorAll('.timeline-card') : [];
+
+    /* ⚠️ 环境不支持 IntersectionObserver 时：**直接全部点亮** ——
+       宁可没有动画，也不能把内容藏在"透明 + 下移"的初始态里。 */
+    if (typeof IntersectionObserver !== 'function') {
+      Array.prototype.forEach.call(cards, function (card) {
+        card.classList.add('is-in');
+      });
+      return;
+    }
+
+    io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('is-in');
+          io.unobserve(entry.target);      /* 点亮过就不用再盯着它了 */
+        }
+      });
+    }, {
+      root: root,                          /* ⚠️ 是 view，不是 window */
+      rootMargin: '0px 0px -8% 0px',       /* 底部留一点，免得"刚碰到屏幕边就亮" */
+      threshold: 0.12
+    });
+
+    Array.prototype.forEach.call(cards, function (card, index) {
+      /* ⚠️ 交错延迟：55ms 一步、**上限 8 步** —— 这是 DESIGN.md 七定的规矩
+         （不封顶的话 30 张卡会一路加到 1.65 秒，最后几张等起来像卡死）。 */
+      card.style.transitionDelay = Math.min(index, 8) * 55 + 'ms';
+      io.observe(card);
     });
   }
 

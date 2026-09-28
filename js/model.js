@@ -294,6 +294,39 @@
     return key;
   }
 
+  /* ------------------------------------------------------------
+     缩略图占位：按名字"算"出一套稳定的外观（2026-09-28 美术改版）
+
+     ⚠️ 为什么要哈希而不是 Math.random()：
+        每次 renderWithStates 都会重画 DOM，用随机数的话**每切一次视图角度和配色都变**，
+        看起来像页面在"抖"。哈希保证**同一个名字永远同一套外观**。
+
+     ⭐ 放这里而不是各视图各写一份 —— 时间轴和地点列表都要用，
+        分两份就是"同一个逻辑两种写法"（原则 2）。
+     ------------------------------------------------------------ */
+
+  /** 字符串 → 稳定的非负整数 */
+  function hashName(s) {
+    var str = String(s || '');
+    var h = 0, i;
+    for (i = 0; i < str.length; i++) {
+      h = (h * 31 + str.charCodeAt(i)) | 0;   /* |0 保证留在 32 位整数内 */
+    }
+    return Math.abs(h);
+  }
+
+  /** 名字 → 0..5 的配色方案编号（对应 CSS 里的 .ph-0 ~ .ph-5） */
+  function thumbVariant(name, count) {
+    var n = count || 6;
+    return hashName(name) % n;
+  }
+
+  /** 名字 → 首字（给"渐变 + 首字水印"用）；空名字给一个中性符号，不能是空白 */
+  function initialOf(name) {
+    var s = String(name || '').trim();
+    return s ? s.charAt(0) : '·';
+  }
+
   /**
    * 城市名规范化
    * 为什么需要：用户手填可能写「武汉市」，而高德逆地理编码返回的是「武汉」。
@@ -339,6 +372,9 @@
     createPlace: createPlace,
     validate: validate,
     typeLabel: typeLabel,
+    hashName: hashName,             /* 2026-09-28 美术改版：缩略图占位用 */
+    thumbVariant: thumbVariant,
+    initialOf: initialOf,
     normalizeCity: normalizeCity,
     isSameCity: isSameCity
   };
