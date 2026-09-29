@@ -2921,3 +2921,98 @@ body.is-landing .app-nav {
   /* 输入框占满之后，主城市行里那两个按钮会落到第二行 ——
      这正是基础样式里给 `.map-maincity` 加 `flex-wrap` 的用处。 */
 }
+
+/* ============================================================
+   ⭐ 窄屏的「主城市与筛选」折叠（2026-09-29 Day 14 · 真机测试发现）
+
+   ⚠️ 问题：手机上「搜索框 + 主城市 + 设定/清除 + 筛选两行」合计约占 **28% 屏
+      幕高度**，地图只剩三分之二。
+      ⭐ 而电脑屏幕大，从来不挤 ——
+      **所以这个问题只在真机上才看得出来**（这就是"这一步我自己为什么没发现"）。
+      解法是：**最高频的搜索框留在外面**（不该被折叠），
+      把「主城市」和「筛选」收进面板，窄屏默认收起。
+
+   ⭐ 策略：**宽屏零变化** —— 开关按钮默认 `display:none`、面板永远展开；
+      所有紧凑化和折叠**全部关在 `@media (max-width: 559px)` 里**。
+   ⚠️ 这一整块放在文件末尾：媒体查询"同优先级后来者胜"，这样能稳稳覆盖前面。
+   ============================================================ */
+
+/* 面板：普通 flex 列，间距和 .map-toolbar 一致 ——
+   所以**宽屏展开时的样子和改造前一模一样**，没有视觉变化。 */
+.map-tools-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+/* 开关按钮：**宽屏不显示** */
+.map-tools-toggle {
+  display: none;
+}
+
+@media (max-width: 559px) {
+  /* ⭐ 窄屏才亮出开关 */
+  .map-tools-toggle {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    width: 100%;
+    padding: var(--space-2) var(--space-3);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--color-glass);
+    box-shadow: var(--glass-shadow);      /* 和 .mini-btn 同一档浮起感 */
+    color: var(--color-text);
+    font-family: inherit;
+    font-size: var(--text-sm);
+    text-align: left;                     /* ⚠️ button 默认居中，要显式左对齐 */
+    cursor: pointer;
+  }
+
+  .map-tools-toggle-text {
+    flex: 1 1 auto;                       /* ⚠️ 撑开中间，把箭头推到最右 */
+  }
+
+  .map-tools-toggle-caret {
+    flex: 0 0 auto;
+    transition: transform var(--duration-fast);
+  }
+
+  /* ⭐ 收起态：藏面板 + 箭头转向（给个"现在能展开"的暗示） */
+  .map-toolbar.is-tools-collapsed .map-tools-panel {
+    display: none;
+  }
+
+  .map-toolbar.is-tools-collapsed .map-tools-toggle-caret {
+    transform: rotate(-90deg);
+  }
+
+  /* ---------- 紧凑化：每样都压一档 ----------
+     ⚠️ 全部走 token（`--space-*` / `--text-*`），不硬写数值（原则 2 + 4px 网格） */
+
+  /* 工具栏内间距：8px → 4px */
+  .map-toolbar {
+    gap: var(--space-1);
+  }
+
+  /* 搜索框：内边距各减一档，高度就下来了 */
+  .map-search {
+    padding: var(--space-1) var(--space-2);
+  }
+
+  /* 筛选栏与 chip：字号收到 12px（绝对下限），内边距各减一档 */
+  .map-filter {
+    gap: var(--space-1);
+    padding: var(--space-1);
+  }
+
+  .chip {
+    padding: var(--space-1) var(--space-2);
+    font-size: var(--text-xs);
+  }
+
+  /* 主城市那行的两个按钮同样收一档 */
+  .map-maincity .mini-btn {
+    padding: var(--space-1) var(--space-2);
+  }
+}

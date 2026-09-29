@@ -17,7 +17,7 @@
   <link rel="preconnect" href="https://fonts.loli.net" crossorigin>
   <link rel="stylesheet"
         href="https://fonts.loli.net/css2?family=Noto+Serif+SC:wght@600;700&family=Ma+Shan+Zheng&display=swap">
-  <link rel="stylesheet" href="css/style.css?v=56">
+  <link rel="stylesheet" href="css/style.css?v=57">
 </head>
 <body>
 
@@ -173,20 +173,38 @@
               aria-label="搜索结果" hidden></ul>
         </div>
 
-        <!-- 主城市（人生锚点）：连线都从这里出发（PRD 4.1 #8） -->
-        <div class="map-maincity">
-          <input type="text" class="map-search map-search--small" id="main-city-input"
-                 placeholder="主城市（如：武汉）" autocomplete="off">
-          <button type="button" class="mini-btn" id="main-city-set">设定</button>
-          <button type="button" class="mini-btn" id="main-city-clear">清除</button>
-        </div>
+        <!-- ⭐ 窄屏折叠开关（2026-09-29 Day 14 · 真机测试发现）
+             ⚠️ 问题：手机上「搜索框 + 主城市 + 设定/清除 + 筛选两行」一共占了约 **28% 屏幕**，
+                地图只剩三分之二。真机上才看得出来 —— 电脑屏幕大，从来不挤。
+             ⭐ 解法：**最高频的搜索框留在外面**（不该被折叠），
+                把「主城市」和「筛选」收进一个面板，窄屏默认收起。
+             ⚠️ 这个按钮**只在窄屏显示**（宽屏 `display:none`），所以电脑上完全没变化。 -->
+        <button type="button" class="map-tools-toggle" id="map-tools-toggle"
+                aria-expanded="true" aria-controls="map-tools-panel">
+          <span class="map-tools-toggle-icon" aria-hidden="true">☰</span>
+          <span class="map-tools-toggle-text">主城市与筛选</span>
+          <span class="map-tools-toggle-caret" aria-hidden="true">▾</span>
+        </button>
 
-        <!-- 类型筛选栏：全部 / 长期居住 / 短期停留 / 旅游 / 想去（Day 12 补 aria）
-           ⭐ role="group" + aria-label：读屏走到这一排按钮时，
-              才知道它们是"一组用来筛地点类型的开关" —— 否则只是一串孤立的按钮。
-           （同页面的搜索框早就写了 aria-autocomplete / aria-expanded 等，
-             这里原先一处都没有 —— 不是不会做，是漏了。） -->
-      <div class="map-filter" id="map-filter" role="group" aria-label="按地点类型筛选"></div>
+        <!-- ⭐ 会被折叠的部分。
+             ⚠️ 它是个普通的 flex 列容器（间距和 .map-toolbar 一致），
+                所以**宽屏展开时看起来和改造前一模一样** —— 没有视觉变化。 -->
+        <div class="map-tools-panel" id="map-tools-panel">
+          <!-- 主城市（人生锚点）：连线都从这里出发（PRD 4.1 #8） -->
+          <div class="map-maincity">
+            <input type="text" class="map-search map-search--small" id="main-city-input"
+                   placeholder="主城市（如：武汉）" autocomplete="off">
+            <button type="button" class="mini-btn" id="main-city-set">设定</button>
+            <button type="button" class="mini-btn" id="main-city-clear">清除</button>
+          </div>
+
+          <!-- 类型筛选栏：全部 / 长期居住 / 短期停留 / 旅游 / 想去（Day 12 补 aria）
+             ⭐ role="group" + aria-label：读屏走到这一排按钮时，
+                才知道它们是"一组用来筛地点类型的开关" —— 否则只是一串孤立的按钮。
+             （同页面的搜索框早就写了 aria-autocomplete / aria-expanded 等，
+               这里原先一处都没有 —— 不是不会做，是漏了。） -->
+          <div class="map-filter" id="map-filter" role="group" aria-label="按地点类型筛选"></div>
+        </div>
       </div>
 
       <!-- 地图画布：由高德渲染 -->
@@ -405,7 +423,7 @@
 
   <!-- ===== 本地配置：含高德 Key，不提交（模板见 config.example.js）=====
        找不到 config.js 时不会报错，只是地图加载不出来，页面其余部分照常可用 -->
-  <script src="config.js?v=56"
+  <script src="config.js?v=57"
           onerror="console.warn('[TripMemo] 未找到 config.js —— 地图将无法加载。请把 config.example.js 复制为 config.js 并填入 Key 与安全密钥。')"></script>
 
   <!-- ===== 项目脚本：顺序不能乱 =====
@@ -419,20 +437,20 @@
        ⭐ 规则（就一句）：**改完任何 css / js，把这里和上面的数字一起 +1。**
           11 个资源共用同一个编号 —— 多下载几 KB，换"永远不用想哪个该改"，
           对学习阶段来说非常划算。 -->
-  <script src="js/model.js?v=56"></script>
-  <script src="js/mock-data.js?v=56"></script>
-  <script src="js/store.js?v=56"></script>
+  <script src="js/model.js?v=57"></script>
+  <script src="js/mock-data.js?v=57"></script>
+  <script src="js/store.js?v=57"></script>
 
   <!-- 四态逻辑（空 / 加载 / 错误 / 正常）的**唯一实现** —— 两个列表视图共用（Day 13）
        ⚠️ 必须排在 timeline.js / places.js 之前：它们在 init() 里就要用它。
        ⭐ 为什么单独一个文件、而不是在两个视图里各写一份：
           那就是"同一个逻辑两种写法"，改的时候必然漏一个（原则 2）。 -->
-  <script src="js/view-state.js?v=56"></script>
-  <script src="js/detail.js?v=56"></script>
-  <script src="js/drawer.js?v=56"></script>
-  <script src="js/map.js?v=56"></script>
-  <script src="js/timeline.js?v=56"></script>
-  <script src="js/places.js?v=56"></script>
-  <script src="js/main.js?v=56"></script>
+  <script src="js/view-state.js?v=57"></script>
+  <script src="js/detail.js?v=57"></script>
+  <script src="js/drawer.js?v=57"></script>
+  <script src="js/map.js?v=57"></script>
+  <script src="js/timeline.js?v=57"></script>
+  <script src="js/places.js?v=57"></script>
+  <script src="js/main.js?v=57"></script>
 </body>
 </html>

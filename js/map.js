@@ -1572,6 +1572,7 @@
     }
 
     renderFilterBar();
+    initToolsToggle();   /* ⭐ 窄屏「主城市与筛选」折叠开关（2026-09-29 Day 14） */
 
     /* 先亮出"加载中" —— 地图 SDK 要联网下载，这期间画布是全白的 */
     showLoading();
@@ -1632,6 +1633,49 @@
     highlightedCity = city || '';
     renderMarkers();
     console.log('[TripMemo] 地图高亮城市：' + (highlightedCity || '（已取消）'));
+  }
+
+  /**
+   * 窄屏的「主城市与筛选」折叠开关（2026-09-29 Day 14 · 真机测试发现）
+   *
+   * ⚠️ 为什么要它：手机上「搜索框 + 主城市 + 设定/清除 + 筛选两行」一共占了
+   *    约 **28% 的屏幕高度**，地图只剩三分之二。
+   *    ⭐ 而电脑屏幕大，从来不挤 —— **这就是"这一步我自己为什么没发现"的答案**：
+   *       我一直在电脑上看。
+   *
+   * ⭐ 设计取舍：
+   *    · **搜索框不进折叠面板** —— 它是最高频的操作，藏起来等于让用户多点一次；
+   *    · 只在**窄屏**收起（宽屏时这个开关按钮是 `display:none`，面板永远展开）。
+   *
+   * ⚠️ 用 `matchMedia` 只在**启动时**判断一次窄屏 —— 转屏 / 拖窗口**不会**重新收放。
+   *    这是刻意的：⭐ 宁可"转屏后状态不变"，也不要监听 resize 去改 DOM
+   *    （那会**打断用户正在进行的展开动作**）。
+   */
+  function initToolsToggle() {
+    var toolbar = document.querySelector('.map-toolbar');
+    var toggle = document.getElementById('map-tools-toggle');
+
+    if (!toolbar || !toggle) {
+      return;
+    }
+
+    /**
+     * 把面板的收放状态写进 DOM —— **唯一一处改状态的地方**
+     * @param {boolean} open true = 展开
+     */
+    function apply(open) {
+      toolbar.classList.toggle('is-tools-collapsed', !open);
+      toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    }
+
+    toggle.addEventListener('click', function () {
+      /* ⚠️ 判断"现在是什么状态"用**类名**，不用闭包变量 ——
+         同一个状态只有一个来源，以后别处想改它也不会打架。 */
+      apply(toolbar.classList.contains('is-tools-collapsed'));
+    });
+
+    /* ⭐ 窄屏默认收起；宽屏展开（宽屏那按钮根本不显示，状态也不起作用） */
+    apply(!window.matchMedia('(max-width: 559px)').matches);
   }
 
   global.TripMemoMap = {
