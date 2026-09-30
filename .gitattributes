@@ -1,0 +1,18 @@
+# .gitattributes —— 换行符规则
+#
+# ⚠️ 为什么需要这个文件（2026-09-30 Day 15 建）：
+#   本机的 git 配了 `core.autocrlf = true` —— 意思是**检出时会把 LF 自动转成 CRLF**。
+#   这对网页文件无所谓，但对 **shell 脚本是致命的**：
+#   CloudBase 云函数的启动脚本 `scf_bootstrap` 要在 **Linux** 里执行，
+#   它必须是 **LF** 换行；一旦变成 CRLF，Linux 会报
+#       $'\r': command not found
+#   → **函数直接起不来**，而且报错信息完全看不出是换行符的问题。
+#
+# ⭐ 所以：**只针对必须 LF 的文件写规则**，不要一刀切用 `* text=auto` ——
+#    那会重写全仓库所有文件的换行，git 会显示一堆无关改动，把真正的改动淹掉。
+
+# CloudBase 云函数启动脚本：永远 LF
+scf_bootstrap text eol=lf
+
+# 其余 shell 脚本同理（以后加了也自动生效）
+*.sh text eol=lf

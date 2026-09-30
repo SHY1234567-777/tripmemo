@@ -1,0 +1,15 @@
+#!/bin/bash
+# CloudBase HTTP 函数启动脚本：启动 Node.js HTTP 服务并监听 9000 端口
+#
+# ⚠️⚠️ 这个文件有两个「不说看不出来」的要求，两个都会让函数起不来：
+#   ① **必须是 LF 换行** —— Windows 上默认会写成 CRLF，
+#      在 Linux 里执行会报 `$'\r': command not found`，
+#      而且报错信息完全看不出是换行符的问题。
+#      ⭐ 仓库根目录的 `.gitattributes` 已经锁定它永远 LF，别删那条规则。
+#   ② **上传时要有可执行权限** —— 它是要被 `exec` 的脚本，不是普通文本。
+#      （用 CloudBase CLI 部署会自动处理；手动从控制台上传时平台也会处理）
+#
+# ⚠️ 路径里的 node 版本要跟「运行环境」对上（本函数用的是 Node.js 20）。
+#    这里用 `node` 走 PATH，简单一点；如果哪天报找不到 node，
+#    再改成运行环境对应的绝对路径（如 /var/lang/node20/bin/node）。
+exec node index.js

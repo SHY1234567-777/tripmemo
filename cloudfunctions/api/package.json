@@ -1,0 +1,8 @@
+{
+  "name": "tripmemo-api",
+  "version": "1.0.0",
+  "description": "TripMemo 的 API 服务（CloudBase HTTP 云函数）",
+  "main": "index.js",
+  "private": true,
+  "dependencies": {}
+}
