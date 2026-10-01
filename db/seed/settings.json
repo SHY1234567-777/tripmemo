@@ -1,0 +1,5 @@
+{"_id":"s_shy","ownerId":"u_shy","mainCity":{"city":"武汉","lng":114.305392,"lat":30.593099},"sampleLoaded":true,"updatedAt":{"$date":"2026-09-20T01:00:00.000Z"}}
+{"_id":"s_friend_01","ownerId":"u_friend_01","mainCity":{"city":"成都","lng":104.066541,"lat":30.572269},"sampleLoaded":true,"updatedAt":{"$date":"2026-09-20T01:05:00.000Z"}}
+{"_id":"s_friend_02","ownerId":"u_friend_02","mainCity":{"city":"拉萨","lng":91.140856,"lat":29.645554},"sampleLoaded":false,"updatedAt":{"$date":"2026-09-20T01:10:00.000Z"}}
+{"_id":"s_friend_03","ownerId":"u_friend_03","mainCity":{"city":"深圳","lng":114.057868,"lat":22.543099},"sampleLoaded":true,"updatedAt":{"$date":"2026-09-20T01:15:00.000Z"}}
+{"_id":"s_friend_04","ownerId":"u_friend_04","mainCity":null,"sampleLoaded":false,"updatedAt":{"$date":"2026-09-20T01:20:00.000Z"}}

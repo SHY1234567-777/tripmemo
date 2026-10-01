@@ -1,0 +1,104 @@
+{
+  "_file": "TripMemo 数据库结构定义（文档型数据库 · 云开发版）",
+  "_createdAt": "2026-10-01",
+  "_day": "Day 16",
+  "_note": "⚠️ 这份文件是『结构的记录』，供人阅读、供控制台手工对照建集合 —— 它不能直接导入。真正能导入的是 seed/ 下的三个 .json 文件。⚠️ 那些文件的内容必须是 JSON Lines 格式（每行一个完整对象，不能是数组），因为平台的导入功能就是这么要求的。",
+  "_whyNoSql": "⭐ 本项目用的是 CloudBase 的『文档型数据库（云开发版）』。它没有 SQL、没有 DDL、没有 ALTER TABLE —— 改结构是直接改文档。这份 JSON 就是它的『结构定义』，等价于 SQL 项目里的 schema.sql。",
+  "_collectionCount": 3,
+  "_collections": [
+
+    {
+      "name": "users",
+      "desc": "用户。⚠️ 为什么现在就要：places/settings 用 owner_id 关联到它 —— 没有它，owner_id 就是个无人约束的字符串（写错也照样存进去）。⭐ Day 20 接认证系统后，它可能改成『认证系统的用户表 + 业务属性』。",
+      "fields": [
+        { "key": "_id",        "type": "string",  "required": true,  "desc": "用户 id。⚠️ 不用自增数字：将来要和认证系统对接，格式由它决定。⭐ 文档型的主键叫 _id，但接口层统一返回成 id（见 api-contract.md §3.4）" },
+        { "key": "nickname",   "type": "string",  "required": true,  "desc": "昵称", "default": "" },
+        { "key": "createdAt",  "type": "date",    "required": true,  "desc": "注册时间。⭐ 文档型用 ISODate 类型（不是字符串），能直接排序比较", "default": "服务端自动生成" }
+      ],
+      "indexes": [
+        { "fields": ["nickname"], "desc": "可选。按昵称搜索时用；本阶段数据量小，可以先不建" }
+      ]
+    },
+
+    {
+      "name": "places",
+      "desc": "地点（核心集合）。一条 = 一个 place 对象，字段和 js/model.js 的 createPlace() 完全一致 —— 不要改名、不要合并。",
+      "fields": [
+        { "key": "_id",          "type": "string",  "required": true,  "desc": "地点 id。格式 p_ + 36 进制时间戳 + _ + 5 位随机，如 p_mfz3k8a1_b7x2q。⚠️ 当不透明字符串用：不要 parseInt、不要假设长度、不要用大小比较排序" },
+        { "key": "ownerId",      "type": "string",  "required": true,  "desc": "属于哪个用户。⭐ 关联到 users 集合的 _id（相当于外键）。⚠️ 字段名用驼峰，和前端代码一致 —— 文档型不需要下划线转换" },
+        { "key": "name",         "type": "string",  "required": true,  "desc": "地点名称" },
+        { "key": "city",         "type": "string",  "required": true,  "desc": "所属城市。⚠️ 是城市名不是城市 id —— 前端直接按它分组，⭐ 不单独建城市集合（文档型能塞进一个文档的，就不拆）" },
+        { "key": "lng",          "type": "number",  "required": true,  "desc": "经度。⭐ 文档型用 Number，没有 DECIMAL/FLOAT 之分" },
+        { "key": "lat",          "type": "number",  "required": true,  "desc": "纬度" },
+        { "key": "type",         "type": "string",  "required": true,  "desc": "地点类型。⭐ 只允许 4 个值：long（长期居住）/ short（短期停留）/ travel（旅游）/ wishlist（想去）。⚠️ 值不要改 —— 前端 Model.PLACE_TYPES 和 TYPE_COLORS 都按它取值", "enum": ["long", "short", "travel", "wishlist"] },
+        { "key": "startMonth",   "type": "string",  "required": false, "desc": "停留开始，YYYY-MM。⚠️ 空串 = 没填（沿用前端的语义，不用 null）", "default": "" },
+        { "key": "endMonth",     "type": "string",  "required": false, "desc": "停留结束，YYYY-MM。⚠️ 空串 = 至今", "default": "" },
+        { "key": "note",         "type": "string",  "required": false, "desc": "回忆正文。⭐ 文档型没有 VARCHAR 长度限制，天然适合" },
+        { "key": "tags",         "type": "array<string>", "required": false, "desc": "标签数组，如 [\"新疆\", \"自驾\"]。⭐⭐ 这是文档型相对 SQL 的最大优势：数组直接存，不用建标签表、不用 JSON 包一层", "default": [] },
+        { "key": "images",       "type": "array<string>", "required": false, "desc": "图片数组。⚠️ 本期只留字段、不实现上传（PRD 六.10）—— 但必须保留：否则将来加照片后，一编辑就会被清空", "default": [] },
+        { "key": "createdAt",    "type": "date",    "required": true,  "desc": "创建时间。⭐ 用 ISODate，能按时间排序和比较", "default": "服务端自动生成" }
+      ],
+      "indexes": [
+        { "fields": ["ownerId"],  "desc": "⭐ 最重要：按用户查全部地点 —— Day 17 的 GET /api/places 就走它" },
+        { "fields": ["city"],     "desc": "按城市分组/查询" },
+        { "fields": ["startMonth"], "desc": "时间轴按年份排序" }
+      ]
+    },
+
+    {
+      "name": "settings",
+      "desc": "设置。一个用户一条。⚠️ 为什么不塞进 places 集合：mainCity 是『全局唯一的一个值』，每条 place 都带一份会造成 N 份冗余、还会不一致。",
+      "fields": [
+        { "key": "_id",            "type": "string",  "required": true,  "desc": "文档主键" },
+        { "key": "ownerId",        "type": "string",  "required": true,  "desc": "属于哪个用户。⭐ 关联到 users 集合的 _id。⚠️ 一个用户只能有一条 —— 靠『查询即约束』（先查后写），文档型没有主键约束" },
+        { "key": "mainCity",       "type": "object | null", "required": false, "desc": "主城市（人生锚点）：{ city, lng, lat }。⚠️ 允许 null = 用户还没设定（接口要能返回 mainCity: null）", "shape": { "city": "string", "lng": "number", "lat": "number" } },
+        { "key": "sampleLoaded",   "type": "boolean", "required": true,  "desc": "是否装过示例数据。⭐ 文档型有真正的 boolean 类型（SQL 里只能用 TINYINT(1) 代替）", "default": false },
+        { "key": "updatedAt",      "type": "date",    "required": false, "desc": "最后修改时间。⚠️ 文档型没有 ON UPDATE 自动维护，⭐ 需要服务端在写的时候自己更新" }
+      ],
+      "indexes": [
+        { "fields": ["ownerId"], "desc": "⭐ 按用户查设置。本阶段一个用户一条，可以靠它唯一化" }
+      ]
+    }
+
+  ],
+  "_relations": [
+    {
+      "from": "places.ownerId",
+      "to": "users._id",
+      "kind": "多对一",
+      "desc": "一个用户有多个地点。⭐ 文档型可以在『数据模型』里配『关联』（一对多），也可以只当一个普通字段存字符串 —— 本阶段先用后者，简单且够用"
+    },
+    {
+      "from": "settings.ownerId",
+      "to": "users._id",
+      "kind": "一对一",
+      "desc": "一个用户一份设置"
+    },
+    {
+      "from": "(无)",
+      "to": "(无)",
+      "kind": "不建",
+      "desc": "⭐ 地点与城市不建关联 —— places.city 就是个字符串。前端本来按它分组，多建『城市集合』只会多一层查询"
+    }
+  ],
+  "_vsSql": {
+    "_note": "⭐ 这一节记录『同一份设计在 SQL 里长什么样』，因为最初是按 SQL 写的（已删除 db/schema.sql）。留在这儿是防止将来老师要 SQL 时重新推一遍。",
+    "类型映射": {
+      "_id 字符串（p_xxx）": "VARCHAR(32) 主键",
+      "普通字符串": "VARCHAR(n)",
+      "经度/纬度": "DECIMAL(10,7)（⚠️ 不能用 FLOAT，坐标要精确）",
+      "type 四选一": "ENUM('long','short','travel','wishlist')",
+      "YYYY-MM": "CHAR(7)",
+      "长文本 note": "TEXT",
+      "数组 tags/images": "JSON 列",
+      "ISODate": "DATETIME",
+      "boolean": "TINYINT(1)"
+    },
+    "为什么最后没走 SQL": "⭐ 文档型是环境创建时选的、不可切换；而且我们的数据天生就是 JSON 对象（createPlace 的产物），原样搬最顺。⚠️ MySQL 也开通了，但没用它 —— 如果将来老师坚持要 SQL，可以切过去（那时再写 schema.sql）。"
+  },
+  "_evidence": {
+    "字段来源": "js/model.js 的 createPlace() —— 12 个业务字段；契约另加 ownerId，共 13 个",
+    "接口来源": "js/store.js 暴露的 16 个方法（listPlaces / addPlace / getMainCity …）",
+    "契约": "api-contract.md §1（本文档和它保持一致，Day 16 会回写它）"
+  }
+}
