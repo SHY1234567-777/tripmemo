@@ -108,10 +108,10 @@
 | # | 方法 | 路径 | 对应 `store.js` | 干什么 |
 |---|---|---|---|---|
 | 1 | ⭐ **GET** | `/api/places` | `listPlaces` / `readPlacesResult` | ⭐ **列表读取**（地图/时间轴/地点列表都靠它） |
-| 2 | **GET** | `/api/places/:id` | `getPlace` | 读单个地点 |
+| 2 | **GET** | `/api/place?id=` | `getPlace` | 读单个地点 |
 | 3 | **POST** | `/api/places` | `addPlace` | 新增 |
-| 4 | **PUT** | `/api/places/:id` | `updatePlace` | 修改 |
-| 5 | **DELETE** | `/api/places/:id` | `removePlace` | 删除 |
+| 4 | **PUT** | `/api/place?id=` | `updatePlace` | 修改 |
+| 5 | **DELETE** | `/api/place?id=` | `removePlace` | 删除 |
 | 6 | **GET** | `/api/meta` | `getMainCity` / `isSampleLoaded` | 读设置 |
 | 7 | **PUT** | `/api/meta` | `setMainCity` | 改设置 |
 | 8 | **POST** | `/api/places/bulk` | `importJSON` / `loadSampleData` | 批量写入（导入 / 装示例） |
@@ -151,7 +151,8 @@
 | `code` | HTTP | 含义 | 什么情况会出现 |
 |---|---|---|---|
 | `INVALID_INPUT` | 400 | 参数不合法 | 缺 `name`/`city`/`type`，或 `lng`/`lat` 不是数字 |
-| `NOT_FOUND` | 404 | 找不到 | `:id` 不存在（或不属于当前用户） |
+| `NOT_FOUND` | 404 | 找不到 | ① `id` 不存在（或不属于当前用户）<br>② ⭐ **请求的接口不存在**（拼错路径时） |
+| ⭐ **`METHOD_NOT_ALLOWED`** | **405** | **方法不对** | ⭐ **路径存在、但 HTTP 方法不对** ——<br>比如对一个只读接口发 `POST`（Day 17 加） |
 | `UNAUTHORIZED` | 401 | 没登录 | ⚠️ **Day 20 起才可能出现** |
 | `FORBIDDEN` | 403 | 无权访问这条数据 | ⚠️ **Day 20 起**：试图读/改别人的地点 |
 | `QUOTA_EXCEEDED` | 429 | 超出配额 | 资源点用尽（免费版 3000 点/月） |
@@ -167,12 +168,17 @@
 | 层 | 叫什么 | 说明 |
 |---|---|---|
 | ⭐ **数据库内部** | `_id` | CloudBase 文档型数据库的主键名，**服务端专用** |
-| ⭐⭐ **接口层（HTTP）** | ⭐ **`id`**（**不带下划线**） | 请求里的路径参数、响应体里的字段，**一律叫 `id`** |
+| ⭐⭐ **接口层（HTTP）** | ⭐ **`id`**（**不带下划线**） | 请求里的**查询参数**、响应体里的字段，**一律叫 `id`** |
 | ⭐ **前端代码** | `id` | `js/model.js` 现在就叫 `id` —— ⭐ **保持一致，前端几乎不用改** |
 
 **规矩三条**：
 
-1. ⭐ **接口的 URL 一律写 `:id`**（如 `PUT /api/places/:id`）—— **不要写成 `:_id`**。
+1. ⭐⭐ **带参数的接口，一律用「查询参数」，不要用动态路径** ——
+   ⚠️ **因为 CloudBase 的路由路径只能包含字母、数字、下划线和连接符**，
+   **冒号 `:` 不被允许** → ⭐ **`/api/places/:id` 这种写法在「HTTP 访问」里配不了路由**
+   （Day 17 实测：填进弹窗保存不了）。
+   ⭐ **正确写法**：`GET /api/place?id=xxx` ｜ `PUT /api/place?id=xxx` ｜ `DELETE /api/place?id=xxx`
+   ⚠️ 注意**列表接口是复数 `places`、单个接口是单数 `place`** —— 两个不同路径，不冲突。
 2. ⭐ **响应体里的字段一律叫 `id`** —— ⭐ **服务端负责把数据库的 `_id` 映射成 `id` 再返回**。
    （前端拿到的对象形状 = `createPlace()` 造出来的那个对象，⭐ **无缝替换 localStorage**）
 3. ⚠️ **请求体里不要传 `id`**（新增和修改都不传）—— 路径里已经有了，传了也忽略。
@@ -285,7 +291,19 @@ https://tripmemo-d3gd23bd14a396d1d-148733444.ap-shanghai.app.tcloudbase.com/api/
 
 ---
 
-### 2. `GET /api/places/:id` —— 读单个
+### 2. ⭐ `GET /api/place?id=` —— 读单个
+
+> ## ✅ 已实现（Day 17）
+> **公网地址**（⭐ 完整地址，复制用）：
+> ```
+> https://tripmemo-d3gd23bd14a396d1d-148733444.ap-shanghai.app.tcloudbase.com/api/place?id=p_hnust_wuhan
+> ```
+> ⚠️⚠️ **为什么不是 `/api/places/:id`**（初版契约的写法）：
+> ⭐ **CloudBase 的路由路径只能包含字母、数字、下划线和连接符** → **冒号 `:` 不被允许**，
+> **`/api/places/:id` 在「HTTP 访问」里根本配不了路由**（Day 17 实测：填了保存不了）。
+> ⭐ 所以本项目**所有带参数的接口一律用查询参数** ——
+> 这个改动**连带影响了 `PUT` 和 `DELETE` 两个接口的写法**（见 §四.4 / §四.5）。
+> ⭐ **单数 `place` 是读单个、复数 `places` 是列表** —— 两个不同路径，不冲突。
 
 **请求**
 
@@ -354,7 +372,7 @@ https://tripmemo-d3gd23bd14a396d1d-148733444.ap-shanghai.app.tcloudbase.com/api/
 
 ---
 
-### 4. `PUT /api/places/:id` —— 修改
+### 4. ⭐ `PUT /api/place?id=` —— 修改
 
 **请求**
 
@@ -380,7 +398,7 @@ https://tripmemo-d3gd23bd14a396d1d-148733444.ap-shanghai.app.tcloudbase.com/api/
 
 ---
 
-### 5. `DELETE /api/places/:id` —— 删除
+### 5. ⭐ `DELETE /api/place?id=` —— 删除
 
 **请求**
 
@@ -494,7 +512,7 @@ https://tripmemo-d3gd23bd14a396d1d-148733444.ap-shanghai.app.tcloudbase.com/api/
 ⭐ **调用示例**：`DELETE /api/places?confirm=yes`
 
 ⚠️ **为什么强制这个参数**：这是**不可逆的破坏性操作**，而它的 URL **短到容易被误触发**
-（比如前端拼路径时漏了 `:id`，就从"删一条"变成"删全部"）。
+（比如前端漏了 `?id=`，就从"删一条"变成"删全部"）。
 ⭐ **一个显式参数就能挡住这类手滑** —— 这是护栏，不是形式主义。
 
 **响应 `200`**：`{ "ok": true, "deleted": 13 }`
@@ -509,7 +527,7 @@ https://tripmemo-d3gd23bd14a396d1d-148733444.ap-shanghai.app.tcloudbase.com/api/
 |---|---|
 | **1** | ⭐ **身份约束**：Day 20 登录后，**每一条读写都必须带 `ownerId`** —— 否则一个用户能读到别人的地点。**这是安全底线，不是可选优化。** |
 | **2** | ⭐ **参数校验用手写，不要引第三方包** —— HTTP 云函数**不会自动装 `node_modules`**（见 `TripMemo-云函数部署说明-20260930.md` 第二节） |
-| **3** | **路径要用到「路径透传」** —— CloudBase 的 HTTP 访问里那个开关要开着，否则函数收不到 `/api/places/:id` 里的真实路径 |
+| **3** | **路径要用到「路径透传」** —— CloudBase 的 HTTP 访问里那个开关要开着，否则函数收不到真实的请求路径 |
 | **4** | **路由写在 `index.js` 里**（HTTP 云函数的形态就是一个文件写多路由），加在现有 `404` 分支**之前** |
 | **5** | ⭐ **不要改字段名** —— 前端 10 个 js 文件里到处在按这些名字读值（`place.city` / `p.type` …）。要改就先改契约、再改代码，别反着来 |
 | **6** | **写完一个接口就在这个文件上打勾**，别等全写完再回头对 |

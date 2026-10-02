@@ -240,6 +240,48 @@ const server = http.createServer(async (req, res) => {
   }
 
   /* ------------------------------------------------------------
+     ⭐ GET /api/place?id=xxx —— 读单个地点（契约 §四.2）
+     ------------------------------------------------------------
+     ⚠️⚠️ 为什么写成 /api/place?id=xxx，而不是 /api/places/:id：
+        ⭐ CloudBase 的路由路径**只能包含字母、数字、下划线和连接符** ——
+        ⚠️ **冒号 `:` 不被允许**，所以 `/api/places/:id` 这种"动态路径"
+        **在「HTTP 访问」里根本配不了路由**（Day 17 实测：填了保存不了）。
+     ⭐ 所以本项目**所有带参数的接口，一律改用查询参数**（`?id=` / `?limit=` 都是这个套路）。
+     ⚠️ 连带影响：契约里原本写的 PUT /api/places/:id、DELETE /api/places/:id
+        也都要改成查询参数形式（Day 18 写的时候一并改）。
+     ⚠️ 注意路径是 **place（单数）**，和列表的 /api/places（复数）区分开。 */
+  if (path === '/api/place' && req.method === 'GET') {
+    try {
+      const id = url.searchParams.get('id');
+      if (!id) {
+        sendError(res, 400, 'INVALID_INPUT', '缺少 id 参数。用法：/api/place?id=xxx');
+        return;
+      }
+
+      /* ⚠️ `_id` 是数据库里的主键名（这里查库要用它），
+         而对外返回的字段叫 `id` —— 由 toApiPlace() 负责映射。 */
+      const result = await db.collection('places')
+        .where({ _id: id, ownerId: CURRENT_USER_ID })
+        .get();
+      const doc = (result.data || [])[0];
+
+      if (!doc) {
+        /* ⚠️ "不存在"和"存在但不属于你"**都返回 404** —— 契约 §四.2 特意定的：
+           如果后者返回 403，就等于告诉别人"这条数据存在，只是不是你的"。 */
+        sendError(res, 404, 'NOT_FOUND', '找不到这个地点，或它不属于当前用户');
+        return;
+      }
+
+      sendOk(res, { place: toApiPlace(doc) });
+      return;
+    } catch (err) {
+      console.error('[TripMemo] GET /api/place 失败：', err);
+      sendError(res, 500, 'SERVER_ERROR', (err && err.message) || err);
+      return;
+    }
+  }
+
+  /* ------------------------------------------------------------
      ⭐ GET /api/meta —— 读设置（契约 §四.6）
      ------------------------------------------------------------
      ⚠️ 契约特意写了：mainCity 允许是 null（用户还没设定主城市）——
@@ -263,17 +305,19 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
-  /* ⚠️ 路径对但方法不对 → 明确拒绝（别让它变成"万能入口"） */
+  /* ⚠️ 路径对但方法不对 → 明确拒绝（别让它变成"万能入口"）
+     ⚠️ 注意这里**必须走 sendError()**，不能手写 JSON ——
+     契约 §3.1 定的错误形状是 `{ok:false, error:{code, message}}`（**error 是对象**），
+     ⚠️ 手写很容易写成 `error: '字符串'`，就破坏了契约（Day 17 就犯过这个）。 */
   if (isHealth) {
-    res.writeHead(405, { 'Content-Type': 'application/json; charset=utf-8' });
-    res.end(JSON.stringify({ ok: false, error: 'Method Not Allowed' }));
+    sendError(res, 405, 'METHOD_NOT_ALLOWED', '健康检查只接受 GET 请求');
     return;
   }
 
   /* 其余路径 → 404。
-     ⭐ Day 16–20 的真接口（读/写地点、城市、标签）会加在这之前。 */
-  res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
-  res.end(JSON.stringify({ ok: false, error: 'Not Found' }));
+     ⚠️ 这里是**兜底**：所有没被上面任何分支命中的请求都会落到这儿。
+     ⭐ 所以 Day 18–20 写的新接口，**必须加在这一段之前** —— 加在后面永远不会被命中。 */
+  sendError(res, 404, 'NOT_FOUND', '没有这个接口');
 });
 
 // ⚠️ 端口必须是 9000 —— CloudBase 的 HTTP 函数固定监听这个端口（创建时不可改）
