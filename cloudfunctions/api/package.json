@@ -4,5 +4,7 @@
   "description": "TripMemo 的 API 服务（CloudBase HTTP 云函数）",
   "main": "index.js",
   "private": true,
-  "dependencies": {}
+  "dependencies": {
+    "@cloudbase/node-sdk": "^3.2.0"
+  }
 }

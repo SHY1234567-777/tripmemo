@@ -219,6 +219,19 @@
 
 ### 1. ⭐ `GET /api/places` —— 列表读取（最重要的一个）
 
+> ## ✅ 已实现（Day 17）
+> **公网地址**：
+> ```
+> https://tripmemo-d3gd23bd14a396d1d-148733444.ap-shanghai.app.tcloudbase.com/api/places
+> ```
+> ⚠️ **实现说明（重要）**：
+> · 目前**只返回 `CURRENT_USER_ID` 自己的地点** —— Day 17 暂时**写死为 `u_shy`**
+>   （种子数据里他有 **5 条**，所以接口返回 **5 条**，⚠️ **不是全部 8 条**）。
+>   ⭐ Day 20 接登录后，这个常量换成真实登录用户，**接口形状和筛选逻辑都不变**。
+> · 数据库的 `_id` 由服务端**映射成 `id`**（见 §3.4）；`createdAt` 由 ISODate **转成 ISO 字符串**。
+> · ⚠️ **它的路由要在「HTTP 访问」里单独配一条**（路径 `/api/places`）——
+>   不配就报 `INVALID_PATH`（「未找到匹配的转发规则」）。
+
 > ⭐ **地图、时间轴、地点列表三个页面全靠它。** 课程清单也特意强调"别忘了列表读取接口"。
 
 **请求**
@@ -226,6 +239,16 @@
 | 参数 | 位置 | 类型 | 必填 | 说明 |
 |---|---|---|---|---|
 | `type` | query | string | 否 | ⭐ **不传 = 返回全部**（含「想去」）<br>⭐ **只接受这 4 个值**：`long` / `short` / `travel` / `wishlist`<br>⚠️ 传了**这 4 个之外的值** → ⭐ **返回 `400 INVALID_INPUT`**（**不是**静默返回空数组 —— 静默会让前端把"打错字"当成"没有数据"） |
+
+| ⭐ **`limit`** | query | number | 否 | ⭐ **限制返回条数**（Day 17 余力加练加的）<br>· 不传 = **不限制**（返回全部）<br>· 合法范围：**1 ~ 100 的整数**<br>⚠️ 传了非整数 / 小于 1 / 大于 100 → ⭐ **返回 `400 INVALID_INPUT`**<br>⭐ **为什么要它**：数据一多，一次全拉又慢又费流量；它和 `skip` 搭配就是"分页"的基础；<br>⚠️ 更重要的是**安全** —— 不设上限的话，`?limit=999999` 能把服务器和流量拖垮 |
+
+⭐ **`type` 和 `limit` 可以一起用**，例如：
+
+```
+https://tripmemo-d3gd23bd14a396d1d-148733444.ap-shanghai.app.tcloudbase.com/api/places?type=travel&limit=2
+```
+
+（先按类型筛，再只取前 2 条）
 
 ⚠️ **参数缺席和传空串要分清**：`?type=`（空串）按**"不传"处理** = 返回全部。
 ⭐ 这么做是为了配合前端「全部」那个 chip —— 它的 key 就是**空串**（见 `map.js` 的
@@ -378,6 +401,17 @@
 
 ### 6. `GET /api/meta` —— 读设置
 
+> ## ✅ 已实现（Day 17）
+> **公网地址**：
+> ```
+> https://tripmemo-d3gd23bd14a396d1d-148733444.ap-shanghai.app.tcloudbase.com/api/meta
+> ```
+> ⭐ **实测返回**（和下面契约定义的形状完全一致）：
+> ```json
+> {"ok":true,"mainCity":{"city":"武汉","lng":114.305392,"lat":30.593099},"sampleLoaded":true}
+> ```
+> ⚠️ 同样**只读 `CURRENT_USER_ID` 那一行设置**；⚠️ 路由也要在「HTTP 访问」单独配（`/api/meta`）。
+
 **请求**：⭐ **无参数** —— 无路径参数、无 query、无请求体。
 （设置是"当前用户的全局设置"，天然只有一份，不需要指定读哪条。）
 
@@ -485,10 +519,40 @@
 
 ---
 
-## 六、进度（Day 16 状态）
+## 六、进度（Day 17 状态）
 
-| # | 东西 | 状态 |
+| # | 接口 | 状态 |
 |---|---|---|
-| 0 | `GET /api/health` | ✅ **已实现并上线**（Day 15）<br>`https://tripmemo-d3gd23bd14a396d1d-1498733444.ap-shanghai.app.tcloudbase.com/api/health` |
-| — | ⭐ **数据库结构** | ✅ **已完成**（Day 16）：三个集合（`users`/`places`/`settings`）+ **18 条种子数据**，见 §1.4 |
-| 1–9 | 上面那九个接口 | ⚠️ **全部是占位** —— 数据库有了，但**接口一个都还没写**（Day 17 开始） |
+| — | `GET /api/health` | ✅ **已上线**（Day 15） |
+| ⭐ **1** | ⭐ **`GET /api/places`** | ✅ ⭐ **已实现（Day 17）** |
+| ⭐ **6** | ⭐ **`GET /api/meta`** | ✅ ⭐ **已实现（Day 17）** |
+| 2–5、7–9 | 其余七个 | ⚠️ **仍是占位** —— Day 18 起写（Day 18 先做写入接口） |
+| — | ⚠️ `GET /api/db-check` | ⚠️ **临时接口，不在契约里**（Day 17 加，用来验"云函数能不能连数据库"）。验证已通过，**留还是删待定** |
+
+### ⭐ 已上线的完整地址（⭐ 复制用，不省略前缀）
+
+```
+https://tripmemo-d3gd23bd14a396d1d-148733444.ap-shanghai.app.tcloudbase.com/api/health
+```
+```
+https://tripmemo-d3gd23bd14a396d1d-148733444.ap-shanghai.app.tcloudbase.com/api/places
+```
+```
+https://tripmemo-d3gd23bd14a396d1d-148733444.ap-shanghai.app.tcloudbase.com/api/meta
+```
+```
+https://tripmemo-d3gd23bd14a396d1d-148733444.ap-shanghai.app.tcloudbase.com/api/db-check
+```
+
+### ⚠️ 上线一个新接口，永远是**两步**（Day 17 踩过）
+
+```
+① 在 cloudfunctions/api/index.js 里加一个 if 分支（写代码）
+② ⚠️ 去「HTTP 访问」→「+ 添加该域名路由」配一条（路径填接口路径，资源对象选 tripmemo-api）
+```
+
+⚠️ **忘了第 ② 步 → 公网访问会报 `INVALID_PATH`**（官方定义：「未找到匹配的转发规则，请检查 HTTP 网关的路由配置」）。
+⚠️ 而且**路由路径有格式限制**（弹窗红字原文）：
+> 「路径必须以 `/` 开头，且路径只能包含**字母、数字、下划线和连接符**」
+
+→ ⚠️ **`*` 通配符不被允许**，所以**只能一条条加**（别想着配 `/api/*` 一劳永逸）。
