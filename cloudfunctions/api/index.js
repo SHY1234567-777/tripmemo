@@ -73,19 +73,123 @@ function toIsoString(value) {
 }
 
 /**
- * 统一的成功响应 —— 契约 §3.1 定的形状是 { ok: true, ...数据 }
+ * ⭐ 合法的地点类型（4 个）—— 提到模块级，GET / POST / PUT 共用一份，别各写一遍
  */
-function sendOk(res, payload) {
-  res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+const VALID_PLACE_TYPES = ['long', 'short', 'travel', 'wishlist'];
+
+/**
+ * ⭐ 生成一个新的地点 id（服务端生成，不接受客户端传）
+ *
+ * ⚠️ 格式必须和前端 `js/model.js` 的 `newId()` **完全一致** ——
+ *    因为契约 §3.4 定了"接口层的 id 沿用前端那个格式"，
+ *    这样将来导出/导入时旧的 id 不用转换。
+ *    ⚠️ 是 **36 进制**（`Date.now().toString(36)`），不是十进制 —— 写错了格式就对不上。
+ */
+function newPlaceId() {
+  return 'p_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 7);
+}
+
+/**
+ * 统一的成功响应 —— 契约 §3.1 定的形状是 { ok: true, ...数据 }
+ * ⚠️ status 可传，因为契约规定"新增用 201"而不是 200
+ */
+function sendOk(res, payload, status) {
+  res.writeHead(status || 200, { 'Content-Type': 'application/json; charset=utf-8' });
   res.end(JSON.stringify(Object.assign({ ok: true }, payload)));
 }
 
 /**
  * 统一的错误响应 —— 契约 §3.1 定的形状是 { ok: false, error: { code, message } }
+ * ⚠️ 所有错误都必须走这里，不要手写 JSON（手写很容易把 error 写成字符串，破坏契约）
  */
 function sendError(res, status, code, message) {
   res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' });
   res.end(JSON.stringify({ ok: false, error: { code: code, message: String(message) } }));
+}
+
+/**
+ * ⭐ 校验一个"新增地点"的请求体（Day 18）
+ *
+ * @returns {object} 通过则返回 { ok:true, data:归一化后的字段 }；
+ *                   不通过返回 { ok:false, message:中文提示 }
+ *
+ * ⚠️ 提示一律写成中文，而且**要说清缺了什么 / 哪一项不对** ——
+ *    因为错误信息最终会显示给用户看，含糊的提示等于没有提示。
+ */
+function validateNewPlace(body) {
+  const b = body || {};
+
+  /* ---- 必填字符串 ---- */
+  if (!b.name || String(b.name).trim() === '') {
+    return { ok: false, message: '缺少必填字段：name（地点名称）' };
+  }
+  if (!b.city || String(b.city).trim() === '') {
+    return { ok: false, message: '缺少必填字段：city（所属城市）' };
+  }
+
+  /* ---- 坐标：必须是数字，而且要在合法范围内 ---- */
+  /* ⚠️ 用 Number() 而不是 parseFloat：parseFloat("12abc") 会得到 12，把错的当对的放过去 */
+  const lng = Number(b.lng);
+  const lat = Number(b.lat);
+  if (b.lng === undefined || b.lng === null || b.lng === '' || !Number.isFinite(lng)) {
+    return { ok: false, message: '缺少必填字段或格式不对：lng（经度）必须是数字' };
+  }
+  if (b.lat === undefined || b.lat === null || b.lat === '' || !Number.isFinite(lat)) {
+    return { ok: false, message: '缺少必填字段或格式不对：lat（纬度）必须是数字' };
+  }
+  if (lng < -180 || lng > 180) {
+    return { ok: false, message: 'lng（经度）超出合理范围，应为 -180 ~ 180，收到的是：' + b.lng };
+  }
+  if (lat < -90 || lat > 90) {
+    return { ok: false, message: 'lat（纬度）超出合理范围，应为 -90 ~ 90，收到的是：' + b.lat };
+  }
+
+  /* ---- 类型：必须是那 4 个之一 ---- */
+  if (!b.type || VALID_PLACE_TYPES.indexOf(b.type) === -1) {
+    return { ok: false, message: 'type（地点类型）只能是 ' + VALID_PLACE_TYPES.join(' / ') + '，收到的是：' + b.type };
+  }
+
+  /* ---- 通过：把值归一化好再交给后面用 ---- */
+  return {
+    ok: true,
+    data: {
+      name: String(b.name).trim(),
+      city: String(b.city).trim(),
+      lng: lng,
+      lat: lat,
+      type: b.type,
+      startMonth: b.startMonth ? String(b.startMonth) : '',
+      endMonth: b.endMonth ? String(b.endMonth) : '',
+      note: b.note ? String(b.note) : '',
+      tags: Array.isArray(b.tags) ? b.tags : [],
+      images: Array.isArray(b.images) ? b.images : [],
+    },
+  };
+}
+
+/**
+ * ⭐ 读取并解析请求体（Day 18 加）
+ *
+ * ⚠️⚠️ 这里有个很容易踩的点：
+ *    我们是 **HTTP 云函数**（`http.createServer`），所以请求体**不在 `event.body` 里**
+ *    （那是**普通云函数**才有的事）—— 必须**自己从 `req` 这个流向里一段段读出来**。
+ *
+ * ⭐ 读完再 `JSON.parse`。解析失败就抛错，由调用方转成 400。
+ */
+function readJsonBody(req) {
+  return new Promise(function (resolve, reject) {
+    let raw = '';
+    req.on('data', function (chunk) { raw += chunk; });
+    req.on('end', function () {
+      if (!raw) { resolve({}); return; }
+      try {
+        resolve(JSON.parse(raw));
+      } catch (e) {
+        reject(new Error('请求体不是合法的 JSON'));
+      }
+    });
+    req.on('error', reject);
+  });
 }
 
 /**
@@ -192,12 +296,11 @@ const server = http.createServer(async (req, res) => {
          · 不传 / 传空串 → 返回全部
          · 传了 4 个合法值之外 → ⚠️ 返回 400，**不是**静默返回空数组
            （静默会让前端把"打错字"当成"没有数据"） */
-      const VALID_TYPES = ['long', 'short', 'travel', 'wishlist'];
       const typeParam = url.searchParams.get('type');
       if (typeParam !== null && typeParam !== '') {
-        if (VALID_TYPES.indexOf(typeParam) === -1) {
+        if (VALID_PLACE_TYPES.indexOf(typeParam) === -1) {
           sendError(res, 400, 'INVALID_INPUT',
-            'type 只能是 ' + VALID_TYPES.join(' / ') + '，收到的是：' + typeParam);
+            'type 只能是 ' + VALID_PLACE_TYPES.join(' / ') + '，收到的是：' + typeParam);
           return;
         }
         where.type = typeParam;
@@ -276,6 +379,79 @@ const server = http.createServer(async (req, res) => {
       return;
     } catch (err) {
       console.error('[TripMemo] GET /api/place 失败：', err);
+      sendError(res, 500, 'SERVER_ERROR', (err && err.message) || err);
+      return;
+    }
+  }
+
+  /* ------------------------------------------------------------
+     ⭐ POST /api/places —— 新增一个地点（契约 §四.3）
+     ------------------------------------------------------------
+     ⭐ 契约规定：`id` 和 `createdAt` **由服务端生成**，请求体里传了也忽略。
+        ⚠️ 为什么 `createdAt` 必须用服务端时间：否则用户改一下本机时钟，
+           就能伪造出"我 2019 年去过"这种记录。
+     ⚠️ 它和 GET /api/places 是**同一路径、不同方法** —— 靠 `req.method` 区分。 */
+  if (path === '/api/places' && req.method === 'POST') {
+    try {
+      /* ① 读请求体（⚠️ HTTP 函数要自己从 req 流里读，见 readJsonBody 的说明） */
+      let body;
+      try {
+        body = await readJsonBody(req);
+      } catch (e) {
+        sendError(res, 400, 'INVALID_INPUT', '请求体解析失败：' + e.message);
+        return;
+      }
+
+      /* ② 校验必填字段（提示全是中文，并且说清缺了什么） */
+      const checked = validateNewPlace(body);
+      if (!checked.ok) {
+        sendError(res, 400, 'INVALID_INPUT', checked.message);
+        return;
+      }
+      const data = checked.data;
+
+      /* ③ ⭐ 防重复（Day 18 定的规矩「甲」）：
+            同一个用户 + 同一个坐标（lng / lat 完全相同）= 同一个地方。
+         ⭐ 为什么这样判：坐标一样就是同一个物理地点。
+            你要记的是"在那儿待了多久"，那就应该**把一条记录的时间范围拉长**，
+            而不是插两条；而且补记过去时最容易重复提交，这一层正好挡住。
+         ⭐ 注意只查**同一个 ownerId** —— 别人去过同一个坐标跟我没关系。 */
+      const dup = await db.collection('places')
+        .where({ ownerId: CURRENT_USER_ID, lng: data.lng, lat: data.lat })
+        .limit(1)
+        .get();
+      if ((dup.data || []).length > 0) {
+        const existed = dup.data[0];
+        sendError(res, 409, 'DUPLICATE_PLACE',
+          '这个坐标上你已经有一个地点了：「' + (existed.name || '') + '」。'
+          + '如果是要补记同一次停留，请编辑那一条的时间范围，不要新增。');
+        return;
+      }
+
+      /* ④ 拼出完整文档：id 和 createdAt 都由服务端给 */
+      const now = new Date();
+      const doc = Object.assign({}, data, {
+        _id: newPlaceId(),
+        ownerId: CURRENT_USER_ID,
+        createdAt: now,
+      });
+
+      await db.collection('places').add(doc);
+
+      /* ⭐ 余力加练：服务端日志 ——
+         以后怀疑"到底写进去没"，去云函数的「日志」里搜 [TripMemo] 就能看到。 */
+      console.log('[TripMemo] 新增地点成功 id=' + doc._id
+        + ' name=' + doc.name
+        + ' owner=' + doc.ownerId
+        + ' at=' + now.toISOString());
+
+      /* ⭐ 契约 §3.1 规定新增返回 **201**（不是 200）；
+         ⭐ §四.3 规定返回**完整对象**而不是只返回 id ——
+            这样前端拿到就能直接插进列表，不用再请求一次。 */
+      sendOk(res, { place: toApiPlace(doc) }, 201);
+      return;
+    } catch (err) {
+      console.error('[TripMemo] POST /api/places 失败：', err);
       sendError(res, 500, 'SERVER_ERROR', (err && err.message) || err);
       return;
     }
