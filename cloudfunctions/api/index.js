@@ -1,26 +1,29 @@
 const http = require('http');
-const cloudbase = require('@cloudbase/node-sdk');
 
-/* ------------------------------------------------------------
-   ⭐ 数据库连接（Day 17 加）
-   ------------------------------------------------------------
-   ⚠️ 为什么是 `@cloudbase/node-sdk` 而不是别的：
-      它是 CloudBase 官方的服务端 SDK，**在云函数里用它不需要配任何密钥**
-      （官方原文：「在 CloudBase 云函数内使用服务端 SDK 时，开发者不需要填入腾讯云密钥」）——
-      平台会自动注入鉴权信息。
+/* ============================================================
+   ⭐⭐ 分层说明（Day 19 重构）
+   ============================================================
+   这个文件现在是**接口层** —— 只管：**接请求 → 调函数 → 返响应**。
+   ⚠️ 它**已经看不到数据库细节**了（没有 `db.collection(...)`、没有集合名）。
 
-   ⭐ 为什么云函数能读到权限为 PRIVATE 的集合（官方原文）：
-      「**服务端上，是以管理员身份调用云数据库的，拥有读取、写入、修改、删除任意数据的权限。
-        所以服务端又称管理端。**」
-      → 前端直连读不到别人的数据，但云函数能读全部 —— 这正是我们要的效果。
+   | 层 | 文件 | 只负责 |
+   |---|---|---|
+   | ⭐ **接口层** | `index.js`（本文件） | HTTP：路径/方法判断、参数校验、状态码、JSON 响应 |
+   | ⭐ **数据访问层** | `repositories/*.js` | 查什么、怎么查、把数据库文档转成接口形状 |
+   | ⭐ **连接层** | `cloudbase.js` | 连上数据库（环境 ID 只在那里出现） |
 
-   ⚠️ `env` 显式传而不是让 SDK 自己猜：
-      官方示例在"普通云函数"里可以 `init({})`（环境变量自动注入），
-      但我们是 **HTTP 云函数**，形态不同，**显式传更稳**。
-      ⚠️ 环境 ID 不是密钥（它是半公开的，前端代码里本来就会出现）。 */
-const ENV_ID = 'tripmemo-d3gd23bd14a396d1d';
-const app = cloudbase.init({ env: ENV_ID });
-const db = app.database();
+   ⭐ 「Day 19 要掌握」的答案：
+      **"查数据库"那段代码，从下面这些路由分支里，搬到了 `repositories/placesRepository.js`。**
+   ============================================================ */
+
+const placesRepo = require('./repositories/placesRepository.js');
+const settingsRepo = require('./repositories/settingsRepository.js');
+const usersRepo = require('./repositories/usersRepository.js');
+
+/* ⭐ 从数据层引过来用（保证"4 种类型"只有一处定义） */
+const VALID_PLACE_TYPES = placesRepo.VALID_PLACE_TYPES;
+/* ⭐ 转接口形状这一步属于数据层，但 POST 组装文档时要用一下 */
+const toApiPlace = placesRepo.toApiPlace;
 
 /* ------------------------------------------------------------
    ⚠️ 临时的"当前用户"（Day 17）
@@ -31,63 +34,6 @@ const db = app.database();
       （/api/places 只会返回这个用户的地点，不是全部）。 */
 const CURRENT_USER_ID = 'u_shy';
 
-/**
- * ⭐ 把数据库里的一条 place 文档，转成接口对外返回的形状
- *
- * ⚠️ 为什么要有这一步（不能直接把 doc 返回出去）：
- *   1. ⭐ **`_id` 要改成 `id`** —— 契约 §3.4 定死的：数据库内部叫 `_id`，
- *      接口层一律叫 `id`。⚠️ 漏了这一步，前端拿到的就是 `undefined`。
- *   2. ⭐ **时间字段要转成 ISO 字符串** —— 数据库里是 ISODate 对象，
- *      直接 JSON 序列化会变成一个前端看不懂的结构。
- *   3. ⚠️ **不直接透传** —— 数据库里可能有内部字段，显式列出来才不会漏出去。
- *
- * @param {object} doc 数据库文档
- * @returns {object} 契约 §1.2 定义的 place 形状
- */
-function toApiPlace(doc) {
-  return {
-    id: doc._id,
-    ownerId: doc.ownerId || '',
-    name: doc.name || '',
-    city: doc.city || '',
-    lng: doc.lng,
-    lat: doc.lat,
-    type: doc.type || '',
-    startMonth: doc.startMonth || '',
-    endMonth: doc.endMonth || '',
-    note: doc.note || '',
-    tags: Array.isArray(doc.tags) ? doc.tags : [],
-    images: Array.isArray(doc.images) ? doc.images : [],
-    createdAt: toIsoString(doc.createdAt),
-  };
-}
-
-/**
- * 把数据库的日期转成 ISO 字符串（前端认这个格式）
- * ⚠️ 兼容三种可能：Date 对象 / 字符串 / 空
- */
-function toIsoString(value) {
-  if (!value) return '';
-  if (value instanceof Date) return value.toISOString();
-  return String(value);
-}
-
-/**
- * ⭐ 合法的地点类型（4 个）—— 提到模块级，GET / POST / PUT 共用一份，别各写一遍
- */
-const VALID_PLACE_TYPES = ['long', 'short', 'travel', 'wishlist'];
-
-/**
- * ⭐ 生成一个新的地点 id（服务端生成，不接受客户端传）
- *
- * ⚠️ 格式必须和前端 `js/model.js` 的 `newId()` **完全一致** ——
- *    因为契约 §3.4 定了"接口层的 id 沿用前端那个格式"，
- *    这样将来导出/导入时旧的 id 不用转换。
- *    ⚠️ 是 **36 进制**（`Date.now().toString(36)`），不是十进制 —— 写错了格式就对不上。
- */
-function newPlaceId() {
-  return 'p_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 7);
-}
 
 /**
  * 统一的成功响应 —— 契约 §3.1 定的形状是 { ok: true, ...数据 }
@@ -248,19 +194,19 @@ const server = http.createServer(async (req, res) => {
      ⭐ 验证通过后，这个接口可以留着（当健康检查用），也可以删。 */
   if (path === '/api/db-check' && req.method === 'GET') {
     try {
-      const placesRes = await db.collection('places').get();
-      const usersRes = await db.collection('users').get();
-      const settingsRes = await db.collection('settings').get();
-      const list = placesRes.data || [];
+      /* ⭐ 三个集合各数一次 —— 具体怎么数由 repository 负责，这里只拿结果 */
+      const placesStat = await placesRepo.countAll();
+      const usersCount = await usersRepo.countAll();
+      const settingsCount = await settingsRepo.countAll();
 
       res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
       res.end(JSON.stringify({
         ok: true,
         data: {
-          placesCount: list.length,
-          usersCount: (usersRes.data || []).length,
-          settingsCount: (settingsRes.data || []).length,
-          firstPlaceName: list[0] ? list[0].name : null,
+          placesCount: placesStat.count,
+          usersCount: usersCount,
+          settingsCount: settingsCount,
+          firstPlaceName: placesStat.first ? placesStat.first.name : null,
         },
       }));
       return;
@@ -290,8 +236,6 @@ const server = http.createServer(async (req, res) => {
      ⚠️ 只返回 CURRENT_USER_ID 自己的地点（"按用户筛选"） */
   if (path === '/api/places' && req.method === 'GET') {
     try {
-      const where = { ownerId: CURRENT_USER_ID };
-
       /* ⭐ 可选的 type 筛选（契约 §四.1 定义的行为）：
          · 不传 / 传空串 → 返回全部
          · 传了 4 个合法值之外 → ⚠️ 返回 400，**不是**静默返回空数组
@@ -303,7 +247,6 @@ const server = http.createServer(async (req, res) => {
             'type 只能是 ' + VALID_PLACE_TYPES.join(' / ') + '，收到的是：' + typeParam);
           return;
         }
-        where.type = typeParam;
       }
 
       /* ⭐ 可选的 limit（Day 17 余力加练）：限制返回条数。
@@ -326,12 +269,12 @@ const server = http.createServer(async (req, res) => {
         }
       }
 
-      const query = db.collection('places').where(where);
-      const result = limit > 0
-        ? await query.limit(limit).get()
-        : await query.get();
-
-      const places = (result.data || []).map(toApiPlace);
+      /* ⭐ 校验通过后，把条件交给数据层 —— 这里不再出现 db.collection */
+      const places = await placesRepo.findPlaces({
+        ownerId: CURRENT_USER_ID,
+        type: typeParam || '',
+        limit: limit,
+      });
 
       sendOk(res, { places: places });
       return;
@@ -361,21 +304,17 @@ const server = http.createServer(async (req, res) => {
         return;
       }
 
-      /* ⚠️ `_id` 是数据库里的主键名（这里查库要用它），
-         而对外返回的字段叫 `id` —— 由 toApiPlace() 负责映射。 */
-      const result = await db.collection('places')
-        .where({ _id: id, ownerId: CURRENT_USER_ID })
-        .get();
-      const doc = (result.data || [])[0];
+      /* ⭐ 交给数据层查 —— `_id` 和 `id` 的映射也在那边做了 */
+      const place = await placesRepo.findPlaceById(id, CURRENT_USER_ID);
 
-      if (!doc) {
+      if (!place) {
         /* ⚠️ "不存在"和"存在但不属于你"**都返回 404** —— 契约 §四.2 特意定的：
            如果后者返回 403，就等于告诉别人"这条数据存在，只是不是你的"。 */
         sendError(res, 404, 'NOT_FOUND', '找不到这个地点，或它不属于当前用户');
         return;
       }
 
-      sendOk(res, { place: toApiPlace(doc) });
+      sendOk(res, { place: place });
       return;
     } catch (err) {
       console.error('[TripMemo] GET /api/place 失败：', err);
@@ -416,12 +355,9 @@ const server = http.createServer(async (req, res) => {
             你要记的是"在那儿待了多久"，那就应该**把一条记录的时间范围拉长**，
             而不是插两条；而且补记过去时最容易重复提交，这一层正好挡住。
          ⭐ 注意只查**同一个 ownerId** —— 别人去过同一个坐标跟我没关系。 */
-      const dup = await db.collection('places')
-        .where({ ownerId: CURRENT_USER_ID, lng: data.lng, lat: data.lat })
-        .limit(1)
-        .get();
-      if ((dup.data || []).length > 0) {
-        const existed = dup.data[0];
+      const existed = await placesRepo.findExistingAtCoordinate(
+        CURRENT_USER_ID, data.lng, data.lat);
+      if (existed) {
         sendError(res, 409, 'DUPLICATE_PLACE',
           '这个坐标上你已经有一个地点了：「' + (existed.name || '') + '」。'
           + '如果是要补记同一次停留，请编辑那一条的时间范围，不要新增。');
@@ -431,12 +367,13 @@ const server = http.createServer(async (req, res) => {
       /* ④ 拼出完整文档：id 和 createdAt 都由服务端给 */
       const now = new Date();
       const doc = Object.assign({}, data, {
-        _id: newPlaceId(),
+        _id: placesRepo.newPlaceId(),
         ownerId: CURRENT_USER_ID,
         createdAt: now,
       });
 
-      await db.collection('places').add(doc);
+      /* ⭐ 交给数据层插 —— 这里不出现 add() */
+      await placesRepo.insertPlace(doc);
 
       /* ⭐ 余力加练：服务端日志 ——
          以后怀疑"到底写进去没"，去云函数的「日志」里搜 [TripMemo] 就能看到。 */
@@ -464,15 +401,9 @@ const server = http.createServer(async (req, res) => {
         前端要能处理这种情况（地图上就没有连线起点）。 */
   if (path === '/api/meta' && req.method === 'GET') {
     try {
-      const result = await db.collection('settings')
-        .where({ ownerId: CURRENT_USER_ID })
-        .get();
-      const doc = (result.data || [])[0] || null;
-
-      sendOk(res, {
-        mainCity: doc && doc.mainCity ? doc.mainCity : null,
-        sampleLoaded: doc ? !!doc.sampleLoaded : false,
-      });
+      /* ⭐ 直接拿"接口要的两个字段"，拼装逻辑在数据层 */
+      const settings = await settingsRepo.getSettings(CURRENT_USER_ID);
+      sendOk(res, settings);
       return;
     } catch (err) {
       console.error('[TripMemo] GET /api/meta 失败：', err);
