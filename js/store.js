@@ -5,8 +5,9 @@
    为什么单独一个文件：以后换成云数据库时，只需要改这一个文件，
                       界面代码一行都不用动（见 TECH_DESIGN 2.3）。
 
-   存储位置：浏览器 localStorage（PRD 第八节）
-   Day 7 · 步骤 2b
+   ⭐ 存储位置（Day 20 起）：**云数据库**，通过公网接口读写。
+      ⚠️ 之前是浏览器 localStorage —— 换设备就没了、别人也看不到。
+   Day 7 · 步骤 2b ｜ Day 20 接到公网接口
    ============================================================ */
 
 (function (global) {
@@ -14,9 +15,158 @@
 
   var Model = global.TripMemoModel;
 
-  /* localStorage 的键名 —— 带版本号，以后结构变了可以平滑升级 */
-  var KEY_PLACES = 'tripmemo.places.v1';
-  var KEY_SETTINGS = 'tripmemo.settings.v1';   /* 全局设置（目前只有主城市） */
+  /* ------------------------------------------------------------
+     ⭐⭐ 接口地址（Day 20）
+     ------------------------------------------------------------
+     ⚠️ 为什么本地和公网要用不同地址：
+        · 公网页面（静态托管域名 .tcloudbaseapp.com）**必须直连云函数地址** ——
+          因为静态托管的域名下面**没有 /api** 这个东西。
+        · 本地调试时**不能直连** —— ⚠️ CloudBase 免费版不让把 localhost 加进
+          跨域白名单（要付费），所以本地直连会被网关拦掉（CORS 错误）。
+          ⭐ 解决办法：本地起一个代理（仓库根目录的 dev-proxy.py），
+             它同时提供静态文件和转发 /api —— 于是页面和接口**同源**，不触发跨域。
+     ------------------------------------------------------------ */
+  var API_BASE = (function () {
+    var h = global.location.hostname;
+    if (h === 'localhost' || h === '127.0.0.1' || h === '') {
+      return '';   /* ⭐ 本地：空串 = 相对路径 = 走本地代理（同源） */
+    }
+    /* ⭐ 公网：直连云函数 */
+    return 'https://tripmemo-d3gd23bd14a396d1d-148733444.ap-shanghai.app.tcloudbase.com';
+  }());
+
+  /* ------------------------------------------------------------
+     ⭐⭐ 身份认证（Day 20）
+     ------------------------------------------------------------
+     ⚠️ 为什么必须加这个：
+        以前云函数里写死了 `CURRENT_USER_ID = 'u_shy'` ——
+        所以**谁打开都看到同一份数据**（都是 shy 的）。
+        ⭐ 现在改成匿名登录：每个浏览器自动获得一个**自己的**身份。
+
+     ⚠️ 为什么用「匿名登录」而不是账号密码：
+        不用注册、不用填东西，打开就有身份。
+        ⭐ 代价：换浏览器/清缓存会变成"新用户"（数据看不到了）。
+        以后要"换设备也能看到自己的"，再升级成真正的账号登录。
+
+     ⭐ 登录后的操作顺序（每一步都不能省）：
+        ① init SDK
+        ② 看有没有现存会话（有 = 之前登录过，不用再登）
+        ③ 没有 → signInAnonymously()
+        ④ 从会话里取出 access_token → ⭐ 之后每个请求都带上它
+     ------------------------------------------------------------ */
+  var CLOUD_ENV = 'tripmemo-d3gd23bd14a396d1d';
+  var cbaAuth = null;
+  var accessToken = null;
+  var authError = null;
+
+  /**
+   * ⭐ 建立身份（页面启动时调用一次）
+   * @returns {Promise<boolean>} 成功 true
+   * ⚠️ 失败**不阻断**页面 —— 只是这个请求不带身份，云函数会用它的兜底用户。
+   */
+  function initAuth() {
+    authError = null;
+
+    if (typeof global.cloudbase === 'undefined') {
+      authError = 'CloudBase SDK 没加载（检查 index.html 里的 script 标签顺序）';
+      return Promise.resolve(false);
+    }
+
+    var app;
+    try {
+      app = global.cloudbase.init({ env: CLOUD_ENV, region: 'ap-shanghai' });
+
+      /* ⚠️⚠️ 这里有个踩过的坑（Day 20）：
+         取 auth 的方式在**新旧大版本之间不一样** ——
+           · v3（最新）：`app.auth` 是**属性** → 直接取
+           · v2（旧）：  `app.auth` 是**方法** → 要调用
+         ⭐ 之前固定用了旧版 2.17.3，结果报
+            "cbaAuth.getSession is not a function" —— 页面直接白屏。
+         ⭐ 所以：**两种都兼容**，而且**版本不对时明确报错**，不要静默失败。 */
+      cbaAuth = (typeof app.auth === 'function') ? app.auth() : app.auth;
+
+      if (!cbaAuth || typeof cbaAuth.signInAnonymously !== 'function') {
+        authError = 'SDK 的认证接口和预期不一样（版本不匹配，signInAnonymously 不存在）';
+        console.error('[TripMemo] ' + authError, app);
+        return Promise.resolve(false);
+      }
+      if (typeof cbaAuth.getSession !== 'function') {
+        authError = '当前 SDK 版本没有 getSession（需要 v3）—— index.html 里应引用 latest';
+        console.error('[TripMemo] ' + authError, cbaAuth);
+        return Promise.resolve(false);
+      }
+    } catch (err) {
+      authError = '初始化认证失败：' + ((err && err.message) || err);
+      console.error('[TripMemo] ' + authError, err);
+      return Promise.resolve(false);
+    }
+
+    return cbaAuth.getSession().then(function (r) {
+      /* ⭐ 已有会话 = 之前登录过，直接用，不要重复登录 */
+      if (r && r.data && r.data.session) return null;
+      return cbaAuth.signInAnonymously();
+    }).then(function () {
+      return cbaAuth.getSession();
+    }).then(function (r) {
+      var s = r && r.data && r.data.session;
+      if (!s || !s.access_token) throw new Error('登录后没拿到 access_token');
+      accessToken = s.access_token;
+      console.log('[TripMemo] 已有身份，token 长度 ' + accessToken.length);
+      return true;
+    }).catch(function (err) {
+      authError = '登录失败：' + ((err && err.message) || err);
+      console.error('[TripMemo] 认证失败：', err);
+      return false;
+    });
+  }
+
+  /**
+   * ⭐ 统一的接口请求封装（Day 20）
+   *
+   * ⚠️ 为什么必须统一走这里，而不是各处写 fetch：
+   *    接口的应答有好几种情况（成功 / 400 参数错 / 409 重复 / 500 崩了），
+   *    每处的处理方式必须一致 —— 散着写一定会漏掉某一种。
+   *
+   * @param {string} method 'GET' | 'POST'
+   * @param {string} path   如 '/api/places'
+   * @param {object} [body] 有 body 就发 JSON
+   * @returns {Promise<{status:number, json:object|null}>}
+   *          ⚠️ **即使 HTTP 状态是 400/409 也 resolve** —— 因为那是接口的正常应答，
+   *             不是"网络坏了"。真连不上才 reject。
+   */
+  function requestJson(method, path, body) {
+    var opts = { method: method, headers: {} };
+    /* ⭐ 带上身份 —— 云函数靠它判断"这是谁"，而不是靠写死的用户 */
+    if (accessToken) {
+      opts.headers['Authorization'] = 'Bearer ' + accessToken;
+    }
+    if (body !== undefined) {
+      opts.headers['Content-Type'] = 'application/json';
+      opts.body = JSON.stringify(body);
+    }
+    return global.fetch(API_BASE + path, opts).then(function (res) {
+      return res.json().then(
+        function (json) { return { status: res.status, json: json }; },
+        function () { return { status: res.status, json: null }; }   /* 应答不是 JSON */
+      );
+    });
+  }
+
+  /**
+   * ⭐ 从接口应答里取出"错误提示"（给用户看的中文）
+   * ⚠️ 契约 §3.1 规定的错误形状是 { ok:false, error:{ code, message } }
+   */
+  function errorMessageOf(result) {
+    var j = result && result.json;
+    if (j && j.error && j.error.message) return j.error.message;
+    if (j && j.error && typeof j.error === 'string') return j.error;
+    return '接口返回异常（HTTP ' + ((result && result.status) || '?') + '）';
+  }
+
+  /* ⚠️ Day 20 起：地点和设置都存云数据库了，不再用 localStorage ——
+     所以原来那两个键名（KEY_PLACES / KEY_SETTINGS）已经删掉。
+     ⭐ 只有"装示例数据前的本地备份"还在用 localStorage（见下面的 KEY_BACKUP），
+        因为那是"本地操作的保险"，本来就不该上云。 */
 
   /* 载入示例数据前，把用户原有数据备份到这个键（Day 8）
      只在"还没有备份"时才写 —— 防止手滑点两次把备份覆盖成示例数据 */
@@ -25,6 +175,12 @@
   /* 内存中的缓存：避免每次都读 localStorage */
   var placesCache = null;
   var settingsCache = null;
+
+  /* ⭐ 初始化（第一次从云端拉数据）是否失败（Day 20）
+     ⚠️ 为什么单独一个变量、不复用 lastError：
+        lastError 记的是"历史上最近一次错"，可能是很久以前保存失败留下的。
+        ⭐ 而"这次打开页面加载失败"必须由这次加载自己报告 —— 否则会误报。 */
+  var initError = null;
 
   /* 最近一次数据层错误（Day 8 新增）
      为什么要它：原来出错只写 console.error，用户看到的是一片空白，
@@ -69,34 +225,25 @@
    * @returns {{ok: boolean, places: Array, reason: string}}
    */
   function readPlacesResult() {
+    /* ⭐ 如果"第一次从云端拉数据"就失败了，如实报错 ——
+       ⚠️ 不能让上层看到空数组（那会被显示成「还没有记录」，把用户往错的方向引） */
+    if (initError) {
+      return { ok: false, places: [], reason: initError };
+    }
+
     if (placesCache !== null) {
       return { ok: true, places: placesCache, reason: '' };   /* 缓存命中 → 一定成功 */
     }
 
-    var raw = null;
-    try {
-      raw = global.localStorage.getItem(KEY_PLACES);
-    } catch (err) {
-      /* 浏览器禁用了 localStorage（隐私模式等） */
-      reportError('读取地点', err);
-      placesCache = [];
-      return { ok: false, places: [], reason: '读不到浏览器里的数据（可能被隐私模式挡住了）' };
-    }
-
-    if (!raw) {
-      placesCache = [];
-      return { ok: true, places: [], reason: '' };   /* ⭐ "没有数据" ≠ "失败" */
-    }
-
-    try {
-      var parsed = JSON.parse(raw);
-      placesCache = Array.isArray(parsed) ? parsed : [];
-      return { ok: true, places: placesCache, reason: '' };
-    } catch (err) {
-      reportError('解析地点数据', err);
-      placesCache = [];
-      return { ok: false, places: [], reason: '数据格式坏了，读不出来' };
-    }
+    /* ⭐ Day 20 起：数据源只有云端了。
+       ⚠️ 走到了这里说明**页面还没调用 init()** —— 这是代码 bug，不是"没有数据"，
+          所以如实报错（而不是去读 localStorage 兜底）——
+          ⭐ 否则会出现"看起来正常、其实读的是本地旧数据"的错觉。 */
+    return {
+      ok: false,
+      places: [],
+      reason: '数据还没加载（页面启动时应当先调用 TripMemoStore.init()）'
+    };
   }
 
   /** 取全部地点（薄封装 —— 只想拿数据、不关心失败原因时用它） */
@@ -104,13 +251,27 @@
     return readPlacesResult().places;
   }
 
-  /** 把内存缓存写回 localStorage，并广播变更事件 */
-  function persist(action, place) {
-    try {
-      global.localStorage.setItem(KEY_PLACES, JSON.stringify(placesCache));
-    } catch (err) {
-      reportError('保存地点', err);
-    }
+  /**
+   * ⭐ 广播变更事件，并把这次改动**同步到云数据库**（Day 20）
+   *
+   * ⚠️ 为什么是"先广播、后台同步"（乐观更新）：
+   *    原来是同步写 localStorage —— 写完就算成功。现在要发网络请求，
+   *    但**不能把界面卡住等服务器**（那点一下要等好几百毫秒）。
+   *    ⭐ 所以：**先在本地当它成功了**（界面立刻有反馈），
+   *       同时后台发请求；⚠️ **万一服务器拒绝，就回滚本地数据 + 报错**。
+   *
+   * @param {string} action 'add' | 'update' | 'remove'
+   * @param {object} place  刚变动的那条
+   * @param {object} [before] ⚠️ 仅 update 需要：改动**之前**的那份（回滚用）
+   */
+  function persist(action, place, before) {
+    broadcastChange(action, place);
+
+    syncToCloud(action, place, before);
+  }
+
+  /** 只广播，不发请求（init 时用） */
+  function broadcastChange(action, place) {
     /* 通知界面刷新 —— 各视图监听到后自己重画。
        ⚠️ 除了"条数"，还必须告诉外界**发生了什么**（新增/编辑/删除）和**是哪一条**。
           只播报 count 的话，监听者只知道"数据变了"，给不出准确反馈 ——
@@ -129,6 +290,115 @@
   /* ------------------------------------------------------------
      二、增删改查
      ------------------------------------------------------------ */
+
+  /**
+   * ⭐ 把一次本地改动同步到云数据库（Day 20）
+   * ⚠️ 失败时**回滚本地数据** —— 否则界面会显示"实际上没存上"的东西（幽灵数据）。
+   */
+  function syncToCloud(action, place, before) {
+    var promise;
+
+    if (action === 'add') {
+      promise = requestJson('POST', '/api/places', place).then(function (r) {
+        /* ⚠️ 409 = 云端已经有同坐标了；400 = 参数不合法。
+           两种情况都说明"没存上"，必须回滚。 */
+        if (r.json && r.json.ok === true) return null;
+        return new Error(errorMessageOf(r));
+      });
+    } else if (action === 'remove') {
+      /* ⚠️ 删除接口（DELETE）还没做（清单里排在第 4 周）——
+         所以这一步**只改本地**，云端仍然留着那条。
+         ⭐ 这是已知缺口，记在 api-contract.md 的待办里。 */
+      return;
+    } else if (action === 'update') {
+      /* ⚠️ 修改接口（PUT）也还没做 —— 同上，只改本地。 */
+      return;
+    } else {
+      return;
+    }
+
+    promise.catch(function (err) {
+      rollback(action, place, before);
+      reportError('同步到云端', err);
+    });
+  }
+
+  /** ⭐ 把一次失败的改动撤销掉（把本地数据恢复成改动前的样子） */
+  function rollback(action, place, before) {
+    var list = listPlaces();
+    if (action === 'add') {
+      for (var i = 0; i < list.length; i++) {
+        if (list[i].id === place.id) { list.splice(i, 1); break; }
+      }
+      broadcastChange('remove', place);
+    } else if (action === 'remove') {
+      list.push(place);
+      broadcastChange('add', place);
+    } else if (action === 'update' && before) {
+      for (var j = 0; j < list.length; j++) {
+        if (list[j].id === place.id) { list[j] = before; break; }
+      }
+      broadcastChange('update', before);
+    }
+  }
+
+  /**
+   * ⭐ 第一次从云端拉数据（Day 20）
+   * ⚠️ 页面启动时必须先 await 它，再渲染 —— 否则列表里什么都还没有。
+   * @returns {Promise<boolean>} 成功 true
+   */
+  function init() {
+    initError = null;
+
+    /* ⭐ 第一步永远是"先有身份" —— 否则请求会被当成匿名/别人 */
+    return initAuth().then(function () {
+      return requestJson('GET', '/api/places');
+    }).then(function (r) {
+      if (!r.json || r.json.ok !== true || !Array.isArray(r.json.places)) {
+        throw new Error(errorMessageOf(r));
+      }
+      placesCache = r.json.places;
+
+      return requestJson('GET', '/api/meta');
+    }).then(function (r) {
+      if (r.json && r.json.ok === true) {
+        settingsCache = {
+          mainCity: r.json.mainCity || null,
+          sampleLoaded: !!r.json.sampleLoaded
+        };
+      } else {
+        /* ⚠️ 设置拉不到不算致命 —— 地点数据才是主角，先让它显示出来 */
+        settingsCache = { mainCity: null, sampleLoaded: false };
+        console.warn('[TripMemo] 读设置失败，先按默认值继续：', r);
+      }
+
+      broadcastChange('init', null);
+      document.dispatchEvent(new CustomEvent('settings:change', {
+        detail: { mainCity: getMainCity() }
+      }));
+
+      /* ⭐ 临时自检（Day 20 实测用）：把"云函数看到的身份"打到 Console。
+         ⚠️ 为什么要它：token 存在这个函数的闭包里，在 Console 里手动取不到 ——
+            所以让页面自己问一次、自己打出来。
+         ⭐ 确认身份解析通了之后，这两行可以删掉。 */
+      requestJson('GET', '/api/whoami').then(function (w) {
+        /* ⭐ 存到全局，方便在 Console 里随时查看（输入 __tripmemoWhoami 回车） */
+        global.__tripmemoWhoami = w.json;
+        /* ⚠️ 用 JSON.stringify 打成**一行文字** ——
+           直接打印对象的话，Console 里只显示一个可折叠的 `▶ Object`，
+           还得手点才看得见内容，很不方便。 */
+        console.log('[TripMemo] 身份自检 → ' + JSON.stringify(w.json));
+      });
+
+      return true;
+    }).catch(function (err) {
+      /* ⭐ 记成"加载失败"，让界面显示错误态（而不是伪装成"还没有记录"） */
+      initError = '读不到云端数据：' + ((err && err.message) ? err.message : String(err));
+      placesCache = [];
+      reportError('从云端加载', err);
+      return false;
+    });
+  }
 
   /** 取单条 */
   function getPlace(id) {
@@ -169,9 +439,10 @@
     var list = listPlaces();
     for (var i = 0; i < list.length; i++) {
       if (list[i].id === id) {
-          var merged = Model.createPlace(Object.assign({}, list[i], input, { id: id }));
+          var before = list[i];   /* ⭐ 留一份改动前的，万一云端拒绝要回滚 */
+          var merged = Model.createPlace(Object.assign({}, before, input, { id: id }));
           list[i] = merged;
-          persist('update', merged);
+          persist('update', merged, before);
         return { ok: true, place: merged };
       }
     }
@@ -215,32 +486,17 @@
     if (settingsCache !== null) {
       return settingsCache;
     }
-    var raw = null;
-    try {
-      raw = global.localStorage.getItem(KEY_SETTINGS);
-    } catch (err) {
-      reportError('读取设置', err);
-      settingsCache = {};
-      return settingsCache;
-    }
-    try {
-      settingsCache = raw ? JSON.parse(raw) : {};
-    } catch (err) {
-      reportError('解析设置数据', err);
-      settingsCache = {};
-    }
-    if (!settingsCache || typeof settingsCache !== 'object') {
-      settingsCache = {};
-    }
+    /* ⭐ Day 20 起：设置也来自云端（init() 里拉的 /api/meta）。
+       ⚠️ 走到这里 = 还没 init()，或 init 时没拉到设置 —— 返回空设置（不算致命错误）。 */
+    settingsCache = {};
     return settingsCache;
   }
 
   function persistSettings() {
-    try {
-      global.localStorage.setItem(KEY_SETTINGS, JSON.stringify(settingsCache));
-    } catch (err) {
-      reportError('保存设置', err);
-    }
+    /* ⚠️ 设置目前**只存在本地内存里** ——
+       因为写设置的接口（PUT /api/meta）还没实现（契约里登记了，代码没写）。
+       ⭐ 后果：主城市**换设备会丢**。已记在 api-contract.md 的待办里。
+       ⚠️ 等 PUT 做了之后，这里补一个 requestJson('PUT', '/api/meta', ...) 即可。 */
     document.dispatchEvent(new CustomEvent('settings:change', {
       detail: { mainCity: getMainCity() }
     }));
@@ -380,6 +636,11 @@
     placesCache = (places || []).map(function (item) {
       return Model.createPlace(item);
     });
+    /* ⚠️⚠️ 已知缺口（Day 20）：这里**只改本地，不会同步到云端**。
+       原因：批量写入的接口（POST /api/places/bulk）还没做。
+       ⭐ 后果：「导入 JSON」和「装示例数据」这两个功能**页面上看起来有效，
+          但刷新一下就没了**（因为刷新会从云端重新拉）。
+       ⚠️ 等批量接口做了之后，这里补一次 requestJson('POST', '/api/places/bulk', ...)。 */
     persist();
   }
 
@@ -478,6 +739,8 @@
      ------------------------------------------------------------ */
   global.TripMemoStore = {
     listPlaces: listPlaces,
+    init: init,                           /* ⭐ Day 20：页面启动时先从云端拉一次数据 */
+    getAuthError: function () { return authError; },   /* ⭐ 登录失败时给界面显示用 */
     readPlacesResult: readPlacesResult,   /* Day 13：能如实报告"这次读失败"，给视图的四种状态用 */
     getPlace: getPlace,
     addPlace: addPlace,

@@ -16,23 +16,86 @@ const http = require('http');
       **"查数据库"那段代码，从下面这些路由分支里，搬到了 `repositories/placesRepository.js`。**
    ============================================================ */
 
+const cloudbaseModule = require('./cloudbase.js');
 const placesRepo = require('./repositories/placesRepository.js');
 const settingsRepo = require('./repositories/settingsRepository.js');
 const usersRepo = require('./repositories/usersRepository.js');
 
 /* ⭐ 从数据层引过来用（保证"4 种类型"只有一处定义） */
+/* ⭐ 环境 ID —— ⚠️ 它住在 cloudbase.js 里（Day 19 重构时挪过去的），
+   这里必须**显式引过来**。⭐ Day 20 就因为这个漏引，导致云函数一跑就
+   `ReferenceError: ENV_ID is not defined` → 进程退出 → 网关返回 439。 */
+const ENV_ID = cloudbaseModule.ENV_ID;
+
 const VALID_PLACE_TYPES = placesRepo.VALID_PLACE_TYPES;
 /* ⭐ 转接口形状这一步属于数据层，但 POST 组装文档时要用一下 */
 const toApiPlace = placesRepo.toApiPlace;
 
 /* ------------------------------------------------------------
-   ⚠️ 临时的"当前用户"（Day 17）
+   ⭐⭐ 身份解析（Day 20 实装）
    ------------------------------------------------------------
-   ⚠️ 现在还没有登录系统（Day 20 才做），但接口必须有"这是谁的数据"这个概念 ——
-      ⭐ 所以先写死一个种子数据里存在的用户，**Day 20 接认证后这里的值改成从登录态取**。
-   ⭐ 这么做还有个好处：**能顺便验证"按用户筛选"这个逻辑是通的**
-      （/api/places 只会返回这个用户的地点，不是全部）。 */
-const CURRENT_USER_ID = 'u_shy';
+   ⚠️ 之前这里是写死的 `CURRENT_USER_ID = 'u_shy'` ——
+      所以**谁打开都看到同一份数据**。
+   ⭐ 现在改成：**每个请求先从请求头里解出"你是谁"**。
+
+   ⭐ 流程：
+      ① 前端匿名登录 → 拿到 access_token
+      ② 每个请求带 `Authorization: Bearer {token}`
+      ③ ⭐ 云函数把 token 转给平台问"这人是谁"（`/auth/v1/user/me`）
+      ④ 拿到 uid → 拿它当 ownerId 做筛选
+
+   ⚠️ 兜底：**没带 token / 验证失败** 时用 FALLBACK_USER_ID ——
+      这样"没登录也能看到数据"，不至于页面直接空白。
+      ⭐ 但注意这**只是过渡措施**：理论上应该改成直接返回 401（记在待办里）。
+   ------------------------------------------------------------ */
+const FALLBACK_USER_ID = 'u_shy';
+
+/**
+ * ⭐ 从请求头里取出 access token（去掉 `Bearer ` 前缀）
+ * ⚠️ 官方原话："通过获取请求 Header 中 Authorization 字段获取到请求 Token，
+ *    注意去除 Bearer 字段"
+ */
+function getBearerToken(req) {
+  var h = req.headers['authorization'] || req.headers['Authorization'];
+  if (!h) return null;
+  var m = /^Bearer\s+(.+)$/i.exec(String(h).trim());
+  return m ? m[1] : null;
+}
+
+/**
+ * ⭐ 拿 token 去问平台"这是谁"
+ *
+ * ⭐ 为什么把验证交给平台、而不是自己解 JWT：
+ *    自己解 = 不验签名 = ⚠️ **前端随便编一个就能冒充别人**。
+ *    官方有现成的接口，验证由平台做，伪造的 token 会被拒。
+ *
+ * @returns {Promise<{ok:boolean, uid?:string, reason?:string, raw?:object}>}
+ */
+async function resolveUserId(req) {
+  const token = getBearerToken(req);
+  if (!token) return { ok: false, reason: 'no_token' };
+
+  const url = 'https://' + ENV_ID + '.api.tcloudbasegateway.com/auth/v1/user/me';
+  try {
+    const res = await fetch(url, { headers: { Authorization: 'Bearer ' + token } });
+    const json = await res.json().catch(function () { return null; });
+
+    if (!res.ok) {
+      return { ok: false, reason: 'http_' + res.status, raw: json };
+    }
+
+    /* ⚠️ 用户 id 到底在哪个字段里（`user_id` / `sub` / 嵌套在 `data` 里）——
+       官方不同版本的文档给的示例不完全一致，所以这里**按顺序都试一遍**。
+       ⭐ 到底命中哪个，用下面的 /api/whoami 实测一次就知道了。 */
+    const d = (json && json.data) ? json.data : json;
+    const uid = (d && (d.user_id || d.sub || d.uid)) || null;
+
+    if (!uid) return { ok: false, reason: 'no_uid_field', raw: json };
+    return { ok: true, uid: String(uid), raw: json };
+  } catch (err) {
+    return { ok: false, reason: 'fetch_failed: ' + ((err && err.message) || err) };
+  }
+}
 
 
 /**
@@ -163,6 +226,33 @@ const server = http.createServer(async (req, res) => {
   const url = new URL(req.url || '/', 'http://127.0.0.1');
   const path = url.pathname;
 
+  /* ⭐⭐ 每个请求先解出"这是谁"（Day 20）
+     ⚠️ 必须先于所有路由 —— 后面每个查询都要用它做筛选。
+     ⭐ 解析失败不报错、用兜底用户，保证"至少能看到东西"（过渡措施，见上面的说明）。 */
+  const who = await resolveUserId(req);
+  if (!who.ok && who.reason !== 'no_token') {
+    console.warn('[TripMemo] 身份解析失败（用兜底用户）：' + who.reason);
+  }
+  const userId = who.ok ? who.uid : FALLBACK_USER_ID;
+
+  /* ⭐ 临时接口：把"云函数看到的身份"原样吐出来（Day 20 实测用）
+     ⚠️ 它的唯一作用是**看清除 token 验证后到底返回了什么字段** ——
+        确认之后就可以删掉它（或留着当排查工具）。
+     ⚠️ 它不在契约里，不是正式接口。 */
+  if (path === '/api/whoami' && req.method === 'GET') {
+    sendOk(res, {
+      hasToken: !!getBearerToken(req),
+      tokenLength: (getBearerToken(req) || '').length,
+      resolved: who.ok,
+      userId: userId,
+      usedFallback: !who.ok,
+      reason: who.reason || null,
+      freshPlaceCount: 0,
+      upstreamRaw: who.raw || null,
+    });
+    return;
+  }
+
   /* ⭐ GET /api/health —— 健康检查
      职责只有一个：证明「云函数 + 公网访问」这条链路是通的。
      ⚠️ 不连数据库、不写业务逻辑。
@@ -233,7 +323,7 @@ const server = http.createServer(async (req, res) => {
         因为前端的 store.readPlacesResult() 返回的就是 {ok, places}，
         ⭐ 沿用这个形状，Day 18 改前端时改动最小。
 
-     ⚠️ 只返回 CURRENT_USER_ID 自己的地点（"按用户筛选"） */
+     ⚠️ 只返回 userId 自己的地点（"按用户筛选"） */
   if (path === '/api/places' && req.method === 'GET') {
     try {
       /* ⭐ 可选的 type 筛选（契约 §四.1 定义的行为）：
@@ -271,7 +361,7 @@ const server = http.createServer(async (req, res) => {
 
       /* ⭐ 校验通过后，把条件交给数据层 —— 这里不再出现 db.collection */
       const places = await placesRepo.findPlaces({
-        ownerId: CURRENT_USER_ID,
+        ownerId: userId,
         type: typeParam || '',
         limit: limit,
       });
@@ -305,7 +395,7 @@ const server = http.createServer(async (req, res) => {
       }
 
       /* ⭐ 交给数据层查 —— `_id` 和 `id` 的映射也在那边做了 */
-      const place = await placesRepo.findPlaceById(id, CURRENT_USER_ID);
+      const place = await placesRepo.findPlaceById(id, userId);
 
       if (!place) {
         /* ⚠️ "不存在"和"存在但不属于你"**都返回 404** —— 契约 §四.2 特意定的：
@@ -356,7 +446,7 @@ const server = http.createServer(async (req, res) => {
             而不是插两条；而且补记过去时最容易重复提交，这一层正好挡住。
          ⭐ 注意只查**同一个 ownerId** —— 别人去过同一个坐标跟我没关系。 */
       const existed = await placesRepo.findExistingAtCoordinate(
-        CURRENT_USER_ID, data.lng, data.lat);
+        userId, data.lng, data.lat);
       if (existed) {
         sendError(res, 409, 'DUPLICATE_PLACE',
           '这个坐标上你已经有一个地点了：「' + (existed.name || '') + '」。'
@@ -368,7 +458,7 @@ const server = http.createServer(async (req, res) => {
       const now = new Date();
       const doc = Object.assign({}, data, {
         _id: placesRepo.newPlaceId(),
-        ownerId: CURRENT_USER_ID,
+        ownerId: userId,
         createdAt: now,
       });
 
@@ -402,7 +492,7 @@ const server = http.createServer(async (req, res) => {
   if (path === '/api/meta' && req.method === 'GET') {
     try {
       /* ⭐ 直接拿"接口要的两个字段"，拼装逻辑在数据层 */
-      const settings = await settingsRepo.getSettings(CURRENT_USER_ID);
+      const settings = await settingsRepo.getSettings(userId);
       sendOk(res, settings);
       return;
     } catch (err) {

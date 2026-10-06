@@ -447,8 +447,31 @@
     }
   }
 
-  /** 页面初始化 */
+  /**
+   * ⭐ 页面初始化（Day 20 改）
+   *
+   * ⚠️ 为什么要在最前面等一次数据：
+   *    Day 20 起数据来自云端接口，是**异步**的。
+   *    如果不等，各个视图会先画一次"空列表"，等数据到了再重画一遍 ——
+   *    ⭐ 用户会看到画面**闪烁**一下。
+   *    ⭐ 所以顺序改成：**先把数据拉下来 → 再初始化界面**，
+   *       这样视图第一次画出来就是真实数据。
+   *
+   * ⚠️ 注意**成功和失败都要继续初始化界面**：
+   *    失败了也要把界面搭起来，好让「读不到数据」这个错误**显示给用户看** ——
+   *    否则页面会是一片空白，用户更不知道出了什么事。
+   */
   function init() {
+    var Store = window.TripMemoStore;
+    if (Store && Store.init) {
+      Store.init().then(initViews, initViews);
+    } else {
+      initViews();
+    }
+  }
+
+  /** 真正初始化界面的部分（Day 20 从 init 里拆出来，内容没变） */
+  function initViews() {
     // 导航按钮 → 切换视图
     document.querySelectorAll('.nav-btn[data-view]').forEach(function (btn) {
       btn.addEventListener('click', function () {

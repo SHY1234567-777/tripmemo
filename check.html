@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TripMemo 检查台</title>
+<!--
+  TripMemo 检查台（Day 20）
+
+  ⭐ 它是干什么的：
+     一个"看一眼就知道后端好不好"的页面。以前要判断"是不是后端挂了"，
+     得打开接口地址、看 JSON、再翻数据库 —— 现在打开这一个页面就够了。
+
+  ⚠️ 它**不依赖 js/store.js** —— 刻意独立调接口。
+     因为它的职责是"反映接口本身的真实状况"，
+     如果走 store 的封装，store 出问题就会连检查台一起坏掉。
+
+  ⚠️ 它**不是给最终用户看的页面**，没有做主站的视觉打磨（只借了配色）。
+     地址：/tripmemo/check.html
+-->
+<style>
+  :root {
+    --bg: #F7F2E9;
+    --surface: #F1E8D8;
+    --card: #FBF7EF;
+    --text: #3D3428;
+    --text-muted: #6B6153;
+    --ink: #5B4636;
+    --accent: #C0523F;
+    --ok: #5F6C57;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 24px 16px 48px;
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
+                 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+    line-height: 1.6;
+  }
+  .wrap { max-width: 820px; margin: 0 auto; }
+  h1 { font-size: 24px; margin: 0 0 4px; color: var(--ink); }
+  .meta { color: var(--text-muted); font-size: 13px; margin-bottom: 20px; }
+  .meta b { color: var(--text); }
+  .card {
+    background: var(--card); border: 1px solid var(--surface);
+    border-radius: 10px; padding: 16px 18px; margin-bottom: 14px;
+  }
+  .card h2 {
+    font-size: 15px; margin: 0 0 10px; color: var(--ink);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .badge {
+    font-size: 12px; font-weight: 400; padding: 2px 8px; border-radius: 20px;
+    background: var(--surface); color: var(--text-muted);
+  }
+  .badge.ok { background: #E4EADF; color: var(--ok); }
+  .badge.bad { background: #F6E0DC; color: var(--accent); }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--surface); }
+  th { color: var(--text-muted); font-weight: 500; }
+  .kv { font-size: 13px; }
+  .kv div { display: flex; gap: 10px; padding: 3px 0; }
+  .kv span:first-child { color: var(--text-muted); min-width: 120px; }
+  pre {
+    background: var(--surface); border-radius: 6px; padding: 10px;
+    font-size: 12px; overflow: auto; margin: 8px 0 0;
+    font-family: ui-monospace, Consolas, monospace;
+  }
+  button {
+    font: inherit; font-size: 13px; padding: 8px 16px; cursor: pointer;
+    background: var(--ink); color: #fff; border: 0; border-radius: 6px;
+    margin-right: 8px; margin-top: 4px;
+  }
+  button:hover { opacity: .88; }
+  button:disabled { opacity: .45; cursor: default; }
+  button.ghost { background: transparent; color: var(--ink); border: 1px solid var(--ink); }
+  .note { font-size: 12px; color: var(--text-muted); margin-top: 8px; }
+  code { background: var(--surface); padding: 1px 5px; border-radius: 4px; font-size: 12px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>TripMemo 检查台</h1>
+  <div class="meta">
+    ⭐ 最后更新：<b id="updated">—</b>
+    ｜ 接口地址：<code id="apiBase">—</code>
+  </div>
+
+  <!-- ============ ① 后端健康状态 ============ -->
+  <div class="card">
+    <h2>① 后端健康状态 <span class="badge" id="healthBadge">未检查</span></h2>
+    <div class="kv" id="healthBody">点下面的按钮开始检查。</div>
+    <button id="btn-all">全部检查</button>
+    <button class="ghost" id="btn-health">只查健康状态</button>
+  </div>
+
+  <!-- ============ ② 核心表真实数据 ============ -->
+  <div class="card">
+    <h2>② 核心表真实数据 <span class="badge" id="placesBadge">未检查</span></h2>
+    <div id="placesBody">点「全部检查」看数据库里到底有什么。</div>
+    <button class="ghost" id="btn-places">只看地点数据</button>
+  </div>
+
+  <!-- ============ ③ 写入测试 ============ -->
+  <div class="card">
+    <h2>③ 写入测试 <span class="badge" id="writeBadge">未测试</span></h2>
+    <p style="font-size:13px;margin:0 0 4px">
+      点下面的按钮，会往数据库**真的写一条**测试地点（坐标随机，避免撞上防重复）。
+    </p>
+    <button id="btn-write">写入一条测试地点</button>
+    <pre id="writeOut" style="display:none"></pre>
+    <div class="note">
+      ⚠️ 它会真的写进云数据库。⚠️ <b>删除接口还没做（排在第 4 周）</b>，
+      所以测试数据要删的话得去 CloudBase 控制台的 <code>places</code> 集合里删。
+    </div>
+  </div>
+
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ⚠️ 和 js/store.js 里的判断保持一致：本地走代理（同源），公网直连云函数 */
+  var API_BASE = (function () {
+    var h = location.hostname;
+    if (h === 'localhost' || h === '127.0.0.1' || h === '') return '';
+    return 'https://tripmemo-d3gd23bd14a396d1d-148733444.ap-shanghai.app.tcloudbase.com';
+  }());
+
+  document.getElementById('apiBase').textContent = API_BASE || '（本地代理）';
+
+  function $(id) { return document.getElementById(id); }
+
+  /** ⭐ 每做完一件事就刷新"最后更新"时间 —— 这就是余力加练要的那一项 */
+  function touchUpdated() {
+    var d = new Date();
+    $('updated').textContent = d.toLocaleString('zh-CN', { hour12: false });
+  }
+
+  function setBadge(id, text, kind) {
+    var el = $(id);
+    el.textContent = text;
+    el.className = 'badge' + (kind ? ' ' + kind : '');
+  }
+
+  function request(method, path, body) {
+    var opts = { method: method, headers: {} };
+    if (body !== undefined) {
+      opts.headers['Content-Type'] = 'application/json';
+      opts.body = JSON.stringify(body);
+    }
+    return fetch(API_BASE + path, opts).then(function (res) {
+      return res.json().then(
+        function (json) { return { status: res.status, json: json }; },
+        function () { return { status: res.status, json: null }; }
+      );
+    });
+  }
+
+  function errText(r) {
+    var j = r && r.json;
+    if (j && j.error && j.error.message) return j.error.message;
+    return 'HTTP ' + ((r && r.status) || '?');
+  }
+
+  /* ---------------- ① 健康状态 ---------------- */
+  function checkHealth() {
+    setBadge('healthBadge', '检查中…', '');
+    return request('GET', '/api/db-check').then(function (r) {
+      var body = $('healthBody');
+      var d = r.json && r.json.data;
+      if (r.json && r.json.ok === true && d) {
+        setBadge('healthBadge', '正常', 'ok');
+        body.innerHTML =
+          '<div class="kv">' +
+          '<div><span>地点条数（全库）</span><b>' + d.placesCount + '</b></div>' +
+          '<div><span>用户条数</span><b>' + d.usersCount + '</b></div>' +
+          '<div><span>设置条数</span><b>' + d.settingsCount + '</b></div>' +
+          '<div><span>第一条地点</span><b>' + (d.firstPlaceName || '（无）') + '</b></div>' +
+          '</div>';
+      } else {
+        setBadge('healthBadge', '异常', 'bad');
+        body.innerHTML = '<div class="kv"><div><span>错误</span><b>' + errText(r) + '</b></div></div>' +
+          '<pre>' + JSON.stringify(r.json, null, 2) + '</pre>';
+      }
+      touchUpdated();
+      return r;
+    }).catch(function (err) {
+      setBadge('healthBadge', '连不上', 'bad');
+      $('healthBody').innerHTML = '<div class="kv"><div><span>错误</span><b>' + err + '</b></div></div>';
+      touchUpdated();
+    });
+  }
+
+  /* ---------------- ② 核心表数据 ---------------- */
+  function checkPlaces() {
+    setBadge('placesBadge', '读取中…', '');
+    return request('GET', '/api/places').then(function (r) {
+      var body = $('placesBody');
+      var list = (r.json && r.json.places) || [];
+      if (r.json && r.json.ok === true) {
+        setBadge('placesBadge', list.length + ' 条', 'ok');
+        var rows = list.slice(0, 8).map(function (p) {
+          return '<tr><td>' + p.name + '</td><td>' + p.city + '</td><td>' + p.type +
+                 '</td><td>' + p.startMonth + ' ~ ' + (p.endMonth || '至今') + '</td></tr>';
+        }).join('');
+        body.innerHTML =
+          '<table><thead><tr><th>名称</th><th>城市</th><th>类型</th><th>停留</th></tr></thead>' +
+          '<tbody>' + rows + '</tbody></table>' +
+          (list.length > 8 ? '<div class="note">只列了前 8 条，共 ' + list.length + ' 条。</div>' : '');
+      } else {
+        setBadge('placesBadge', '失败', 'bad');
+        body.innerHTML = '<div class="kv"><div><span>错误</span><b>' + errText(r) + '</b></div></div>';
+      }
+      touchUpdated();
+      return r;
+    }).catch(function (err) {
+      setBadge('placesBadge', '连不上', 'bad');
+      $('placesBody').innerHTML = '<div class="kv"><div><span>错误</span><b>' + err + '</b></div></div>';
+      touchUpdated();
+    });
+  }
+
+  /* ---------------- ③ 写入测试 ---------------- */
+  function testWrite() {
+    var btn = $('btn-write');
+    btn.disabled = true;
+    setBadge('writeBadge', '写入中…', '');
+
+    /* ⚠️ 坐标随机 —— 否则会撞上"同一坐标算重复"的规则（409） */
+    var lng = Number((100 + Math.random() * 30).toFixed(4));
+    var lat = Number((20 + Math.random() * 25).toFixed(4));
+    var payload = {
+      name: '检查台测试点',
+      city: '测试城市',
+      lng: lng,
+      lat: lat,
+      type: 'travel',
+      startMonth: '2026-10',
+      endMonth: '2026-10',
+      note: '来自检查台的写入测试。',
+      tags: ['测试']
+    };
+
+    request('POST', '/api/places', payload).then(function (r) {
+      var out = $('writeOut');
+      out.style.display = 'block';
+      out.textContent = JSON.stringify(r.json, null, 2);
+      if (r.json && r.json.ok === true) {
+        setBadge('writeBadge', '成功（' + r.status + '）', 'ok');
+      } else {
+        setBadge('writeBadge', '被拒（' + r.status + '）', 'bad');
+      }
+      touchUpdated();
+    }).catch(function (err) {
+      setBadge('writeBadge', '连不上', 'bad');
+      var out = $('writeOut');
+      out.style.display = 'block';
+      out.textContent = String(err);
+      touchUpdated();
+    }).then(function () {
+      btn.disabled = false;
+    });
+  }
+
+  /* ---------------- 绑定 ---------------- */
+  $('btn-all').addEventListener('click', function () {
+    checkHealth().then(checkPlaces);
+  });
+  $('btn-health').addEventListener('click', checkHealth);
+  $('btn-places').addEventListener('click', checkPlaces);
+  $('btn-write').addEventListener('click', testWrite);
+
+  /* ⭐ 打开就自动检查一次 —— 省得每次都要点 */
+  checkHealth().then(checkPlaces);
+}());
+</script>
+</body>
+</html>

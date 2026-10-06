@@ -17,9 +17,27 @@
   <link rel="preconnect" href="https://fonts.loli.net" crossorigin>
   <link rel="stylesheet"
         href="https://fonts.loli.net/css2?family=Noto+Serif+SC:wght@600;700&family=Ma+Shan+Zheng&display=swap">
-  <link rel="stylesheet" href="css/style.css?v=57">
+  <link rel="stylesheet" href="css/style.css?v=59">
 </head>
 <body>
+
+  <!-- ⭐ 立刻设好"初始视图"对应的类（Day 20 修）
+       ⚠️ 为什么要在这么靠前的地方做：
+          门面页**隐藏左侧工具栏**靠的是 body 上的 `is-landing` 类，
+          而那个类原本由 main.js 的 switchView() 添加 ——
+          ⭐ 但 Day 20 之后，main.js 要**先等云端数据回来**才切视图，
+          于是出现"页面已经画出来了、类还没加上"：
+          ⚠️ **工具栏会先闪一下，甚至一直挂着**（第一次打开最明显）。
+       ⭐ 这段脚本紧跟 <body> 执行，比所有 js 都早 —— 从一开始就是对的。
+       ⚠️ 判断要和 main.js 保持一致：没有 hash（或 hash 认不出来）→ 门面页。 -->
+  <script>
+    (function () {
+      var h = (location.hash || '').replace(/^#/, '');
+      if (h !== 'map' && h !== 'timeline' && h !== 'places') {
+        document.body.classList.add('is-landing');
+      }
+    }());
+  </script>
 
   <!-- ===== 左侧导航栏：切换视图 + 导出 =====
        宽屏（≥768px）时是贴着左边的竖条，窄屏时自动变回顶部横条。
@@ -423,7 +441,7 @@
 
   <!-- ===== 本地配置：含高德 Key，不提交（模板见 config.example.js）=====
        找不到 config.js 时不会报错，只是地图加载不出来，页面其余部分照常可用 -->
-  <script src="config.js?v=57"
+  <script src="config.js?v=59"
           onerror="console.warn('[TripMemo] 未找到 config.js —— 地图将无法加载。请把 config.example.js 复制为 config.js 并填入 Key 与安全密钥。')"></script>
 
   <!-- ===== 项目脚本：顺序不能乱 =====
@@ -437,20 +455,31 @@
        ⭐ 规则（就一句）：**改完任何 css / js，把这里和上面的数字一起 +1。**
           11 个资源共用同一个编号 —— 多下载几 KB，换"永远不用想哪个该改"，
           对学习阶段来说非常划算。 -->
-  <script src="js/model.js?v=57"></script>
-  <script src="js/mock-data.js?v=57"></script>
-  <script src="js/store.js?v=57"></script>
+  <!-- ===== ⭐ CloudBase 认证 SDK（Day 20）=====
+       ⭐ 为什么需要它：让每个访客有**自己的身份** ——
+          以前所有请求都被当成同一个人（云函数里写死的 u_shy），
+          谁打开都看到同一份数据。
+       ⚠️ 它必须排在 store.js **之前** —— store.js 里要用全局的 cloudbase。
+       ⚠️ 这是本项目的第 3 个外部依赖（前两个：高德地图 JS API、字体）。
+       ⚠️⚠️ 用 latest（不是固定版本号）：
+          原因见 store.js 里 initAuth() 的注释 —— 认证 API 在新旧大版本之间**不兼容**，
+          固定一个旧版本号会直接报 "getSession is not a function"。 -->
+  <script src="https://static.cloudbase.net/cloudbase-js-sdk/latest/cloudbase.full.js"></script>
+
+  <script src="js/model.js?v=59"></script>
+  <script src="js/mock-data.js?v=59"></script>
+  <script src="js/store.js?v=59"></script>
 
   <!-- 四态逻辑（空 / 加载 / 错误 / 正常）的**唯一实现** —— 两个列表视图共用（Day 13）
        ⚠️ 必须排在 timeline.js / places.js 之前：它们在 init() 里就要用它。
        ⭐ 为什么单独一个文件、而不是在两个视图里各写一份：
           那就是"同一个逻辑两种写法"，改的时候必然漏一个（原则 2）。 -->
-  <script src="js/view-state.js?v=57"></script>
-  <script src="js/detail.js?v=57"></script>
-  <script src="js/drawer.js?v=57"></script>
-  <script src="js/map.js?v=57"></script>
-  <script src="js/timeline.js?v=57"></script>
-  <script src="js/places.js?v=57"></script>
-  <script src="js/main.js?v=57"></script>
+  <script src="js/view-state.js?v=59"></script>
+  <script src="js/detail.js?v=59"></script>
+  <script src="js/drawer.js?v=59"></script>
+  <script src="js/map.js?v=59"></script>
+  <script src="js/timeline.js?v=59"></script>
+  <script src="js/places.js?v=59"></script>
+  <script src="js/main.js?v=59"></script>
 </body>
 </html>
