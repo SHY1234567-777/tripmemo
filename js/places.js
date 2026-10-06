@@ -92,17 +92,6 @@
     var thumb = document.createElement('div');
     thumb.className = 'place-thumb';
 
-    /* ⚠️ 有照片就贴照片 —— 这条分支**保留**（将来加了上传功能，数据一变就自动生效） */
-    var first = (place.images && place.images.length) ? place.images[0] : '';
-    if (first) {
-      var img = document.createElement('img');
-      img.className = 'place-thumb-img';
-      img.src = first;
-      img.alt = place.name;
-      thumb.appendChild(img);
-      return thumb;
-    }
-
     /* ⭐ 没照片 → **按名字算出的双色渐变 + 首字水印**（2026-09-28 美术改版）
        ⚠️ 改版前这里是个灰底斜纹框 + 「暂无」两个字。
           客户明确要求"禁止出现灰底暂无照片" —— 那是**把"缺东西"摆在脸上**，
@@ -112,6 +101,22 @@
        ⚠️ 首字走 data-initial、由 CSS 的 ::after 渲染 —— 纯 CSS 读不到 JS 的字符串。 */
     thumb.classList.add('ph-' + Model.thumbVariant(place.name));
     thumb.setAttribute('data-initial', Model.initialOf(place.name));
+
+    /* ⭐ 有照片 → 在上面叠一个 <img>（Day 21）
+       ⚠️ 为什么不"有照片就只画 img"：那样一旦链接换不到，这一格就空了。
+       ⭐ 现在是**两层**：底下永远是好看的色块 + 首字，照片加载成功就盖住它；
+          换不到 → 这个 img 被撤掉 → 色块露出来 = "没照片"该有的样子。
+       ⚠️ 这里**不设 src** —— 数据库存的是 fileID（cloud:// 开头），不是网址，
+          要等渲染完之后由 Store.attachPhotosTo() 批量换。 */
+    var first = (place.images && place.images.length) ? place.images[0] : '';
+    if (first) {
+      var img = document.createElement('img');
+      img.className = 'place-thumb-img';
+      img.setAttribute('data-photo-id', first);
+      img.alt = place.name;
+      thumb.appendChild(img);
+    }
+
     return thumb;
   }
 
@@ -266,6 +271,27 @@
       head.classList.add('ph-' + Model.thumbVariant(group.city));
       head.setAttribute('data-initial', Model.initialOf(group.city));
 
+      /* ⭐ 这个城市的第一张照片，当作分组的封面（Day 21）
+         ⭐ 怎么"叠"上去：CSS 里 `.city-head` 是 Grid，照片区是 `grid-area: photo`，
+            而 `.city-head::before`（那个渐变 + 首字）就占着这一格 ——
+            ⚠️ 所以只要给 img 也写 `grid-area: photo`，它就会**正好压在同一格上**，
+               不用动任何布局。
+         ⚠️ 取的是"这个城市下、按当前顺序第一张有照片的地点" ——
+            没照片就什么都不加，色块 + 首字照旧。 */
+      var coverId = '';
+      group.places.forEach(function (p) {
+        if (!coverId && p.images && p.images.length) {
+          coverId = p.images[0];
+        }
+      });
+      if (coverId) {
+        var cover = document.createElement('img');
+        cover.className = 'city-head-img';
+        cover.setAttribute('data-photo-id', coverId);
+        cover.alt = '';
+        head.appendChild(cover);
+      }
+
       var name = document.createElement('span');
       name.className = 'city-name';
       name.textContent = group.city;
@@ -395,6 +421,12 @@
 
       elList.appendChild(box);
     });
+
+    /* ⭐ 批量把照片贴上（Day 21）
+       ⚠️ 必须放在**最后** —— 要等所有卡片都进 DOM 了才扫得到那些 img。
+       ⭐ 缩略图里的 <img> 只有 fileID 没有 src（fileID 不是网址），
+          这一步统一去换链接；换不到的 img 会被移除，露出下面的色块。 */
+    Store.attachPhotosTo(elList);
   }
 
   /* ------------------------------------------------------------

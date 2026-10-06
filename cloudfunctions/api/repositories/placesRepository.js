@@ -156,6 +156,70 @@ async function insertPlace(doc) {
 }
 
 /**
+ * ⭐ 修改一个地点（Day 21）
+ *
+ * ⚠️⚠️ 契约 §四.4 特别强调的一条（关系到"会不会丢数据"）：
+ *    请求体里**只传要改的字段，没传的保持原样**。
+ *    ⭐ 所以这里**按"字段在不在 patch 里"判断，而不是按"值真不真"** ——
+ *       否则用户想把 note 清空（传空字符串）时会被当成"没传"，清不掉。
+ *    ⚠️ 绝对不能拿默认值去补没传的字段 —— 那样前端一编辑就会把
+ *       `images` / `tags` 这些没带上的数据清空（契约里专门点名了这点）。
+ *
+ * ⚠️ `_id` / `ownerId` / `createdAt` **不可改** —— 传了也忽略。
+ *
+ * @param {string} id      要改的地点 id（数据库里叫 `_id`）
+ * @param {string} ownerId 当前用户（⭐ 只能改自己的）
+ * @param {object} patch   要改的字段
+ * @returns {Promise<{ok:boolean, place?:object, reason?:string, clashName?:string}>}
+ *          ⭐ 结构化结果（不是抛错）—— 由**接口层**决定映射成 200 / 404 / 409
+ */
+async function updatePlace(id, ownerId, patch) {
+  /* ① 先确认这条存在、而且是你自己的 —— 用同一个查询做，不给"探测别人数据"的机会 */
+  const found = await db.collection(COLLECTION)
+    .where({ _id: id, ownerId: ownerId })
+    .limit(1)
+    .get();
+
+  const doc = (found.data || [])[0];
+  if (!doc) return { ok: false, reason: 'not_found' };
+
+  /* ② 组装"要更新的字段" —— 只挑 patch 里**明确出现过**的，并且避开不可改字段 */
+  const IMMUTABLE = ['_id', 'id', 'ownerId', 'createdAt'];
+  const update = {};
+
+  Object.keys(patch || {}).forEach(function (key) {
+    if (IMMUTABLE.indexOf(key) !== -1) return;   /* ⚠️ 不可改的字段直接跳过 */
+    update[key] = patch[key];
+  });
+
+  if (Object.keys(update).length === 0) {
+    /* 没有任何可改字段 —— 直接返回当前状态，不算错 */
+    return { ok: true, place: toApiPlace(doc) };
+  }
+
+  /* ③ ⭐ 查重（Day 18 定的规矩，改的时候同样适用）
+        合并之后的坐标不能和**别的**地点撞上 ——
+        ⚠️ 所以要**排除自己**，否则"不改坐标只改名字"也会被自己挡住。 */
+  const merged = Object.assign({}, doc, update);
+  const others = await db.collection(COLLECTION)
+    .where({ ownerId: ownerId, lng: merged.lng, lat: merged.lat })
+    .limit(2)          /* ⚠️ 取 2 条：因为结果里可能包含自己 */
+    .get();
+  const clash = (others.data || []).filter(function (d) { return d._id !== id; })[0];
+  if (clash) {
+    return { ok: false, reason: 'duplicate', clashName: clash.name || '' };
+  }
+
+  /* ④ 写回（⭐ 只更新这几个字段，其余原样不动） */
+  await db.collection(COLLECTION)
+    .doc(id)
+    .update(update);
+
+  /* ⑤ 返回"更新后的完整对象"（契约 §四.4 要求 200 + 完整 place） */
+  return { ok: true, place: toApiPlace(merged) };
+}
+
+/**
  * ⭐ 数条数 + 取第一条（给 `/api/db-check` 那个临时接口用）
  * @returns {Promise<{count:number, first:object|null}>} first 是**原始文档**
  */
@@ -176,6 +240,7 @@ module.exports = {
   findPlaces: findPlaces,
   findPlaceById: findPlaceById,
   findExistingAtCoordinate: findExistingAtCoordinate,
+  updatePlace: updatePlace,
   insertPlace: insertPlace,
   countAll: countAll,
 };

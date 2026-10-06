@@ -1499,6 +1499,7 @@ body.is-landing .app-nav {
 
 /* ---------- 卡片左侧：图片位（为后续图片功能预留） ---------- */
 .timeline-thumb {
+  position: relative;   /* ⭐ 给上面叠的照片当定位基准（Day 21） */
   /* ⚠️ 宽 120px，**高度由 4:3 算出来**（= 90px）——
       这个比例是**原始需求指定的**（"左侧 4:3 拍立得照片区"）。
       原来这里是 88×88 的正方形，那是"缩略图"的比例，不是"照片"的比例。 */
@@ -1534,7 +1535,10 @@ body.is-landing .app-nav {
 }
 
 /* 有图时：图铺满整个框 */
+/* ⚠️ 同 .place-thumb-img：照片叠在色块上，要绝对定位 */
 .timeline-thumb-img {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
@@ -2043,6 +2047,7 @@ body.is-landing .app-nav {
 
 /* ---------- 地点条目的图片位（为后期图片插入预留） ---------- */
 .place-thumb {
+  position: relative;   /* ⭐ 给上面叠的照片当定位基准（Day 21） */
   flex: 0 0 56px;
   width: 56px;
   height: 56px;
@@ -2073,7 +2078,12 @@ body.is-landing .app-nav {
   content: attr(data-initial);
 }
 
+/* ⚠️ Day 21：照片是**叠在色块上面的第二层** ——
+   所以要绝对定位（不然它会和"首字"并排挤在一起）。
+   照片没换成链接时，这个 img 会被 JS 移除，下面那层色块就露出来了。 */
 .place-thumb-img {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
@@ -2191,11 +2201,36 @@ body.is-landing .app-nav {
   flex-direction: column;
   justify-content: flex-end;
   padding: var(--space-6);
+  /* ⭐ 背景分四层，从下往上是：
+       ① 底色（纸张色）
+       ② 原来那层含蓄的墨色晕染
+       ③ ⭐ --hero-photo：**这张照片**（由 drawer.js 设成 url(...)；没照片时是 none）
+       ④ ⭐ 最上面压一层暗色渐变 —— ⚠️ 必须的，
+          不然浅色照片上白字完全看不清（可访问性底线）。
+     ⚠️ 多层背景的 background-size 是按层写的，所以这里有四段。 */
   background:
+    linear-gradient(rgba(48, 40, 31, 0.42), rgba(48, 40, 31, 0.78)),
+    var(--hero-photo, none) center / cover no-repeat,
     radial-gradient(120% 120% at 15% 0%,
       rgba(91, 70, 54, 0.22) 0%, rgba(91, 70, 54, 0) 62%),
     var(--color-surface);
   border-bottom: 1px solid var(--color-border);
+}
+
+/* ⭐ 有照片时文字要变浅色（背景已经被压暗了）——
+   ⚠️ 用 .has-photo 这个类来切换，由 drawer.js 控制 */
+.drawer-hero.has-photo .drawer-kicker,
+.drawer-hero.has-photo .drawer-title,
+.drawer-hero.has-photo .drawer-sub {
+  color: #fff;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, .45);
+}
+.drawer-hero.has-photo .drawer-back {
+  background: rgba(255, 255, 255, .18);
+  color: #fff;
+}
+.drawer-hero.has-photo .drawer-back:hover {
+  background: rgba(255, 255, 255, .3);
 }
 
 /* 返回按钮：钉在左上角 */
@@ -2369,30 +2404,38 @@ body.is-landing .app-nav {
   line-height: 1.7;
 }
 
-/* 「照片」页签的占位框（Day 10）——
-   ⚠️ 这不是"摆个空 div 敷衍"，而是**明确把版面留给照片**：
-      等高、带虚线框，照片上线后把这个框换成 <img> 网格即可。
-      虚线框的质感和项目里其它"暂无照片"占位框保持一致
-      （`.place-thumb` / `.timeline-thumb` 用的是同一套斜纹底 + 主色虚线）。 */
-.drawer-photo-slot {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 240px;
-  padding: var(--space-5);
-  border: 1px dashed rgba(91, 70, 54, 0.28);
-  border-radius: var(--radius-lg);
-  background:
-    repeating-linear-gradient(
-      45deg,
-      rgba(91, 70, 54, 0.07) 0 6px,
-      rgba(91, 70, 54, 0.02) 6px 12px
-    ),
-    var(--color-surface);
-  color: var(--color-text-weak);
-  font-size: var(--text-sm);
-  line-height: 1.7;
-  text-align: center;
+/* ⭐ 照片网格（Day 21 实装）——
+   ⚠️ 这里原来是「照片页签的占位框」（Day 10 留的版面）。
+      当时注释里就写了"照片上线后把这个框换成 <img> 网格即可" —— 现在换了。 */
+.drawer-photo-grid {
+  display: grid;
+  /* ⚠️ 原来是 auto-fill + minmax(104px, 1fr) —— 抽屉里翻车了：
+      抽屉比页面窄得多，`1fr` 直接把一张图撑到满宽，**一行一张、要滚半天才看完**。
+      ⭐ 改成**固定 3 列**：每张 = (抽屉宽 - 两个间隙) / 3，一屏能看 6 张以上。 */
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-2);
+}
+.drawer-photo-item {
+  display: block;
+  aspect-ratio: 1 / 1;    /* ⭐ 正方形格子：配 object-fit:cover 图片不会变形 */
+  overflow: hidden;
+  border-radius: var(--radius-md);
+  background: var(--color-input);
+  border: 1px solid var(--color-border);
+  transition: transform var(--duration-fast) var(--ease-out);
+}
+.drawer-photo-item:hover {
+  transform: scale(1.02);
+}
+.drawer-photo-item:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+.drawer-photo-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
 }
 
 /* ---------- 底部 ---------- */
@@ -2595,6 +2638,143 @@ body.is-landing .app-nav {
 }
 
 /* 校验失败的提示条 */
+/* ============================================================
+   ⭐ 照片（Day 21）
+   ============================================================
+   表单里的照片区：一排缩略图 + 一个「添加照片」按钮。
+   ⚠️ 上传中的那张会盖一层半透明遮罩 + "上传中…" ——
+      否则用户会以为没反应，反复点添加。
+   ⚠️ 颜色全部用项目变量（手账色板），别写死色值。
+   ============================================================ */
+
+.photo-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+/* ⭐ 一张照片都没有时不占高度（否则表单里会多一块空白） */
+.photo-strip:empty { display: none; }
+
+.photo-thumb {
+  position: relative;
+  width: 76px;
+  height: 76px;
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--color-input);
+  border: 1px solid var(--color-border);
+}
+.photo-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;   /* ⭐ 保持比例填满 —— 不然会被拉变形 */
+  display: block;
+}
+.photo-thumb.is-uploading img { opacity: .45; }
+.photo-thumb.is-failed { border-color: var(--color-accent); }
+
+.photo-thumb-status {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  letter-spacing: .02em;
+  color: #fff;
+  background: rgba(61, 52, 40, .5);
+}
+
+.photo-del {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  cursor: pointer;
+  background: rgba(61, 52, 40, .62);
+  color: #fff;
+  font-size: 13px;
+  line-height: 18px;
+}
+.photo-del:hover { background: var(--color-accent-fill); }
+
+.photo-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+}
+.photo-add {
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  padding: 5px 12px;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-accent-text);
+  border: 1px dashed var(--color-border);
+}
+.photo-add:hover {
+  border-color: var(--color-accent);
+  background: var(--color-hover);
+}
+.photo-hint {
+  font-size: 12px;
+  color: var(--color-text-weak);
+}
+
+/* ⭐ 城市分组封面照片（Day 21）
+   ⚠️ 关键就是 `grid-area: photo` —— 让它和 `.city-head::before`（渐变 + 首字）
+      占**同一格**，于是正好压在上面；没有照片时它根本不存在，色块照旧。 */
+.city-head-img {
+  grid-area: photo;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: var(--radius-md);
+  display: block;
+}
+
+/* ⭐「封面」标记 + 「设为封面」按钮（编辑弹窗里，Day 21） */
+.photo-cover-mark {
+  position: absolute;
+  left: 3px;
+  bottom: 3px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(61, 52, 40, .72);
+  color: #fff;
+  font-size: 11px;
+  line-height: 1.6;
+  pointer-events: none;   /* ⚠️ 别挡住下面的点击 */
+  z-index: 2;
+}
+.photo-cover-btn {
+  position: absolute;
+  left: 3px;
+  bottom: 3px;
+  padding: 1px 6px;
+  border: 0;
+  border-radius: 4px;
+  cursor: pointer;
+  background: rgba(255, 255, 255, .9);
+  color: var(--color-accent-text);
+  font: inherit;
+  font-size: 11px;
+  line-height: 1.6;
+  opacity: 0;                       /* ⭐ 平时藏起来，鼠标移上去才露出来 */
+  transition: opacity var(--duration-fast) var(--ease-out);
+  z-index: 2;
+}
+.photo-thumb:hover .photo-cover-btn,
+.photo-cover-btn:focus-visible {
+  opacity: 1;
+}
+
 .form-error {
   margin: 0;
   padding: var(--space-2) var(--space-3);

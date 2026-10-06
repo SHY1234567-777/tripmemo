@@ -27,6 +27,13 @@
   /* 新增态用的坐标（用户点地图时带进来的） */
   var draftCoords = { lng: NaN, lat: NaN };
 
+  /* ⭐ 当前表单里"待保存的照片"列表（Day 21）
+     每一项：{ fileID, uploading, failed, previewUrl }
+     ⚠️ 为什么单独维护一份、而不是直接读 DOM：
+        上传是异步的 —— 用户可能"选完就点保存"，那时 fileID 还没回来。
+        这份列表能如实反映每张的状态（✅完成 / ⏳上传中 / ❌失败）。 */
+  var pendingPhotos = [];
+
   /* DOM 引用，初始化时取一次 */
   var el = {};
 
@@ -42,6 +49,11 @@
     el.formError  = document.getElementById('form-error');
     el.foot       = document.getElementById('modal-foot');
     el.btnClose   = document.getElementById('modal-close');
+    /* ⭐ 照片相关（Day 21） */
+    el.photoStrip = document.getElementById('photo-strip');
+    el.btnAddPhoto = document.getElementById('btn-add-photo');
+    el.photoInput = document.getElementById('photo-input');
+    el.photoHint  = document.getElementById('photo-hint');
 
     el.f = {
       name:  document.getElementById('f-name'),
@@ -115,7 +127,185 @@
     el.f.end.value   = p.endMonth || '';
     el.f.note.value  = p.note || '';
     el.f.tags.value  = (p.tags && p.tags.length) ? p.tags.join(', ') : '';
+
+    /* ⭐ 把已有的照片装进待保存列表（Day 21）
+       ⚠️ 已存在的只有 fileID，没有本地预览图 —— 要异步去换链接。 */
+    pendingPhotos = (p.images || []).map(function (fileID) {
+      return { fileID: fileID, uploading: false, failed: false, previewUrl: '' };
+    });
+    renderPhotos();
+    loadExistingPhotoUrls();
+
     hideFormError();
+  }
+
+  /* ------------------------------------------------------------
+     四之二、照片（Day 21）
+     ------------------------------------------------------------ */
+
+  /** ⭐ 把 pendingPhotos 画成缩略图 */
+  function renderPhotos() {
+    if (!el.photoStrip) {
+      return;
+    }
+    el.photoStrip.innerHTML = '';
+
+    pendingPhotos.forEach(function (ph, idx) {
+      var box = document.createElement('div');
+      box.className = 'photo-thumb'
+        + (ph.uploading ? ' is-uploading' : '')
+        + (ph.failed ? ' is-failed' : '');
+
+      var img = document.createElement('img');
+      img.src = ph.previewUrl || '';
+      img.alt = '';
+      box.appendChild(img);
+
+      /* ⚠️ 上传中/失败要盖一层文字 —— 否则用户以为没反应，反复点添加 */
+      if (ph.uploading || ph.failed) {
+        var st = document.createElement('div');
+        st.className = 'photo-thumb-status';
+        st.textContent = ph.uploading ? '上传中…' : '失败';
+        box.appendChild(st);
+      }
+
+      /* ⭐ 封面（Day 21）：
+         规则是"第一张就是封面"，所以"设为封面"其实 = **把这张挪到第一位** ——
+         ⚠️ 这样不用给数据库加 coverIndex 字段，也不用改接口，
+            而且三个用到封面的地方（地点缩略图 / 城市分组头 / 抽屉顶部）会自动跟着变。 */
+      if (idx === 0) {
+        var mark = document.createElement('span');
+        mark.className = 'photo-cover-mark';
+        mark.textContent = '封面';
+        box.appendChild(mark);
+      } else {
+        var setCover = document.createElement('button');
+        setCover.type = 'button';
+        setCover.className = 'photo-cover-btn';
+        setCover.textContent = '设为封面';
+        setCover.title = '把这张作为封面（会自动排到第一张）';
+        setCover.addEventListener('click', function () { makeCover(idx); });
+        box.appendChild(setCover);
+      }
+
+      var del = document.createElement('button');
+      del.type = 'button';
+      del.className = 'photo-del';
+      del.textContent = '×';
+      del.title = '移除这张';
+      del.addEventListener('click', function () { removePhotoAt(idx); });
+      box.appendChild(del);
+
+      el.photoStrip.appendChild(box);
+    });
+
+    updatePhotoHint();
+  }
+
+  function updatePhotoHint() {
+    if (!el.photoHint) {
+      return;
+    }
+    var uploading = pendingPhotos.filter(function (x) { return x.uploading; }).length;
+    if (uploading > 0) {
+      el.photoHint.textContent = '正在上传 ' + uploading + ' 张…';
+      return;
+    }
+    var ok = pendingPhotos.filter(function (x) { return x.fileID; }).length;
+    el.photoHint.textContent = ok
+      ? ('已添加 ' + ok + ' 张；点右上角 × 可移除')
+      : '可多选；上传前会自动压缩';
+  }
+
+  /**
+   * ⭐ 为"已存在"的照片异步换取显示链接
+   * ⚠️ 只处理还没有 previewUrl 的（不要重复请求）
+   */
+  function loadExistingPhotoUrls() {
+    var need = pendingPhotos.filter(function (x) { return x.fileID && !x.previewUrl; });
+    if (!need.length) {
+      return;
+    }
+    var ids = need.map(function (x) { return x.fileID; });
+
+    Store.resolvePhotoUrls(ids).then(function (list) {
+      list.forEach(function (item) {
+        pendingPhotos.forEach(function (x) {
+          if (x.fileID === item.fileID && !x.previewUrl) {
+            x.previewUrl = item.url;
+          }
+        });
+      });
+      renderPhotos();
+    }).catch(function (err) {
+      console.warn('[TripMemo] 照片链接换取失败：', err);
+    });
+  }
+
+  /** ⭐ 用户选了文件 → 逐个上传 */
+  function handlePhotoFiles(files) {
+    var arr = Array.prototype.slice.call(files || []);
+    if (!arr.length) {
+      return;
+    }
+
+    /* ⚠️ 上传要一个"地点 id"来建目录。⭐ 新增态还没 id ——
+       用一个临时前缀顶着；不影响功能，只是云存储里目录名不同。 */
+    var placeId = currentId || ('draft_' + Date.now().toString(36));
+
+    arr.forEach(function (file) {
+      var item = {
+        fileID: null,
+        uploading: true,
+        failed: false,
+        /* ⭐ 本地预览（URL.createObjectURL）—— 不用等上传完就能看见图 */
+        previewUrl: (global.URL && global.URL.createObjectURL) ? global.URL.createObjectURL(file) : ''
+      };
+      pendingPhotos.push(item);
+      renderPhotos();
+
+      Store.uploadPhoto(file, placeId).then(function (fileID) {
+        item.fileID = fileID;
+        item.uploading = false;
+        renderPhotos();
+      }).catch(function (err) {
+        item.uploading = false;
+        item.failed = true;
+        renderPhotos();
+        console.error('[TripMemo] 照片上传失败：', err);
+        if (el.photoHint) {
+          el.photoHint.textContent = '上传失败：' + ((err && err.message) || err);
+        }
+      });
+    });
+  }
+
+  /**
+   * ⭐ 把第 idx 张设为封面（Day 21）
+   * ⭐ 做法：**把它挪到数组第一位** ——
+   *    "封面 = 第一张"这条规则在三个地方用着（地点缩略图 / 城市分组头 / 抽屉顶部），
+   *    所以只要顺序变了，三处会自动跟着变，⚠️ 不用给数据库加字段。
+   */
+  function makeCover(idx) {
+    if (idx <= 0 || idx >= pendingPhotos.length) {
+      return;
+    }
+    var item = pendingPhotos.splice(idx, 1)[0];
+    pendingPhotos.unshift(item);
+    renderPhotos();
+  }
+
+  /** ⭐ 移除第 idx 张（只从"待保存列表"里去掉；云端文件不删） */
+  function removePhotoAt(idx) {
+    var item = pendingPhotos[idx];
+    if (!item) {
+      return;
+    }
+    if (item.previewUrl && item.previewUrl.indexOf('blob:') === 0 && global.URL) {
+      global.URL.revokeObjectURL(item.previewUrl);   /* ⭐ 释放本地预览占的内存 */
+    }
+    pendingPhotos.splice(idx, 1);
+    renderPhotos();
   }
 
   /** 标签输入框按逗号拆成数组；中英文逗号都支持 */
@@ -141,7 +331,11 @@
       /* 编辑时保留原有坐标与图片；新增时用点击处的坐标 */
       lng:        currentId ? (Store.getPlace(currentId) || {}).lng : draftCoords.lng,
       lat:        currentId ? (Store.getPlace(currentId) || {}).lat : draftCoords.lat,
-      images:     currentId ? ((Store.getPlace(currentId) || {}).images || []) : []
+      /* ⭐ 照片（Day 21）：只取**上传成功**的那些；
+         ⚠️ 还在传 / 传失败的不写进数据库 —— 否则会存进去一个空 fileID。 */
+      images:     pendingPhotos
+                    .filter(function (x) { return !!x.fileID; })
+                    .map(function (x) { return x.fileID; })
     };
   }
 
@@ -214,6 +408,7 @@
   function openNew(lng, lat, prefill) {
     currentId = null;
     draftCoords = { lng: lng, lat: lat };
+    pendingPhotos = [];      /* ⭐ 新增态必须是干净的（Day 21） */
     fillForm(prefill || null);
     switchTo('new');
     showModal();
@@ -357,6 +552,20 @@
     }
 
     fillTypeOptions();
+
+    /* ⭐ 照片：按钮 → 隐藏的 file input → change（Day 21）
+       ⚠️ 中间非要过一次 <input type="file">：浏览器安全限制 ——
+          只有用户亲手点才能弹文件框，脚本不能自己弹。
+       ⚠️ 每次点完把 value 清空：否则连着两次选同一个文件不会触发 change。 */
+    if (el.btnAddPhoto && el.photoInput) {
+      el.btnAddPhoto.addEventListener('click', function () {
+        el.photoInput.value = '';
+        el.photoInput.click();
+      });
+      el.photoInput.addEventListener('change', function () {
+        handlePhotoFiles(el.photoInput.files);
+      });
+    }
 
     /* 关闭按钮 */
     el.btnClose.addEventListener('click', close);

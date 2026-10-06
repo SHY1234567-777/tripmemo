@@ -39,7 +39,9 @@
 
   var el = {};
   var currentId = null;
-  var activeTab = 'story';
+  /* ⭐ Day 21：照片做好之后，默认落在「照片」——
+     ⚠️ 顺序是 Day 10 就定下的：**照片排在最前**，它才是这个抽屉的主要内容。 */
+  var activeTab = 'photo';
 
   /* 打开抽屉之前焦点在哪 —— 关掉之后要还回去，否则键盘用户会"掉"到页面开头 */
   var lastFocused = null;
@@ -90,6 +92,50 @@
     el.title.textContent = place.name;
     el.sub.textContent = Model.typeLabel(place.type)
       + '　' + (place.type === Model.WISHLIST_KEY ? '还没去过' : Model.stayLabel(place));
+
+    renderHeroPhoto(place);
+  }
+
+  /**
+   * ⭐ 把第一张照片铺到抽屉顶部当背景（Day 21）
+   *
+   * ⭐ 为什么用"第一张"：用户加照片的顺序就是"最重要的一张放前面" ——
+   *    和"删掉一张就没封面了"相比，"第一张自动当封面"零操作、最省心。
+   * ⚠️ 「手动指定封面」记进待办了（要给 images 加一个 coverIndex 字段）。
+   *
+   * ⚠️ 没有照片 → 把背景清掉、类名去掉，**恢复原来的样子**（不是留一块空白）。
+   */
+  function renderHeroPhoto(place) {
+    if (!el.hero) {
+      return;
+    }
+
+    var first = (place.images && place.images.length) ? place.images[0] : '';
+
+    /* ⚠️ 每次都要先清 —— 上一个地点的照片可能还挂着 */
+    el.hero.style.removeProperty('--hero-photo');
+    el.hero.classList.remove('has-photo');
+
+    if (!first) {
+      return;
+    }
+
+    /* ⚠️ 先乐观地加上类（文字变浅色）—— 等链接回来才换背景的话，
+       中间会有一瞬"深色背景 + 深色文字"看不清。 */
+    el.hero.classList.add('has-photo');
+
+    Store.resolvePhotoUrls([first]).then(function (list) {
+      var url = list.length ? list[0].url : '';
+      if (!url) {
+        /* ⭐ 换不到链接 → 撤回，恢复原样 */
+        el.hero.classList.remove('has-photo');
+        return;
+      }
+      el.hero.style.setProperty('--hero-photo', 'url("' + url + '")');
+    }).catch(function (err) {
+      console.warn('[TripMemo] 抽屉背景照片换取失败：', err);
+      el.hero.classList.remove('has-photo');
+    });
   }
 
   /** 一条只读信息（三格）—— 对应参考图里那条"累计访问 / 第一次到访 / 最近到访" */
@@ -189,16 +235,59 @@
       return;
     }
 
-    /* ---- 照片：**明确把版面留出来** ----
-       ⚠️ 不是"忘了做"，也不是"摆个空 div 敷衍"：
-          用一个和项目里其它「暂无照片」一致的虚线框把位置占住，
-          照片功能上线后把这个框换成 <img> 网格即可，周围结构都不用动。 */
-    var slot = document.createElement('div');
-    slot.className = 'drawer-photo-slot';
-    slot.textContent =
-      '照片会放在这里。照片功能还没做 —— 按 PRD 4.3 排在 Day 8–28'
-      + '（先做账号与云数据，再做照片上传）。';
-    el.body.appendChild(slot);
+    /* ---- ⭐ 照片（Day 21 实装）----
+       ⚠️ 数据库里存的是 **fileID**（cloud:// 开头），不是能直接显示的网址 ——
+          要先用 Store.resolvePhotoUrls() 换成链接才能放进 <img src>。
+       ⭐ 所以流程是：**先按数量把格子摆出来（占位）→ 异步把图填进去**，
+          这样点了页签立刻有反馈，不用等网络。 */
+    var grid = document.createElement('div');
+    grid.className = 'drawer-photo-grid';
+
+    var fileIDs = (place.images || []).filter(function (x) { return !!x; });
+
+    if (!fileIDs.length) {
+      grid.appendChild(makeEmpty('这个地方还没有照片。'));
+      el.body.appendChild(grid);
+      return;
+    }
+
+    /* ⚠️ 用一个 map 记住"哪个格子对应哪个 fileID" ——
+       换链接是异步的，回来时要能找到该填哪一格。 */
+    var cellByFileID = {};
+
+    fileIDs.forEach(function (fileID) {
+      var cell = document.createElement('a');
+      cell.className = 'drawer-photo-item';
+      cell.target = '_blank';          /* ⭐ 点开看大图：直接新标签打开，不做灯箱 */
+      cell.rel = 'noopener';           /* ⚠️ 安全：新窗口别能反控本页 */
+      cell.setAttribute('aria-label', '查看大图');
+
+      var img = document.createElement('img');
+      img.alt = '';
+      cell.appendChild(img);
+
+      grid.appendChild(cell);
+      cellByFileID[fileID] = { cell: cell, img: img };
+    });
+    el.body.appendChild(grid);
+
+    /* ⭐ 异步换成真实链接 */
+    Store.resolvePhotoUrls(fileIDs).then(function (list) {
+      list.forEach(function (item) {
+        var ref = cellByFileID[item.fileID];
+        if (!ref || !item.url) {
+          return;
+        }
+        ref.img.src = item.url;
+        ref.cell.href = item.url;      /* 点开就是原图 */
+      });
+      /* ⚠️ 一张都没换成 → 说明云存储这条路出问题了，别留一片空白 */
+      var shown = grid.querySelectorAll('img[src]').length;
+      if (!shown) {
+        clear(grid);
+        grid.appendChild(makeEmpty('照片暂时显示不出来（可能网络或权限问题）。'));
+      }
+    });
   }
 
   /* ------------------------------------------------------------
@@ -212,10 +301,9 @@
     }
 
     currentId = placeId;
-    /* ⚠️ 每次打开都回到「故事」，而**不是第一个页签「照片」** ——
-       照片功能还没做（PRD 4.3），落在占位页签上体验差。
-       等照片上线，把这里改成 'photo' 就行（一行）。 */
-    activeTab = 'story';
+    /* ⭐ Day 21：照片功能上线了 —— 每次打开回到「照片」。
+       （原来这里刻意停在「故事」，是因为照片那页还是占位说明。） */
+    activeTab = 'photo';
     lastFocused = document.activeElement;
 
     renderHero(place);
@@ -254,6 +342,8 @@
     el.root   = document.getElementById('drawer-place');
     el.scrim  = document.getElementById('drawer-scrim');
     el.close  = document.getElementById('drawer-close');
+    /* ⭐ 顶部那块（放照片背景的地方，Day 21） */
+    el.hero   = document.querySelector('.drawer-hero');
     el.kicker = document.getElementById('drawer-kicker');
     el.title  = document.getElementById('drawer-title');
     el.sub    = document.getElementById('drawer-sub');

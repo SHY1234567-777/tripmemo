@@ -177,6 +177,78 @@ function validateNewPlace(body) {
 }
 
 /**
+ * ⭐ 校验一个"修改地点"的请求体（Day 21）
+ *
+ * ⚠️⚠️ 和 validateNewPlace 的关键区别：**这是部分更新** ——
+ *    ⭐ **只校验"请求体里出现过的字段"，没出现的完全不碰**。
+ *    ⚠️ 如果像新增那样"缺什么就补默认值"，那前端一编辑就会把
+ *       `images` / `tags` 这些没带上的数据清空（契约 §四.4 专门警告过这点）。
+ *
+ * ⭐ 判断用 `'xxx' in body`（字段在不在），**不是** `if (body.xxx)`（值真不真）——
+ *    否则用户想把 note 清空（传空字符串）会清不掉。
+ *
+ * @returns {object} { ok:true, data:要改的字段 } 或 { ok:false, message:中文提示 }
+ */
+function validatePlacePatch(body) {
+  const b = body || {};
+  const data = {};
+
+  /* ---- 字符串类字段 ---- */
+  if ('name' in b) {
+    if (!b.name || String(b.name).trim() === '') {
+      return { ok: false, message: 'name（地点名称）不能改成空的' };
+    }
+    data.name = String(b.name).trim();
+  }
+  if ('city' in b) {
+    if (!b.city || String(b.city).trim() === '') {
+      return { ok: false, message: 'city（所属城市）不能改成空的' };
+    }
+    data.city = String(b.city).trim();
+  }
+
+  /* ---- 坐标 ---- */
+  if ('lng' in b) {
+    const lng = Number(b.lng);
+    if (!Number.isFinite(lng)) {
+      return { ok: false, message: 'lng（经度）必须是数字，收到的是：' + b.lng };
+    }
+    if (lng < -180 || lng > 180) {
+      return { ok: false, message: 'lng（经度）超出合理范围，应为 -180 ~ 180' };
+    }
+    data.lng = lng;
+  }
+  if ('lat' in b) {
+    const lat = Number(b.lat);
+    if (!Number.isFinite(lat)) {
+      return { ok: false, message: 'lat（纬度）必须是数字，收到的是：' + b.lat };
+    }
+    if (lat < -90 || lat > 90) {
+      return { ok: false, message: 'lat（纬度）超出合理范围，应为 -90 ~ 90' };
+    }
+    data.lat = lat;
+  }
+
+  /* ---- 类型 ---- */
+  if ('type' in b) {
+    if (VALID_PLACE_TYPES.indexOf(b.type) === -1) {
+      return { ok: false, message: 'type（地点类型）只能是 ' + VALID_PLACE_TYPES.join(' / ') + '，收到的是：' + b.type };
+    }
+    data.type = b.type;
+  }
+
+  /* ---- 其余可选字段：传了就更新（⭐ 空字符串是合法值，表示"清空"）---- */
+  ['startMonth', 'endMonth', 'note'].forEach(function (k) {
+    if (k in b) data[k] = b[k] ? String(b[k]) : '';
+  });
+  ['tags', 'images'].forEach(function (k) {
+    if (k in b) data[k] = Array.isArray(b[k]) ? b[k] : [];
+  });
+
+  return { ok: true, data: data };
+}
+
+/**
  * ⭐ 读取并解析请求体（Day 18 加）
  *
  * ⚠️⚠️ 这里有个很容易踩的点：
@@ -408,6 +480,61 @@ const server = http.createServer(async (req, res) => {
       return;
     } catch (err) {
       console.error('[TripMemo] GET /api/place 失败：', err);
+      sendError(res, 500, 'SERVER_ERROR', (err && err.message) || err);
+      return;
+    }
+  }
+
+  /* ------------------------------------------------------------
+     ⭐ PUT /api/place?id=xxx —— 修改一个地点（契约 §四.4，Day 21）
+     ------------------------------------------------------------
+     ⭐ 它是**部分更新**：只改请求体里出现的字段，没传的保持原样。
+     ⚠️ 契约特意警告过：绝不能把没传的字段重置成默认值 ——
+        否则前端一编辑，就会把 `images` / `tags` 这些没带上的清空。
+     ⚠️ `id` / `createdAt` / `ownerId` **不可改**（请求体里传了也忽略）。
+     ⚠️ 它和 GET /api/place 是**同一路径、不同方法**，靠 `req.method` 区分。 */
+  if (path === '/api/place' && req.method === 'PUT') {
+    try {
+      const id = url.searchParams.get('id');
+      if (!id) {
+        sendError(res, 400, 'INVALID_INPUT', '缺少 id 参数。用法：/api/place?id=xxx');
+        return;
+      }
+
+      let body;
+      try {
+        body = await readJsonBody(req);
+      } catch (e) {
+        sendError(res, 400, 'INVALID_INPUT', '请求体解析失败：' + e.message);
+        return;
+      }
+
+      const checked = validatePlacePatch(body);
+      if (!checked.ok) {
+        sendError(res, 400, 'INVALID_INPUT', checked.message);
+        return;
+      }
+
+      const r = await placesRepo.updatePlace(id, userId, checked.data);
+
+      if (!r.ok && r.reason === 'not_found') {
+        sendError(res, 404, 'NOT_FOUND', '找不到这个地点，或它不属于当前用户');
+        return;
+      }
+      if (!r.ok && r.reason === 'duplicate') {
+        sendError(res, 409, 'DUPLICATE_PLACE',
+          '改完之后会和已有的地点撞坐标：「' + (r.clashName || '') + '」。');
+        return;
+      }
+
+      console.log('[TripMemo] 修改地点成功 id=' + id
+        + ' owner=' + userId
+        + ' 改的字段=' + Object.keys(checked.data).join(','));
+
+      sendOk(res, { place: r.place });
+      return;
+    } catch (err) {
+      console.error('[TripMemo] PUT /api/place 失败：', err);
       sendError(res, 500, 'SERVER_ERROR', (err && err.message) || err);
       return;
     }

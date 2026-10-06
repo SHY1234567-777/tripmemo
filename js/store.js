@@ -55,6 +55,7 @@
         ④ 从会话里取出 access_token → ⭐ 之后每个请求都带上它
      ------------------------------------------------------------ */
   var CLOUD_ENV = 'tripmemo-d3gd23bd14a396d1d';
+  var cbaApp = null;     /* ⭐ SDK 实例 —— 上传照片要用它 */
   var cbaAuth = null;
   var accessToken = null;
   var authError = null;
@@ -75,6 +76,7 @@
     var app;
     try {
       app = global.cloudbase.init({ env: CLOUD_ENV, region: 'ap-shanghai' });
+      cbaApp = app;    /* ⭐ 存到外层，上传照片时要用 */
 
       /* ⚠️⚠️ 这里有个踩过的坑（Day 20）：
          取 auth 的方式在**新旧大版本之间不一样** ——
@@ -291,6 +293,182 @@
      二、增删改查
      ------------------------------------------------------------ */
 
+  /* ------------------------------------------------------------
+     ⭐⭐ 照片（Day 21）
+     ------------------------------------------------------------
+     ⭐ 存哪：CloudBase **云存储**（不是数据库）——
+        数据库里 `places.images` 只存**文件的 fileID**（一串 cloud:// 开头的标识）。
+     ⭐ 为什么不能存 Base64：一张手机照片变字符串后好几 MB，
+        而数据库一条文档上限 16MB —— 几张就爆了。
+
+     ⭐ 流程：压缩 → 上传拿 fileID → 存进 images（调 PUT）→ 显示时换链接
+     ------------------------------------------------------------ */
+
+  /** 照片的最长边（像素）—— ⚠️ 手机原图动辄 4000px，不压根本传不动 */
+  var PHOTO_MAX_SIDE = 1600;
+  /** JPEG 压缩质量 0~1 —— ⭐ 0.82 是"肉眼看不出、体积小很多"的常用值 */
+  var PHOTO_QUALITY = 0.82;
+
+  /**
+   * ⭐ 在浏览器里压缩一张图片（纯 canvas，不引任何库）
+   *
+   * ⚠️ 为什么必须压：手机拍一张 3~5MB，不压的话——
+   *    · 上传慢、费流量
+   *    · 云存储很快占满
+   *    · 页面加载一堆原图会卡
+   *
+   * @param {File} file
+   * @returns {Promise<File>} 压缩后的新文件（⭐ 仍是 File —— 上传接口要这个类型）
+   */
+  function compressImage(file) {
+    return new Promise(function (resolve, reject) {
+      var img = new Image();
+      var url = URL.createObjectURL(file);
+
+      img.onload = function () {
+        URL.revokeObjectURL(url);
+
+        var w = img.naturalWidth;
+        var h = img.naturalHeight;
+        var scale = Math.min(1, PHOTO_MAX_SIDE / Math.max(w, h));
+
+        var canvas = document.createElement('canvas');
+        canvas.width = Math.round(w * scale);
+        canvas.height = Math.round(h * scale);
+
+        var ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+        canvas.toBlob(function (blob) {
+          if (!blob) { reject(new Error('压缩失败（canvas.toBlob 返回空）')); return; }
+          /* ⚠️ 转成 File 而不是直接用 Blob ——
+             上传接口要的是 File 类型，用 Blob 有版本差异风险。 */
+          var name = 'photo_' + Date.now() + '.jpg';
+          try {
+            resolve(new File([blob], name, { type: 'image/jpeg' }));
+          } catch (e) {
+            /* 个别老浏览器没有 File 构造函数 —— 退回 Blob 试试 */
+            resolve(blob);
+          }
+        }, 'image/jpeg', PHOTO_QUALITY);
+      };
+
+      img.onerror = function () {
+        URL.revokeObjectURL(url);
+        reject(new Error('这张图片打不开（可能不是图片文件）'));
+      };
+
+      img.src = url;
+    });
+  }
+
+  /**
+   * ⭐ 上传一张照片到云存储
+   * @param {File} file
+   * @param {string} placeId 地点 id —— ⭐ 用它做目录，删地点时好找
+   * @returns {Promise<string>} ⭐ fileID（存在数据库里的就是它）
+   */
+  function uploadPhoto(file, placeId) {
+    if (!cbaApp) {
+      return Promise.reject(new Error('还没登录，不能上传照片'));
+    }
+    if (!file || file.type.indexOf('image/') !== 0) {
+      return Promise.reject(new Error('只能上传图片文件'));
+    }
+
+    return compressImage(file).then(function (compressed) {
+      /* ⚠️ cloudPath 规则：只允许字母数字 / ! - _ . 空格 * 和中文，用 / 分层。
+         这里按地点分目录，⭐ 将来"删地点时顺手删照片"能找到它们。 */
+      var cloudPath = 'places/' + placeId + '/'
+        + Date.now() + '_' + Math.random().toString(36).slice(2, 7) + '.jpg';
+
+      return cbaApp.uploadFile({ cloudPath: cloudPath, filePath: compressed });
+    }).then(function (res) {
+      if (!res || !res.fileID) throw new Error('上传成功但没拿到 fileID');
+      return res.fileID;
+    });
+  }
+
+  /**
+   * ⭐ 把 fileID 换成能放进 <img src> 的链接
+   *
+   * ⚠️ 为什么不自己拼 URL：官方明确警告过 ——
+   *    "不要拼接 envId / 域名 / 路径去造一个看起来像公开的链接，
+   *     要用 getTempFileURL() 拿 SDK 解析出来的地址"。
+   *
+   * ⭐ 云存储默认权限是"所有用户可读" —— 这种情况下拿到的链接**不过期**，
+   *    所以路径和显示都很直接。（如果以后改成私有读，这里要处理有效期。）
+   *
+   * @param {string[]} fileIDs
+   * @returns {Promise<Array<{fileID:string, url:string}>>} ⚠️ 失败的那些 url 为空字符串
+   */
+  function resolvePhotoUrls(fileIDs) {
+    var list = (fileIDs || []).filter(function (x) { return !!x; });
+    if (!list.length) return Promise.resolve([]);
+    if (!cbaApp) return Promise.resolve([]);
+
+    return cbaApp.getTempFileURL({
+      fileList: list.map(function (id) { return { fileID: id, maxAge: 3600 }; }),
+    }).then(function (res) {
+      return ((res && res.fileList) || []).map(function (f) {
+        return { fileID: f.fileID, url: f.tempFileURL || f.download_url || '' };
+      });
+    }).catch(function (err) {
+      console.warn('[TripMemo] 换取照片链接失败：', err);
+      return [];
+    });
+  }
+
+  /**
+   * ⭐ 扫描一个容器里所有"等着贴照片"的 <img>，批量换成真实链接（Day 21）
+   *
+   * ⭐ 为什么用这个套路（而不是在画缩略图时各自请求）：
+   *    列表一屏可能有十几个地点，**一个一个去换链接就是十几次请求**；
+   *    这里先收集再一次性换，只发一次。
+   *
+   * ⭐ 怎么用：缩略图里放一个 `<img data-photo-id="cloud://...">`（**先不设 src**），
+   *    渲染完之后调一次本函数即可。
+   * ⚠️ 换不到链接的那些 img 会被**移除** —— 下面那层"色块 + 首字"就露出来了，
+   *    正好是"没照片"该有的样子。
+   *
+   * @param {HTMLElement} root 要扫描的容器
+   */
+  function attachPhotosTo(root) {
+    if (!root || !root.querySelectorAll) return;
+
+    var imgs = Array.prototype.slice.call(root.querySelectorAll('img[data-photo-id]'));
+    if (!imgs.length) return;
+
+    /* ⭐ 去重：同一个 fileID 只请求一次（列表里可能重复出现） */
+    var ids = [];
+    imgs.forEach(function (img) {
+      var id = img.getAttribute('data-photo-id');
+      if (id && ids.indexOf(id) === -1) ids.push(id);
+    });
+    if (!ids.length) return;
+
+    resolvePhotoUrls(ids).then(function (list) {
+      var urlById = {};
+      list.forEach(function (item) { urlById[item.fileID] = item.url; });
+
+      imgs.forEach(function (img) {
+        var url = urlById[img.getAttribute('data-photo-id')];
+        if (url) {
+          img.src = url;
+        } else if (img.parentNode) {
+          /* ⚠️ 没换到 → 移除这个 img，让下面的色块露出来 */
+          img.parentNode.removeChild(img);
+        }
+      });
+    }).catch(function (err) {
+      console.warn('[TripMemo] 批量换照片链接失败：', err);
+      /* ⚠️ 整体失败时把所有占位 img 都撤掉 —— 宁可显示色块，不要留一片碎图 */
+      imgs.forEach(function (img) {
+        if (img.parentNode) img.parentNode.removeChild(img);
+      });
+    });
+  }
+
   /**
    * ⭐ 把一次本地改动同步到云数据库（Day 20）
    * ⚠️ 失败时**回滚本地数据** —— 否则界面会显示"实际上没存上"的东西（幽灵数据）。
@@ -305,13 +483,20 @@
         if (r.json && r.json.ok === true) return null;
         return new Error(errorMessageOf(r));
       });
+    } else if (action === 'update') {
+      /* ⭐ Day 21：修改接口做好了（PUT /api/place?id=）——
+         这是"给已有地点补照片"的前提，所以先做了它。
+         ⚠️ 服务端是**部分更新**：只改请求体里出现的字段。
+            这里传的是合并后的完整对象，也没问题（⭐ 它是"部分更新"的超集）。 */
+      promise = requestJson('PUT', '/api/place?id=' + encodeURIComponent(place.id), place)
+        .then(function (r) {
+          if (r.json && r.json.ok === true) return null;
+          return new Error(errorMessageOf(r));
+        });
     } else if (action === 'remove') {
       /* ⚠️ 删除接口（DELETE）还没做（清单里排在第 4 周）——
          所以这一步**只改本地**，云端仍然留着那条。
          ⭐ 这是已知缺口，记在 api-contract.md 的待办里。 */
-      return;
-    } else if (action === 'update') {
-      /* ⚠️ 修改接口（PUT）也还没做 —— 同上，只改本地。 */
       return;
     } else {
       return;
@@ -741,6 +926,10 @@
     listPlaces: listPlaces,
     init: init,                           /* ⭐ Day 20：页面启动时先从云端拉一次数据 */
     getAuthError: function () { return authError; },   /* ⭐ 登录失败时给界面显示用 */
+    /* ⭐ Day 21：照片相关 */
+    uploadPhoto: uploadPhoto,
+    resolvePhotoUrls: resolvePhotoUrls,
+    attachPhotosTo: attachPhotosTo,
     readPlacesResult: readPlacesResult,   /* Day 13：能如实报告"这次读失败"，给视图的四种状态用 */
     getPlace: getPlace,
     addPlace: addPlace,

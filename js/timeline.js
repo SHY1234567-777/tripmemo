@@ -85,17 +85,6 @@
     var thumb = document.createElement('div');
     thumb.className = 'timeline-thumb';
 
-    /* 有照片就贴照片（这条分支**保留** —— 将来加了上传，数据一变就自动生效） */
-    var first = (place.images && place.images.length) ? place.images[0] : '';
-    if (first) {
-      var img = document.createElement('img');
-      img.className = 'timeline-thumb-img';
-      img.src = first;
-      img.alt = place.name;
-      thumb.appendChild(img);
-      return thumb;
-    }
-
     /* ⭐ 没照片 → **按名字算的双色渐变 + 首字水印**（2026-09-28 手账改版）
        ⚠️ 和 `places.js` 的 `makeThumb` 是**同一套做法**（共用 `Model.thumbVariant` /
           `Model.initialOf` 和 CSS 里的 `.ph-N` 公共类）——
@@ -103,6 +92,18 @@
        ⚠️ 原来这里是灰底斜纹框 + 「暂无照片」；客户明确要求"禁止出现灰底暂无照片"。 */
     thumb.classList.add('ph-' + Model.thumbVariant(place.name));
     thumb.setAttribute('data-initial', Model.initialOf(place.name));
+
+    /* ⭐ 有照片 → 叠一个 <img>（Day 21，做法和 places.js 完全一致）
+       ⚠️ 不设 src：数据库里存的是 fileID，要等 Store.attachPhotosTo() 批量换。 */
+    var first = (place.images && place.images.length) ? place.images[0] : '';
+    if (first) {
+      var img = document.createElement('img');
+      img.className = 'timeline-thumb-img';
+      img.setAttribute('data-photo-id', first);
+      img.alt = place.name;
+      thumb.appendChild(img);
+    }
+
     return thumb;
   }
 
@@ -316,6 +317,12 @@
 
     /* ⭐ 装"进视口就点亮"的观察（2026-09-28 手账改版） */
     watchCardsInView();
+
+    /* ⭐ 批量把照片贴上（Day 21）
+       ⚠️ 必须放在最后：要等所有卡片都进 DOM 了才扫得到那些 img。
+       ⭐ 缩略图里的 <img> 只有 fileID 没有 src，这一步统一换链接；
+          换不到的会被移除，露出下面的色块。 */
+    Store.attachPhotosTo(elList);
   }
 
   /**
