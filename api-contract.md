@@ -393,13 +393,26 @@ https://tripmemo-d3gd23bd14a396d1d-148733444.ap-shanghai.app.tcloudbase.com/api/
 
 ### 4. ⭐ `PUT /api/place?id=` —— 修改
 
+> ## ✅ 已实现（Day 20.5）
+> **公网地址**（⭐ 完整地址，复制用）：
+> ```
+> https://tripmemo-d3gd23bd14a396d1d-148733444.ap-shanghai.app.tcloudbase.com/api/place?id=p_hnust_wuhan
+> ```
+> ⚠️ **它是"部分更新"** —— 只改请求体里**出现过**的字段，没出现的**保持原样**。
+> ⭐ 实现时专门注意了三点：
+> · ⭐ **按"字段在不在请求体里"判断**，**不是**按值真假 ——
+>   否则用户想把 `note` 清空（传空字符串）会被当成"没传"，清不掉。
+> · ⚠️ **绝不能拿默认值补没传的字段** —— 那会让前端一编辑就清空 `images` / `tags`。
+> · ⭐ **改完要查重，而且要排除自己** —— 否则"只改名字不改坐标"也会被自己挡住。
+> ⭐ **实测通过**：在前端改一个地点的备注 → 刷新 → 改动还在 ✓
+
 **请求**
 
 | 参数 | 位置 | 类型 | 必填 | 说明 |
 |---|---|---|---|---|
-| `id` | ⭐ **路径（path）** | string | ✅ | 要改的那个地点的 id（同 §四.2） |
+| `id` | ⭐ **查询参数（query）** | string | ✅ | 要改的那个地点的 id（同 §四.2）<br>⚠️ **不是路径参数** —— 见 §3.4 第 1 条：路径不能含冒号 |
 
-⭐ **无 query。** 请求体：⭐ **只传要改的字段**（部分更新），**没传的保持原样**。
+⭐ **无路径参数。** 请求体：⭐ **只传要改的字段**（部分更新），**没传的保持原样**。
 
 ```json
 { "note": "改成这句了", "tags": ["新疆"] }
@@ -409,11 +422,13 @@ https://tripmemo-d3gd23bd14a396d1d-148733444.ap-shanghai.app.tcloudbase.com/api/
 （`images: currentId ? ((Store.getPlace(currentId)||{}).images || []) : []`）——
 ⭐ **服务端绝对不能把没传的字段重置成默认值**，否则一编辑就丢数据。
 
-⚠️ **`id` 和 `createdAt` 不可改**（请求体里传了也忽略）—— 它们分别是主键和创建凭证。
+⚠️ **`_id`、`ownerId`、`createdAt` 不可改**（请求体里传了也忽略）——
+它们分别是主键、数据归属、创建凭证，都不该由客户端指定。
 
 **响应 `200`**：`{ "ok": true, "place": { ...更新后的完整 place 对象... } }`
 
-**错误**：`INVALID_INPUT` ｜ `NOT_FOUND` ｜ `SERVER_ERROR`
+**错误**：`INVALID_INPUT`（字段格式不对）｜ `NOT_FOUND`（id 不存在或不属于你）｜
+⭐ `DUPLICATE_PLACE`（409，改完会和别的地点撞坐标）｜ `SERVER_ERROR`
 
 ---
 
@@ -556,16 +571,19 @@ https://tripmemo-d3gd23bd14a396d1d-148733444.ap-shanghai.app.tcloudbase.com/api/
 
 ---
 
-## 六、进度（Day 17 状态）
+## 六、进度（Day 20.5 状态）
 
 | # | 接口 | 状态 |
 |---|---|---|
 | — | `GET /api/health` | ✅ **已上线**（Day 15） |
 | ⭐ **1** | ⭐ **`GET /api/places`** | ✅ ⭐ **已实现（Day 17）** |
-| ⭐ **6** | ⭐ **`GET /api/meta`** | ✅ ⭐ **已实现（Day 17）** |
+| ⭐ **2** | ⭐ **`GET /api/place?id=`** | ✅ ⭐ **已实现（Day 17.5）** |
 | ⭐ **3** | ⭐ **`POST /api/places`** | ✅ ⭐ **已实现（Day 18）** —— 含中文校验 + 防重复（409） |
-| 4、5、7、8、9 | 其余五个 | ⚠️ **仍是占位** —— Day 19 起写（`PUT` / `DELETE` / 批量 / 清空） |
-| — | ⚠️ `GET /api/db-check` | ⚠️ **临时接口，不在契约里**（Day 17 加，用来验"云函数能不能连数据库"）。验证已通过，**留还是删待定** |
+| ⭐ **4** | ⭐ **`PUT /api/place?id=`** | ✅ ⭐ **已实现（Day 20.5）** —— 部分更新 + 查重（排除自己） |
+| ⭐ **6** | ⭐ **`GET /api/meta`** | ✅ ⭐ **已实现（Day 17）** |
+| 5、7、8、9 | 其余四个 | ⚠️ **仍是占位** —— `DELETE /api/place` / `PUT /api/meta` / 批量写入 / 清空全部 |
+| — | ⚠️ `GET /api/db-check` | ⚠️ **临时接口，不在契约里**（Day 17 加，验"云函数能不能连数据库"）。已验证通过，**留还是删待定** |
+| — | ⚠️ `GET /api/whoami` | ⚠️ **临时接口，不在契约里**（Day 20 加，验"云函数能不能从 token 解出身份"）。已验证通过，**留还是删待定** |
 
 ### ⭐ 已上线的完整地址（⭐ 复制用，不省略前缀）
 
@@ -576,10 +594,24 @@ https://tripmemo-d3gd23bd14a396d1d-148733444.ap-shanghai.app.tcloudbase.com/api/
 https://tripmemo-d3gd23bd14a396d1d-148733444.ap-shanghai.app.tcloudbase.com/api/places
 ```
 ```
+https://tripmemo-d3gd23bd14a396d1d-148733444.ap-shanghai.app.tcloudbase.com/api/place?id=p_hnust_wuhan
+```
+```
+https://tripmemo-d3gd23bd14a396d1d-148733444.ap-shanghai.app.tcloudbase.com/api/places?type=travel&limit=2
+```
+```
 https://tripmemo-d3gd23bd14a396d1d-148733444.ap-shanghai.app.tcloudbase.com/api/meta
 ```
 ```
+https://tripmemo-d3gd23bd14a396d1d-148733444.ap-shanghai.app.tcloudbase.com/api/whoami
+```
+```
 https://tripmemo-d3gd23bd14a396d1d-148733444.ap-shanghai.app.tcloudbase.com/api/db-check
+```
+
+⭐ **另外**：公网检查台（⭐ 一个页面，不是接口）
+```
+https://tripmemo-d3gd23bd14a396d1d-1498733444.tcloudbaseapp.com/tripmemo/check.html
 ```
 
 ### ⚠️ 上线一个新接口，永远是**两步**（Day 17 踩过）
