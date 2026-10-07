@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1600">
+<title>TripMemo 第 3 周交付页</title>
+<!--
+  TripMemo 第 3 周交付页（2026-10-07 · Day 21）
+
+  ⭐ 它解决什么问题：
+     验收表 + 演示提纲的详细版在 TripMemo-第3周验收表与演示提纲-20261006.md 里，
+     但那份 276 行、要滚五六屏，**截不出一张完整的作业图**。
+     ⭐ 这一页把三样东西压成**三栏并排**，一屏拍全。
+
+  ⚠️ 详细版（.md）保留不动 —— 它是"过程记录"，这一页是"交付面"。
+  ⭐ 色板沿用项目手账配色（和网站一致，一看就是同一个作品）。
+-->
+<style>
+  :root {
+    --bg: #F7F2E9;
+    --card: #FBF7EF;
+    --surface: #F1E8D8;
+    --line: #E4D9C6;
+    --text: #3D3428;
+    --muted: #6B6153;
+    --ink: #5B4636;
+    --accent: #C0523F;
+    --ok: #5F6C57;
+    --warn: #A97C2F;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
+                 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+    font-size: 13px; line-height: 1.55;
+    padding: 14px 16px 18px;
+  }
+  header {
+    display: flex; align-items: baseline; gap: 12px;
+    padding-bottom: 8px; margin-bottom: 12px;
+    border-bottom: 2px solid var(--ink);
+  }
+  h1 { font-size: 19px; color: var(--ink); letter-spacing: .01em; }
+  .sub { font-size: 12px; color: var(--muted); }
+  .sub b { color: var(--text); }
+
+  .cols { display: grid; grid-template-columns: 1.15fr 0.85fr 1fr; gap: 14px; }
+
+  .col { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 11px 12px 12px; }
+  .col h2 {
+    font-size: 13px; color: var(--ink); margin-bottom: 9px;
+    padding-bottom: 6px; border-bottom: 1px dashed var(--line);
+    display: flex; align-items: center; gap: 6px;
+  }
+  .col h2 .n {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 17px; height: 17px; border-radius: 50%;
+    background: var(--ink); color: #fff; font-size: 11px; flex: 0 0 auto;
+  }
+
+  /* ---------- 验收项 ---------- */
+  .item { margin-bottom: 7px; padding-bottom: 7px; border-bottom: 1px dotted var(--line); }
+  .item:last-of-type { border-bottom: 0; margin-bottom: 4px; }
+  .item-top { display: flex; align-items: center; gap: 6px; }
+  .item-name { font-weight: 600; flex: 1; }
+  .tag {
+    font-size: 11px; padding: 1px 7px; border-radius: 20px; white-space: nowrap;
+    background: var(--surface); color: var(--muted);
+  }
+  .tag.ok { background: #E4EADF; color: var(--ok); }
+  .tag.part { background: #F5EBD8; color: var(--warn); }
+  .item-note { color: var(--muted); font-size: 11.5px; margin-top: 1px; }
+  .item-note a { color: var(--accent); text-decoration: none; word-break: break-all; }
+  .item-note a:hover { text-decoration: underline; }
+
+  .todo {
+    margin-top: 9px; padding: 7px 9px;
+    background: var(--surface); border-radius: 7px; font-size: 11.5px; color: var(--muted);
+  }
+  .todo b { color: var(--accent); }
+
+  /* ---------- 同伴结论 ---------- */
+  .peer { display: flex; flex-direction: column; gap: 8px; }
+  .peer-row {
+    display: flex; align-items: center; gap: 9px;
+    padding: 8px 10px; border-radius: 8px;
+    background: linear-gradient(135deg, #EDF1E8, #E4EADF);
+  }
+  .peer-mark { font-size: 17px; color: var(--ok); flex: 0 0 auto; }
+  .peer-q { font-size: 11.5px; color: var(--muted); }
+  .peer-a { font-weight: 600; }
+  .note { margin-top: 9px; font-size: 11.5px; color: var(--muted); }
+  .note b { color: var(--text); }
+  .note code {
+    background: var(--surface); padding: 0 4px; border-radius: 3px;
+    font-family: ui-monospace, Consolas, monospace; font-size: 11px;
+  }
+  .uid {
+    margin-top: 7px; padding: 6px 8px; border-radius: 6px;
+    background: #2F2A23; color: #E8E2D6;
+    font-family: ui-monospace, Consolas, monospace; font-size: 10.5px;
+    line-height: 1.5; word-break: break-all;
+  }
+  .uid i { color: #9BC08A; font-style: normal; }
+
+  /* ---------- 演示提纲 ---------- */
+  .seg { margin-bottom: 8px; }
+  .seg:last-of-type { margin-bottom: 4px; }
+  .seg-t { font-weight: 600; color: var(--ink); }
+  .seg-t span { color: var(--muted); font-weight: 400; font-size: 11px; }
+  .seg-b { color: var(--muted); font-size: 11.5px; }
+  .done {
+    margin-top: 9px; padding: 7px 9px; border-radius: 7px;
+    background: linear-gradient(135deg, #EDF1E8, #E4EADF);
+    font-size: 11.5px; color: var(--ok);
+  }
+  .done b { color: var(--text); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>TripMemo 第 3 周交付页</h1>
+  <div class="sub">
+    Day 21 · <b>2026-10-07</b> ｜ 项目：<b>人生记忆地图</b> ｜
+    详细版见 <b>TripMemo-第3周验收表与演示提纲-20261006.md</b>
+  </div>
+</header>
+
+<div class="cols">
+
+  <!-- ============ ① 周验收表 ============ -->
+  <section class="col">
+    <h2><span class="n">1</span>第 3 周验收表（逐项有证据）</h2>
+
+    <div class="item">
+      <div class="item-top">
+        <span class="item-name">GET / POST 公网接口</span>
+        <span class="tag ok">PASS</span>
+      </div>
+      <div class="item-note">
+        浏览器直接打开：
+        <a href="https://tripmemo-d3gd23bd14a396d1d-148733444.ap-shanghai.app.tcloudbase.com/api/places" target="_blank" rel="noopener">/api/places</a>
+        ·
+        <a href="https://tripmemo-d3gd23bd14a396d1d-148733444.ap-shanghai.app.tcloudbase.com/api/place?id=p_hnust_wuhan" target="_blank" rel="noopener">/api/place?id=…</a>
+        ·
+        <a href="https://tripmemo-d3gd23bd14a396d1d-148733444.ap-shanghai.app.tcloudbase.com/api/meta" target="_blank" rel="noopener">/api/meta</a>
+        <br>写入实测：前端加/改地点 → 刷新后仍在（数据库可查）
+      </div>
+    </div>
+
+    <div class="item">
+      <div class="item-top">
+        <span class="item-name">分层重构</span>
+        <span class="tag ok">PASS</span>
+      </div>
+      <div class="item-note">
+        三层四文件：<b>接口层</b> <code>index.js</code>（649 行）｜
+        <b>数据访问层</b> <code>repositories/</code>（3 个）｜ <b>连接层</b> <code>cloudbase.js</code>
+        <br>验证：在 <code>index.js</code> 里搜 <code>db.collection</code> → <b>搜不到</b>
+      </div>
+    </div>
+
+    <div class="item">
+      <div class="item-top">
+        <span class="item-name">公网检查台</span>
+        <span class="tag ok">PASS</span>
+      </div>
+      <div class="item-note">
+        <a href="https://tripmemo-d3gd23bd14a396d1d-1498733444.tcloudbaseapp.com/tripmemo/check.html" target="_blank" rel="noopener">/tripmemo/check.html</a>
+        <br>三个板块：后端健康状态 ｜ 核心表真实数据 ｜ 写入测试入口（+ 最后更新时间）
+      </div>
+    </div>
+
+    <div class="item">
+      <div class="item-top">
+        <span class="item-name">api-contract.md 完整性</span>
+        <span class="tag ok">PASS</span>
+      </div>
+      <div class="item-note">
+        629 行，九个接口逐条写清；<b>已实现标记 5 处</b>；§六 进度表更新到 Day 20.5
+      </div>
+    </div>
+
+    <div class="item">
+      <div class="item-top">
+        <span class="item-name">schema / seed</span>
+        <span class="tag part">部分 PASS</span>
+      </div>
+      <div class="item-note">
+        <code>db/schema.json</code>（105 行）+ <code>db/seed/*.json</code>（18 条）
+        <br>⚠️ 是<b>可重复导入的数据文件</b>，但不是<b>能一键跑的脚本</b>
+      </div>
+    </div>
+
+    <div class="todo">
+      ⚠️ <b>如实标记的 7 项未完成</b>：<code>DELETE /api/place</code> ｜
+      <code>PUT /api/meta</code> ｜ <code>POST /api/places/bulk</code> ｜
+      <code>DELETE /api/places</code> ｜ seed 脚本（<b>FAIL</b>）｜
+      写入失败留痕 ｜ <code>FALLBACK_USER_ID</code> 安全口子
+    </div>
+  </section>
+
+  <!-- ============ ② 同伴交叉验证 ============ -->
+  <section class="col">
+    <h2><span class="n">2</span>同伴交叉验证（三行结论）</h2>
+
+    <div class="peer">
+      <div class="peer-row">
+        <span class="peer-mark">✓</span>
+        <div>
+          <div class="peer-q">① 能否打开</div>
+          <div class="peer-a">可以</div>
+        </div>
+      </div>
+      <div class="peer-row">
+        <span class="peer-mark">✓</span>
+        <div>
+          <div class="peer-q">② 能否真实读写</div>
+          <div class="peer-a">可以（加的地点刷新后还在）</div>
+        </div>
+      </div>
+      <div class="peer-row">
+        <span class="peer-mark">✓</span>
+        <div>
+          <div class="peer-q">③ 有无报错</div>
+          <div class="peer-a">无红色报错</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="note">
+      ⭐ <b>仅有的一条黄色警告，来源不是本项目</b>：<br>
+      <code>Canvas2D: Multiple readback operations…</code><br>
+      来源 <code>maps?v=2.0&amp;key=…</code> = <b>高德地图 SDK 自己的文件</b>；
+      是 <b>Warning</b> 不是 <b>Error</b>，不影响任何功能。
+    </div>
+
+    <div class="note" style="margin-top:8px">
+      ⭐ <b>同伴那侧的身份解析也是通的</b>（他 Console 里的关键一行）：
+    </div>
+    <div class="uid">
+      [TripMemo] 身份自检 →<br>
+      {"ok":true,"resolved":<i>true</i>,"usedFallback":<i>false</i>,<br>
+      &nbsp;"userId":"PJ4zQejz57dzMD0XdHgGPQ"}
+    </div>
+    <div class="note" style="margin-top:6px">
+      <b>resolved:true + usedFallback:false</b> = 平台验证了他的 token、拿到真实 uid
+    </div>
+  </section>
+
+  <!-- ============ ③ 演示提纲 ============ -->
+  <section class="col">
+    <h2><span class="n">3</span>演示提纲（3–5 分钟）</h2>
+
+    <div class="seg">
+      <div class="seg-t">① 用户问题 <span>40 秒</span></div>
+      <div class="seg-b">
+        现有产品只标到<b>城市</b>层，说不出"在城里具体待在哪、待了多久"；也难<b>补记过去</b>。<br>
+        要做三件事：<b>能补记过去</b> · <b>让停留时长被看见</b> · <b>把照片挂回它的地点</b>
+      </div>
+    </div>
+
+    <div class="seg">
+      <div class="seg-t">② 核心流程 <span>2 分钟 · 现场操作</span></div>
+      <div class="seg-b">
+        打开公网首页 → 搜地点加一条 → <b>刷新，它还在</b>（= 真实写入 + 持久化）→
+        传两张照片（自动压缩）→ <b>把第二张设为封面</b> →
+        看列表 / 时间轴 / 抽屉顶部跟着变 →
+        <b>无痕窗口打开：看不到刚加的内容</b>（= 用户分流）→ 打开检查台
+      </div>
+    </div>
+
+    <div class="seg">
+      <div class="seg-t">③ 提示词改写过程 <span>1 分钟</span></div>
+      <div class="seg-b">
+        <b>接口路径</b>：AI 写成 <code>/api/places/:id</code> → 平台不允许冒号 → 改成 <code>/api/place?id=</code><br>
+        <b>错误提示</b>：一开始英文且只报 "invalid" → 要求中文且<b>说清缺哪一项</b><br>
+        <b>照片显示</b>：把 fileID 当网址 → 加载失败 → 要求<b>先换链接、换不到显示色块</b><br>
+        ⭐ 经验：<b>带着"我刚看到什么错"去改写，AI 才给得准</b>
+      </div>
+    </div>
+
+    <div class="seg">
+      <div class="seg-t">④ 验证方式 <span>40 秒</span></div>
+      <div class="seg-b">
+        公网可访问（浏览器开接口看 JSON）｜ <b>真实读写</b>（加/改 → 刷新 → 还在，并去数据库核对）｜
+        <b>身份分流</b>（无痕窗口互不可见）｜ <b>检查台</b>（一页看健康 + 真实数据）｜
+        <b>出错路径也验</b>（缺字段 400、重复 409）
+      </div>
+    </div>
+
+    <div class="done">
+      ✅ <b>已完整走通</b>：2026-10-06 17:51，8 步全做，无卡点 ——
+      含第 3 步「刷新后还在」、第 7 步「无痕窗口看不到」两个关键验证
+    </div>
+  </section>
+
+</div>
+
+</body>
+</html>

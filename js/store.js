@@ -301,7 +301,7 @@
      ⭐ 为什么不能存 Base64：一张手机照片变字符串后好几 MB，
         而数据库一条文档上限 16MB —— 几张就爆了。
 
-     ⭐ 流程：压缩 → 上传拿 fileID → 存进 images（调 PUT）→ 显示时换链接
+     ⭐ 流程：压缩 → 上传拿 fileID → 存进 images（调 PATCH）→ 显示时换链接
      ------------------------------------------------------------ */
 
   /** 照片的最长边（像素）—— ⚠️ 手机原图动辄 4000px，不压根本传不动 */
@@ -420,6 +420,36 @@
   }
 
   /**
+   * ⭐ 从云存储删掉若干文件（Day 22）
+   *
+   * ⚠️ 为什么失败**不报给用户**：
+   *    地点在数据库里**已经删掉了** —— 照片没删干净只是留个孤儿文件，
+   *    不该让用户看到"删除失败"这种误导性的提示。
+   *    ⭐ 所以这里只 `console.warn` 留个记录，供以后排查/清理。
+   *
+   * @param {string[]} fileIDs
+   */
+  function deleteCloudFiles(fileIDs) {
+    var list = (fileIDs || []).filter(function (x) { return !!x; });
+    if (!list.length || !cbaApp) return;
+
+    cbaApp.deleteFile({ fileList: list }).then(function (res) {
+      /* ⚠️ 官方文档提醒：要**逐条检查**返回结果，别假设全成功 */
+      var failed = ((res && res.fileList) || []).filter(function (f) {
+        return f.code !== 'SUCCESS';
+      });
+      if (failed.length) {
+        console.warn('[TripMemo] 有 ' + failed.length + ' 张照片没删掉'
+          + '（不影响地点已删除，但云存储里会留孤儿文件）：', failed);
+      } else {
+        console.log('[TripMemo] 已清理 ' + list.length + ' 张照片');
+      }
+    }).catch(function (err) {
+      console.warn('[TripMemo] 删云存储文件失败（地点本身已删掉，只是留了孤儿文件）：', err);
+    });
+  }
+
+  /**
    * ⭐ 扫描一个容器里所有"等着贴照片"的 <img>，批量换成真实链接（Day 21）
    *
    * ⭐ 为什么用这个套路（而不是在画缩略图时各自请求）：
@@ -484,20 +514,33 @@
         return new Error(errorMessageOf(r));
       });
     } else if (action === 'update') {
-      /* ⭐ Day 21：修改接口做好了（PUT /api/place?id=）——
-         这是"给已有地点补照片"的前提，所以先做了它。
-         ⚠️ 服务端是**部分更新**：只改请求体里出现的字段。
+      /* ⭐ 这里用 **PATCH**（Day 22 把名字改对了）。
+         ⭐ 为什么原来是 PUT：这个接口做的是"部分更新"（只改传了的字段）——
+            那正是 PATCH 的语义，叫 PUT 是名字没对上。
+         ⚠️ 服务端现在**两个方法都接受**，所以老的 PUT 也不会坏。
+         ⚠️ 服务端是部分更新：只改请求体里出现的字段；
             这里传的是合并后的完整对象，也没问题（⭐ 它是"部分更新"的超集）。 */
-      promise = requestJson('PUT', '/api/place?id=' + encodeURIComponent(place.id), place)
+      promise = requestJson('PATCH', '/api/place?id=' + encodeURIComponent(place.id), place)
         .then(function (r) {
           if (r.json && r.json.ok === true) return null;
           return new Error(errorMessageOf(r));
         });
     } else if (action === 'remove') {
-      /* ⚠️ 删除接口（DELETE）还没做（清单里排在第 4 周）——
-         所以这一步**只改本地**，云端仍然留着那条。
-         ⭐ 这是已知缺口，记在 api-contract.md 的待办里。 */
-      return;
+      /* ⭐ Day 22：删除接口做好了（DELETE /api/place?id=）。
+         ⭐ 云端删成功之后，**顺手把这条地点的照片也从云存储删掉** ——
+            ⚠️ 不删的话文件会永远留在云存储里，成为"孤儿文件"（白占额度、还删不掉）。
+         服务端返回里带上了被删的那条，正好用它拿 `images`。 */
+      promise = requestJson('DELETE', '/api/place?id=' + encodeURIComponent(place.id))
+        .then(function (r) {
+          if (!r.json || r.json.ok !== true) {
+            return new Error(errorMessageOf(r));
+          }
+          var imgs = (r.json.place && r.json.place.images)
+            || (place && place.images)
+            || [];
+          deleteCloudFiles(imgs);
+          return null;
+        });
     } else {
       return;
     }

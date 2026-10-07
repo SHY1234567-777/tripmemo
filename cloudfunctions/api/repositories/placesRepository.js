@@ -220,6 +220,38 @@ async function updatePlace(id, ownerId, patch) {
 }
 
 /**
+ * ⭐ 删除一个地点（Day 22）
+ *
+ * ⚠️ 这是**硬删除** —— 真从数据库里删掉，删了找不回来。
+ *    契约 §四.5 明确写了"本期不引入 deleted 标记"，所以不做软删除。
+ *    ⭐ 前端已经有一层二次确认（`detail.js` 的 `window.confirm`）。
+ *
+ * ⚠️ 先查再删，**不是多此一举**：
+ *    · 要确认"这条存在**而且**属于当前用户" —— 否则会变成"能删别人的数据"
+ *    · 而且**删之前得把这条读出来** —— ⭐ 前端要拿它的 `images`
+ *      去云存储里删照片（不删就留下孤儿文件）
+ *
+ * @param {string} id
+ * @param {string} ownerId
+ * @returns {Promise<{ok:boolean, deleted?:number, place?:object, reason?:string}>}
+ *          ⭐ `place` 是被删掉的那条（供前端清理云存储用）
+ */
+async function deletePlace(id, ownerId) {
+  const found = await db.collection(COLLECTION)
+    .where({ _id: id, ownerId: ownerId })
+    .limit(1)
+    .get();
+
+  const doc = (found.data || [])[0];
+  if (!doc) return { ok: false, reason: 'not_found' };
+
+  const res = await db.collection(COLLECTION).doc(id).remove();
+  const deleted = (res && typeof res.deleted === 'number') ? res.deleted : 1;
+
+  return { ok: true, deleted: deleted, place: toApiPlace(doc) };
+}
+
+/**
  * ⭐ 数条数 + 取第一条（给 `/api/db-check` 那个临时接口用）
  * @returns {Promise<{count:number, first:object|null}>} first 是**原始文档**
  */
@@ -241,6 +273,7 @@ module.exports = {
   findPlaceById: findPlaceById,
   findExistingAtCoordinate: findExistingAtCoordinate,
   updatePlace: updatePlace,
+  deletePlace: deletePlace,
   insertPlace: insertPlace,
   countAll: countAll,
 };

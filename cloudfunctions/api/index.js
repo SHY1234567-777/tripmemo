@@ -486,14 +486,19 @@ const server = http.createServer(async (req, res) => {
   }
 
   /* ------------------------------------------------------------
-     ⭐ PUT /api/place?id=xxx —— 修改一个地点（契约 §四.4，Day 21）
+     ⭐ PATCH / PUT /api/place?id=xxx —— 修改一个地点（契约 §四.4）
      ------------------------------------------------------------
-     ⭐ 它是**部分更新**：只改请求体里出现的字段，没传的保持原样。
+     ⭐ **它其实是 PATCH，不是 PUT** —— Day 22 把名字改对了：
+        · 这个接口是**部分更新**（只改传了的字段），那正是 **PATCH** 的语义；
+        · ⚠️ 严格意义的 PUT 是"整体替换"，没传的字段会被清空 ——
+          那在前端一编辑就会把 `images` / `tags` 抹掉，是灾难性的丢数据。
+     ⚠️ **为什么两个方法都接受**：保留 PUT 兼容 ——
+        万一某个网关不认 PATCH 方法，老的 PUT 请求还能用（保险，不是冗余）。
      ⚠️ 契约特意警告过：绝不能把没传的字段重置成默认值 ——
         否则前端一编辑，就会把 `images` / `tags` 这些没带上的清空。
      ⚠️ `id` / `createdAt` / `ownerId` **不可改**（请求体里传了也忽略）。
      ⚠️ 它和 GET /api/place 是**同一路径、不同方法**，靠 `req.method` 区分。 */
-  if (path === '/api/place' && req.method === 'PUT') {
+  if (path === '/api/place' && (req.method === 'PUT' || req.method === 'PATCH')) {
     try {
       const id = url.searchParams.get('id');
       if (!id) {
@@ -534,7 +539,49 @@ const server = http.createServer(async (req, res) => {
       sendOk(res, { place: r.place });
       return;
     } catch (err) {
-      console.error('[TripMemo] PUT /api/place 失败：', err);
+      console.error('[TripMemo] ' + req.method + ' /api/place 失败：', err);
+      sendError(res, 500, 'SERVER_ERROR', (err && err.message) || err);
+      return;
+    }
+  }
+
+  /* ------------------------------------------------------------
+     ⭐ DELETE /api/place?id=xxx —— 删除一个地点（契约 §四.5，Day 22）
+     ------------------------------------------------------------
+     ⚠️ **硬删除** —— 真删，删了找不回来（契约里明确"本期不引入 deleted 标记"）。
+        ⭐ 前面那层保护是前端的一键二次确认（`detail.js` 的 `window.confirm`）。
+     ⭐ 返回里带上**被删掉的那条** —— 前端要拿它的 `images` 去云存储删照片，
+        否则会留下一堆永远没人访问的孤儿文件。
+     ⚠️ 和阅读接口同路径、不同方法，靠 `req.method` 区分。 */
+  if (path === '/api/place' && req.method === 'DELETE') {
+    try {
+      const id = url.searchParams.get('id');
+      if (!id) {
+        sendError(res, 400, 'INVALID_INPUT', '缺少 id 参数。用法：/api/place?id=xxx');
+        return;
+      }
+
+      const r = await placesRepo.deletePlace(id, userId);
+
+      if (!r.ok && r.reason === 'not_found') {
+        /* ⭐ 中文、说清楚"两种可能" —— 不能让人以为"只是没找到"，
+           也可能是"这条不属于你"（但**不区分**，避免被用来探测别人的数据） */
+        sendError(res, 404, 'NOT_FOUND', '找不到这个地点（它可能已经被删掉了，或者不属于当前用户）');
+        return;
+      }
+
+      console.log('[TripMemo] 删除地点成功 id=' + id
+        + ' owner=' + userId
+        + ' 删除条数=' + r.deleted
+        + ' 带走的照片=' + ((r.place && r.place.images) ? r.place.images.length : 0) + ' 张');
+
+      /* ⭐ 响应形状按契约 §四.5：{ ok:true, deleted:1 }，
+         但**多带一个 place** —— 前端要靠它知道该删云存储里哪些文件。
+         ⚠️ 契约里只写了 deleted，这是**有意的扩展**，已在契约里注明。 */
+      sendOk(res, { deleted: r.deleted, place: r.place });
+      return;
+    } catch (err) {
+      console.error('[TripMemo] DELETE /api/place 失败：', err);
       sendError(res, 500, 'SERVER_ERROR', (err && err.message) || err);
       return;
     }
