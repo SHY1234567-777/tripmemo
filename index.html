@@ -17,7 +17,8 @@
   <link rel="preconnect" href="https://fonts.loli.net" crossorigin>
   <link rel="stylesheet"
         href="https://fonts.loli.net/css2?family=Noto+Serif+SC:wght@600;700&family=Ma+Shan+Zheng&display=swap">
-  <link rel="stylesheet" href="css/style.css?v=68">
+  <link rel="stylesheet" href="css/style.css?v=69">
+  <link rel="stylesheet" href="css/landing-c.css?v=69">
 </head>
 <body>
 
@@ -132,56 +133,1119 @@
 
   <main class="app-main">
 
-    <!-- ===== 视图 0：门面页（Day 11 新增）=====
+    <!-- ===== 视图 0：门面页 · 方案 C「胶卷冲印」（2026-10-09 改版）=====
          访客看到的第一屏 —— **不是功能页**，是"这是什么"的自我介绍。
-         点「开始记录」进入地图视图。
+         点「开始记录」进地图视图（靠 id="landing-enter" 绑定，见 js/main.js）。
 
-         结构与参考站（html5up.net/dimension）一致：
-           全屏背景 + 一圈内缩细描边 → 圆形徽标 + 竖线 → 大标题
-           → 横线 → 一行小字 → 横线 → 一个按钮 → 底部一行小字
+         结构：全屏实景照（.c-bg：桌面静物）→ 标题区 → 一叠底片（.c-deck）
+               → 点一下，五张绕底边转开成扇 → 右侧独立一张「开始记录」卡
 
          ⚠️ 这一屏**不显示左侧导航**（靠 body.is-landing 控制）。
             门面就该是整屏一屏，露出一排功能菜单就不像门面了。
          ⚠️ 它没有"返回入口"：它是**门**，不是视图之一。
-            想再看一次刷新页面即可。 -->
+            想再看一次刷新页面即可。
+         ⚠️ 样式在独立的 `css/landing-c.css`、交互在独立的 `js/landing-c.js` ——
+            两个文件都**只服务这一屏**，与 app 其它部分完全隔离（.c-* 前缀零冲突）。
+            那两张表自带一套暗房色调，**刻意不套**项目的 --color-* 与字号 7 档。 -->
     <section class="view is-active" id="view-landing">
-      <div class="landing">
+          <div class="c-bg" aria-hidden="true"></div>
+       <div class="c-fit">
+        <!-- 颗粒层：盖在所有内容之上（老胶片颗粒是叠在画面上的，不是垫在底下） -->
+        <div class="c-grain" aria-hidden="true"></div>
 
-        <!-- 徽标：**把地图上那张图抽象出来** ——
-             一个实心点（主城市锚点）+ 三条弧线放射出去，弧线**越短越细**
-             （呼应"线宽 ∝ 停留时长"这条产品主视觉）。
-             ⚠️ 用内联 SVG 而不是图片文件：**不增加任何项目资产**，
-                而且能跟着 CSS 的 color 走（换主题色不用重画）。
-             ⚠️ 口径统一：三条弧的 `stroke-width` 递减 = 时长递减，
-                所以最细那条别细到看不见（下面是 2.2 / 1.7 / 1.2）。 -->
-        <div class="landing-mark" aria-hidden="true">
-          <svg class="landing-mark-svg" viewBox="0 0 48 48" focusable="false"
-               fill="none" stroke="currentColor" stroke-linecap="round">
-            <!-- 三条弧：从锚点放射出去 -->
-            <path d="M13 36 Q 20 13 37 11" stroke-width="2.2"></path>
-            <path d="M13 36 Q 25 21 39 24" stroke-width="1.7"></path>
-            <path d="M13 36 Q 25 28 37 35" stroke-width="1.2"></path>
-            <!-- 终点：越远的越大（对应地图上"停得越久的点越大"） -->
-            <circle cx="37" cy="11" r="2.7" fill="currentColor" stroke="none"></circle>
-            <circle cx="39" cy="24" r="2.1" fill="currentColor" stroke="none"></circle>
-            <circle cx="37" cy="35" r="1.5" fill="currentColor" stroke="none"></circle>
-            <!-- 锚点最后画，压在三条弧的起点上，视觉上"从这里出发" -->
-            <circle cx="13" cy="36" r="4.2" fill="currentColor" stroke="none"></circle>
-          </svg>
+        <div class="c-head">
+          <p class="c-kicker">ROLL 001 / TRIPMEMO</p>
+          <h1 class="c-title">TripMemo</h1>
+          <p class="c-sub">每一张卡是一个地方，每一张都存着一段停留。<br>把它们摊开，就是你走过的那张地图。</p>
         </div>
 
-        <h1 class="landing-title">TripMemo</h1>
+        <!-- ⚠️ 横向滚动带的老问题：入口在第一屏之外，访客不知道往哪走。
+             这里给一个**常驻的显式指路**，并把它指向右侧。 -->
+        <!-- ⭐⭐ 摊牌区 · 点一下像扇子一样转开
+             ⚠️ 这里**没有**"入口在胶卷末端"的指路 —— 入口就是右侧那张独立卡片 -->
+        <div class="c-deck is-stacked" id="c-deck">
+          <div class="c-fan" id="c-fan" role="button" tabindex="0"
+               aria-expanded="false" aria-label="展开五张地点卡">
 
-        <hr class="landing-rule">
+            <button type="button" class="c-fanhint" id="c-fanhint">
+              <span>点一下，摊开</span>
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+                   stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M8 2v12M3.6 9.6L8 14l4.4-4.4"/>
+              </svg>
+            </button>
 
-        <p class="landing-sub">记录足迹，珍藏每一段在路上的故事</p>
+            <!-- ============ 01 武汉 ============ -->
+            <div class="c-frame" style="--fan-i:-2"
+                 data-top="0" data-city="武汉" role="button" tabindex="0"
+                 aria-label="武汉 · 住了四年，从宿舍到光谷">
+              <div class="c-photo" style="background-image:url('assets/landing-city-wuhan.jpg')"></div>
+              <div class="c-shot">
+    <svg viewBox="0 0 212 268" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+                  <defs>
+                    <!-- 黄昏天空：上暗紫蓝 → 下暖橙，这是落日时分的真实梯度 -->
+                    <linearGradient id="wh-sky" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%"   stop-color="#1b2436"/>
+                      <stop offset="34%"  stop-color="#3d4155"/>
+                      <stop offset="58%"  stop-color="#8a6a55"/>
+                      <stop offset="78%"  stop-color="#d4934f"/>
+                      <stop offset="100%" stop-color="#f0b566"/>
+                    </linearGradient>
+                    <linearGradient id="wh-water" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%"   stop-color="#7a5a3a"/>
+                      <stop offset="22%"  stop-color="#3f3040"/>
+                      <stop offset="100%" stop-color="#141018"/>
+                    </linearGradient>
+                    <!-- 太阳：一团被雾霾柔化的光 -->
+                    <radialGradient id="wh-sun">
+                      <stop offset="0%"   stop-color="#ffe0a8" stop-opacity=".95"/>
+                      <stop offset="46%"  stop-color="#f2a552" stop-opacity=".55"/>
+                      <stop offset="100%" stop-color="#f2a552" stop-opacity="0"/>
+                    </radialGradient>
+                    <!-- 远景剪影用"大气透视"：越远越淡、越偏天空色 -->
+                    <linearGradient id="wh-far" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stop-color="#5a4a52"/>
+                      <stop offset="100%" stop-color="#3a3038"/>
+                    </linearGradient>
+                  </defs>
 
-        <hr class="landing-rule">
+                  <rect width="212" height="268" fill="url(#wh-sky)"/>
+                  <!-- 太阳光晕：黄昏的雾霾把太阳泡开成一团 -->
+                  <circle cx="152" cy="126" r="62" fill="url(#wh-sun)"/>
+                  <circle cx="152" cy="126" r="12" fill="#ffe9c0" opacity=".85"/>
+                  <!-- 几缕横云：薄薄地划过太阳，是黄昏最有信息量的细节 -->
+                  <g fill="#c08a6a" opacity=".2">
+                    <path d="M96 112 Q132 106 176 112 Q184 114 176 116 Q132 111 96 116 Z"/>
+                    <path d="M112 134 Q148 130 190 136 Q196 138 188 140 Q148 135 112 138 Z"/>
+                  </g>
 
-        <button type="button" class="landing-cta" id="landing-enter">开始记录</button>
+                  <!-- 远处的山脊（最淡，压在天际线上） -->
+                  <path d="M0 130 L24 116 L44 124 L64 110 L86 122 L106 114 L130 126 L150 120 L176 130 L196 124 L212 132 L212 140 L0 140 Z"
+                        fill="url(#wh-far)" opacity=".5"/>
 
-        <p class="landing-foot">数据存在你自己的浏览器里，不上传任何服务器。</p>
-      </div>
+                  <!-- ⭐ 汉口江滩天际线：**加窗格与纵深**
+                       ❌ 第一版：11 个纯色矩形 → 就是"方块楼"，一片死黑
+                       ✅ 现在：楼分远/中两层（远层更淡更矮）、每栋楼有排列的窗光斑、
+                           楼顶有女儿墙/水箱/天线等"屋顶细节"、整体压在天际线以下 -->
+                  <!-- 远层：更淡、更矮，把"纵深"做出来 -->
+                  <g fill="#3a3038" opacity=".62">
+                    <rect x="0"   y="116" width="18" height="26"/>
+                    <rect x="30"  y="110" width="14" height="32"/>
+                    <rect x="70"  y="106" width="16" height="36"/>
+                    <rect x="120" y="112" width="12" height="30"/>
+                    <rect x="160" y="108" width="18" height="34"/>
+                    <rect x="196" y="114" width="16" height="28"/>
+                  </g>
+
+                  <!-- 中层：主天际线，颜色最实 -->
+                  <g fill="#241c23">
+                    <rect x="4"   y="118" width="16" height="26"/>
+                    <rect x="22"  y="106" width="13" height="38"/>
+                    <rect x="37"  y="122" width="20" height="22"/>
+                    <rect x="59"  y="98"  width="11" height="46"/>
+                    <rect x="72"  y="112" width="17" height="32"/>
+                    <rect x="91"  y="104" width="14" height="40"/>
+                    <rect x="107" y="124" width="22" height="20"/>
+                    <rect x="131" y="110" width="12" height="34"/>
+                    <rect x="145" y="120" width="18" height="24"/>
+                    <rect x="165" y="102" width="15" height="42"/>
+                    <rect x="182" y="118" width="24" height="26"/>
+                  </g>
+                  <!-- 楼顶的细碎细节：女儿墙 / 水箱 / 天线（这些"小疙瘩"让楼有真实感） -->
+                  <g fill="#241c23">
+                    <rect x="24"  y="103" width="9"  height="3"/>
+                    <rect x="61"  y="95"  width="7"  height="3"/>
+                    <rect x="93"  y="101" width="10" height="3"/>
+                    <rect x="167" y="99"  width="11" height="3"/>
+                    <rect x="185" y="115" width="18" height="3"/>
+                    <rect x="186" y="110" width="3" height="5"/>
+                    <rect x="29"  y="99"  width="2" height="4"/>
+                    <rect x="98"  y="96"  width="1.6" height="5"/>
+                  </g>
+
+                  <!-- ⭐ 窗光：**这是治"死黑的楼"的关键** —— 每栋楼有 2~6 个亮窗，
+                       位置刻意不齐（有的亮有的暗、有的整列亮） -->
+                  <g fill="#f0c078" opacity=".66">
+                    <rect x="26"  y="112" width="2" height="2.6"/><rect x="26" y="120" width="2" height="2.6"/>
+                    <rect x="30"  y="116" width="2" height="2.6"/>
+                    <rect x="62"  y="106" width="2" height="2.6"/><rect x="62" y="114" width="2" height="2.6"/>
+                    <rect x="62"  y="122" width="2" height="2.6"/><rect x="65" y="110" width="2" height="2.6"/>
+                    <rect x="94"  y="110" width="2" height="2.6"/><rect x="94" y="118" width="2" height="2.6"/>
+                    <rect x="98"  y="114" width="2" height="2.6"/><rect x="98" y="128" width="2" height="2.6"/>
+                    <rect x="76"  y="122" width="2" height="2.6"/><rect x="80" y="130" width="2" height="2.6"/>
+                    <rect x="112" y="130" width="2.4" height="2.6"/><rect x="120" y="134" width="2.4" height="2.6"/>
+                    <rect x="134" y="118" width="2" height="2.6"/><rect x="134" y="128" width="2" height="2.6"/>
+                    <rect x="169" y="110" width="2" height="2.6"/><rect x="169" y="118" width="2" height="2.6"/>
+                    <rect x="174" y="114" width="2" height="2.6"/><rect x="174" y="124" width="2" height="2.6"/>
+                    <rect x="187" y="126" width="2.4" height="2.6"/><rect x="196" y="132" width="2.4" height="2.6"/>
+                    <rect x="8"   y="124" width="2" height="2.6"/><rect x="44" y="130" width="2" height="2.6"/>
+                    <rect x="150" y="128" width="2" height="2.6"/><rect x="154" y="136" width="2" height="2.6"/>
+                  </g>
+                  <!-- 几扇更亮的窗（刚开灯的那几户） -->
+                  <g fill="#ffdca0" opacity=".8">
+                    <rect x="62" y="106" width="2" height="2.6"/>
+                    <rect x="94" y="110" width="2" height="2.6"/>
+                    <rect x="169" y="110" width="2" height="2.6"/>
+                  </g>
+                  <!-- 楼的左侧边缘吃光（太阳在右边，楼的右缘被照亮） -->
+                  <g fill="#e8a860" opacity=".18">
+                    <rect x="31" y="106" width="1.4" height="38"/>
+                    <rect x="68" y="98"  width="1.4" height="46"/>
+                    <rect x="103" y="104" width="1.4" height="40"/>
+                    <rect x="178" y="102" width="1.4" height="42"/>
+                  </g>
+
+                  <!-- ⭐⭐ 主视觉：武汉长江大桥的钢桁架
+                       ❌ 第一版：桥面是一条从 -6 到 218 的直线，右端直接飞出画面，
+                           而且桁架是等高的，看起来像"一串栅栏"
+                       ✅ 现在：桥面**左低右高、左近右远**（透视），桁架高度随远离而收，
+                           并让桥**中间偏右**落在画面里（留出左边看江面） -->
+                  <g stroke="#241d22" fill="none">
+                    <!-- 桥面：左端低（近）、右端高（远），做出透视收缩 -->
+                    <path d="M-6 156 L110 148 L218 141" stroke-width="4" opacity=".95"/>
+                    <!-- 上弦杆：与桥面平行但更细 -->
+                    <path d="M-6 151 L110 143.5 L218 136.6" stroke-width="1.5"/>
+                    <!-- 竖杆：每 12px 一根，高度随远离而收（左高右低） -->
+                    <path d="M6 155 L6 150.2 M18 154.5 L18 149.6 M30 154 L30 149 M42 153.5 L42 148.4
+                             M54 153 L54 147.8 M66 152.5 L66 147.2 M78 152 L78 146.6
+                             M90 151.5 L90 146 M102 151 L102 145.4 M114 150.4 L114 144.8
+                             M126 149.8 L126 144.2 M138 149.2 L138 143.6 M150 148.6 L150 143
+                             M162 148 L162 142.4 M174 147.4 L174 141.8 M186 146.8 L186 141.2
+                             M198 146.2 L198 140.6 M210 145.6 L210 140"
+                          stroke-width="1.3"/>
+                    <!-- 斜撑：一正一反交替（钢桥的标志性纹理） -->
+                    <path d="M6 155 L18 149.6 M18 154.5 L30 149 M30 154 L42 148.4
+                             M42 153.5 L54 147.8 M54 153 L66 147.2 M66 152.5 L78 146.6
+                             M78 152 L90 146 M90 151.5 L102 145.4 M102 151 L114 144.8
+                             M114 150.4 L126 144.2 M126 149.8 L138 143.6
+                             M138 149.2 L150 143 M150 148.6 L162 142.4
+                             M162 148 L174 141.8 M174 147.4 L186 141.2
+                             M186 146.8 L198 140.6 M198 146.2 L210 140"
+                          stroke-width="1.1"/>
+                    <!-- 桥墩：立在江里的两根（近的一根粗、远的一根细 → 透视） -->
+                    <g stroke-width="3.6" opacity=".95">
+                      <path d="M38 154 L38 190"/>
+                      <path d="M148 148.3 L148 180"/>
+                    </g>
+                    <g stroke-width="2.4" opacity=".8">
+                      <path d="M212 145.6 L212 172"/>
+                    </g>
+                  </g>
+                  <!-- 龟山电视塔：立在桥的右后（被桥面切过去，有纵深） -->
+                  <g fill="#241d22">
+                    <path d="M190 140 L191.2 106 L192.4 140 Z"/>
+                    <circle cx="191.2" cy="104" r="2.8"/>
+                    <path d="M191.2 98 L191.2 93" stroke="#241d22" stroke-width="1"/>
+                    <path d="M187.6 95 L194.8 95" stroke="#241d22" stroke-width="3.4" opacity=".9"/>
+                  </g>
+
+                  <!-- 江面：从桥墩以下开始（不是一条硬边，是渐入） -->
+                  <rect y="150" width="212" height="118" fill="url(#wh-water)"/>
+                  <!-- 江水与天光的交界：一条偏暖的亮带（黄昏江面的反光） -->
+                  <rect y="150" width="212" height="10" fill="#c08a5a" opacity=".14"/>
+                  <!-- 江水的横向波纹（近处密、远处疏 → 透视） -->
+                  <g stroke="#c08a5a" stroke-width=".8" opacity=".2" stroke-linecap="round">
+                    <path d="M0 166 h30 M44 166 h26 M84 166 h32 M130 166 h24 M168 166 h40"/>
+                    <path d="M8 182 h38 M62 182 h30 M108 182 h26 M150 182 h44"/>
+                    <path d="M0 202 h44 M58 202 h36 M112 202 h40 M166 202 h42"/>
+                    <path d="M14 226 h48 M78 226 h34 M130 226 h44 M188 226 h24"/>
+                    <path d="M6 248 h52 M74 248 h40 M128 248 h48"/>
+                  </g>
+                  <!-- 太阳在水面的倒影：一条垂直震动的高光带（越远越宽） -->
+                  <g fill="#f0b566" opacity=".28">
+                    <rect x="138" y="156" width="32" height="3.4"/>
+                    <rect x="144" y="170" width="22" height="3"/>
+                    <rect x="148" y="184" width="15" height="2.6"/>
+                    <rect x="151" y="198" width="9" height="2.4"/>
+                    <rect x="153" y="212" width="5" height="2.2"/>
+                  </g>
+                  <!-- 桥墩倒影：越往下越化开 -->
+                  <g fill="#0e0b0f" opacity=".5">
+                    <rect x="36"  y="156" width="4" height="30"/>
+                    <rect x="37"  y="186" width="2.6" height="14" opacity=".7"/>
+                    <rect x="146" y="150" width="4" height="30"/>
+                    <rect x="147" y="180" width="2.6" height="14" opacity=".7"/>
+                    <rect x="210" y="146" width="3.4" height="26" opacity=".6"/>
+                  </g>
+                  <!-- 桥体在水里的暗影（一条压在水面上的暗带，把桥"钉"住） -->
+                  <rect y="150" width="212" height="5" fill="#0e0b0f" opacity=".32"/>
+                </svg>
+              </div>
+              <div class="c-bloom"></div>
+              <div class="c-aberr"></div>
+              <div class="c-blotch"></div>
+              <div class="c-vig"></div>
+              <span class="c-frame-n">01</span>
+              <span class="c-frame-stock">TM-400</span>
+              <div class="c-frame-body">
+                <span class="c-frame-t">武汉</span>
+                <span class="c-frame-d">住了四年<br>从宿舍到光谷</span>
+                <span class="c-frame-note">2019 — 2023</span>
+              </div>
+            </div>
+
+            <!-- ============ 02 杭州 ============ -->
+            <div class="c-frame" style="--fan-i:-1"
+                 data-top="0" data-city="杭州" role="button" tabindex="0"
+                 aria-label="杭州 · 停留 4 天，西湖边的雨">
+              <div class="c-photo" style="background-image:url('assets/landing-city-hangzhou.jpg')"></div>
+              <div class="c-shot">
+    <svg viewBox="0 0 212 268" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+                  <defs>
+                    <!-- 雨天的西湖：整体冷青灰，不是晴天蓝 -->
+                    <linearGradient id="hz-sky" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%"   stop-color="#28323e"/>
+                      <stop offset="40%"  stop-color="#4a5a68"/>
+                      <stop offset="70%"  stop-color="#8a9aa0"/>
+                      <stop offset="100%" stop-color="#b8c2be"/>
+                    </linearGradient>
+                    <!-- 湖水：近岸浅、远处深，中间一条亮反光带（"湖面"的关键） -->
+                    <linearGradient id="hz-water" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%"   stop-color="#a8b4b0"/>
+                      <stop offset="14%"  stop-color="#78888c"/>
+                      <stop offset="46%"  stop-color="#3e4e56"/>
+                      <stop offset="100%" stop-color="#141c22"/>
+                    </linearGradient>
+                    <!-- 雨雾：一层白纱，越远越浓 -->
+                    <linearGradient id="hz-mist" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%"   stop-color="#c8d2d0" stop-opacity="0"/>
+                      <stop offset="60%"  stop-color="#c8d2d0" stop-opacity=".42"/>
+                      <stop offset="100%" stop-color="#c8d2d0" stop-opacity=".1"/>
+                    </linearGradient>
+                    <!-- 塔身：石灰色（不是暗红）—— 雷峰塔是灰砖石塔，雨天更冷、更青 -->
+                    <linearGradient id="hz-tower" x1="0.2" y1="0" x2="0.9" y2="1">
+                      <stop offset="0%"   stop-color="#7e7a80"/>
+                      <stop offset="50%"  stop-color="#5c5860"/>
+                      <stop offset="100%" stop-color="#3a3640"/>
+                    </linearGradient>
+                    <linearGradient id="hz-tower-l" x1="0" y1="0" x2="1" y2="0">
+                      <stop offset="0%"   stop-color="#b0aab4" stop-opacity=".55"/>
+                      <stop offset="55%"  stop-color="#b0aab4" stop-opacity=".08"/>
+                      <stop offset="100%" stop-color="#b0aab4" stop-opacity="0"/>
+                    </linearGradient>
+                  </defs>
+
+                  <rect width="212" height="268" fill="url(#hz-sky)"/>
+
+                  <!-- ⭐ 远山：改"水墨晕染"（不是三条渐变波浪）
+                       手法：每座山用一条柔边曲线 + 自身一道天光边，并让山脚化进雾里 -->
+                  <g>
+                    <!-- 最远一层：几乎只剩轮廓，颜色=天空色只深一点（大气透视） -->
+                    <path d="M0 126 Q22 100 46 118 Q68 98 92 116 Q116 96 142 116 Q166 100 188 118 Q200 108 212 116 L212 150 L0 150 Z"
+                          fill="#8c9aa4" opacity=".38"/>
+                    <!-- 中层：颜色加深，山顶留一条亮边（雨天的天光从云缝下来） -->
+                    <path d="M0 138 Q30 112 60 132 Q92 108 124 130 Q156 110 184 130 Q200 120 212 128 L212 154 L0 154 Z"
+                          fill="#5c6a76" opacity=".58"/>
+                    <path d="M0 138 Q30 112 60 132 Q92 108 124 130 Q156 110 184 130 Q200 120 212 128"
+                          stroke="#a8b6c0" stroke-width="1.1" fill="none" opacity=".4"/>
+                    <!-- 近山：更深、更实的剪影，压在湖岸上 -->
+                    <path d="M0 148 Q36 130 74 144 Q114 126 152 144 Q180 134 212 142 L212 158 L0 158 Z"
+                          fill="#3c4854" opacity=".72"/>
+                  </g>
+
+                  <!-- ⭐⭐ 雷峰塔：**重画**
+                       ❌ 第一版：暗红方块一层层堆上去 → 看起来像个木桶/水塔，完全认不出是塔
+                       ✅ 现在：冷灰石质 + 每层明显的外扩飞檐（塔的辨识特征就在"檐"）
+                                + 塔身逐层收分（收得比第一版明显）+ 每层券门 + 塔刹 -->
+                  <g>
+                    <!-- 塔基：一圈更大的台基（八角的暗示） -->
+                    <path d="M128 160 L176 160 L172 152 L132 152 Z" fill="#2e2a32"/>
+                    <path d="M128 160 L176 160 L176 161.6 L128 161.6 Z" fill="#1c1a20" opacity=".7"/>
+
+                    <!-- —— 第 1 层 ——：塔身 + 左右飞檐（檐从身的两侧挑出去） -->
+                    <path d="M136 152 L168 152 L165 140 L139 140 Z" fill="url(#hz-tower)"/>
+                    <!-- 飞檐：出檐宽度≈塔身宽度的 26%（中式塔的"举折"，不能挑太远）
+                         ❌ 上一版挑出 8px（塔身宽 29px 的近 1/3）→ 放大像两把刀
+                         ✅ 现在只挑 4px，且尖端是**上扬的小翘**，不是平伸的刃 -->
+                    <path d="M137.5 140 L166.5 140 L165.5 136.6 Q152 134 138.5 136.6 Z" fill="#2e2a32"/>
+                    <path d="M137.5 140 Q135 139.2 134.2 137.4" stroke="#2e2a32" stroke-width="1.6" fill="none" stroke-linecap="round"/>
+                    <path d="M166.5 140 Q169 139.2 169.8 137.4" stroke="#2e2a32" stroke-width="1.6" fill="none" stroke-linecap="round"/>
+                    <!-- 券门（一层一个拱窗，塔的"眼睛"） -->
+                    <path d="M149 151 L155 151 L155 145 Q152 143.2 149 145 Z" fill="#9aa4ae" opacity=".55"/>
+
+                    <!-- —— 第 2 层 —— -->
+                    <path d="M139 131 L165 131 L162.6 121 L141.4 121 Z" fill="url(#hz-tower)"/>
+                    <path d="M140.4 121 L163.6 121 L162.8 118.4 Q152 116.4 141.2 118.4 Z" fill="#322e38"/>
+                    <path d="M140.4 121 Q138.4 120.4 137.8 119" stroke="#322e38" stroke-width="1.4" fill="none" stroke-linecap="round"/>
+                    <path d="M163.6 121 Q165.6 120.4 166.2 119" stroke="#322e38" stroke-width="1.4" fill="none" stroke-linecap="round"/>
+                    <path d="M150 130.5 L156 130.5 L156 125.5 Q153 124 150 125.5 Z" fill="#9aa4ae" opacity=".5"/>
+
+                    <!-- —— 第 3 层 —— -->
+                    <path d="M141.4 112.5 L162.6 112.5 L160.8 104.5 L143.2 104.5 Z" fill="url(#hz-tower)"/>
+                    <path d="M142.6 104.5 L161.4 104.5 L160.8 102.4 Q152 100.8 143.2 102.4 Z" fill="#322e38"/>
+                    <path d="M142.6 104.5 Q141 104 140.6 102.9" stroke="#322e38" stroke-width="1.3" fill="none" stroke-linecap="round"/>
+                    <path d="M161.4 104.5 Q163 104 163.4 102.9" stroke="#322e38" stroke-width="1.3" fill="none" stroke-linecap="round"/>
+                    <path d="M150.4 111.8 L155.4 111.8 L155.4 107.6 Q152.9 106.4 150.4 107.6 Z" fill="#9aa4ae" opacity=".45"/>
+
+                    <!-- —— 第 4 层 —— -->
+                    <path d="M143.2 96.5 L160.8 96.5 L159.4 90 L144.6 90 Z" fill="url(#hz-tower)"/>
+                    <path d="M144.2 90 L159.8 90 L159.4 88.3 Q152 87.1 144.6 88.3 Z" fill="#322e38"/>
+                    <path d="M144.2 90 Q142.9 89.6 142.6 88.7" stroke="#322e38" stroke-width="1.2" fill="none" stroke-linecap="round"/>
+                    <path d="M159.8 90 Q161.1 89.6 161.4 88.7" stroke="#322e38" stroke-width="1.2" fill="none" stroke-linecap="round"/>
+                    <path d="M150.8 95.8 L154.8 95.8 L154.8 92.4 Q152.8 91.4 150.8 92.4 Z" fill="#9aa4ae" opacity=".4"/>
+
+                    <!-- —— 第 5 层（顶层）—— -->
+                    <path d="M144.6 83 L159.4 83 L158.4 78 L145.6 78 Z" fill="url(#hz-tower)"/>
+                    <path d="M145.4 78 L158.6 78 L158.4 76.6 Q152 75.7 145.6 76.6 Z" fill="#322e38"/>
+                    <path d="M145.4 78 Q144.4 77.6 144.1 76.9" stroke="#322e38" stroke-width="1.1" fill="none" stroke-linecap="round"/>
+                    <path d="M158.6 78 Q159.6 77.6 159.9 76.9" stroke="#322e38" stroke-width="1.1" fill="none" stroke-linecap="round"/>
+                    <path d="M151 82.4 L154 82.4 L154 79.6 Q152.5 78.8 151 79.6 Z" fill="#9aa4ae" opacity=".36"/>
+
+                    <!-- 塔刹：刹杆 + 三个相轮 + 宝珠，顶端一线闪光 -->
+                    <path d="M152 75 L152 66" stroke="#3a3640" stroke-width="2"/>
+                    <circle cx="152" cy="65.4" r="2.6" fill="#3a3640"/>
+                    <circle cx="152" cy="61.4" r="1.9" fill="#3a3640"/>
+                    <circle cx="152" cy="58.2" r="1.3" fill="#3a3640"/>
+                    <circle cx="152" cy="56" r=".8" fill="#c8d2d0" opacity=".7"/>
+
+                    <!-- 受光面：整塔左侧一道竖向亮光（雨天的天光从左上打来） -->
+                    <path d="M136 152 L141.4 121 L143.2 104.5 L144.6 83 L144.6 78 L141 78
+                             L139 96.5 L137 112.5 L135 131 L132 152 Z" fill="url(#hz-tower-l)"/>
+                  </g>
+
+                  <!-- 湖岸线：一条极细的亮线（水面与岸的分界） -->
+                  <rect y="158" width="212" height="110" fill="url(#hz-water)"/>
+                  <rect y="157.4" width="212" height="1.2" fill="#c8d2d0" opacity=".35"/>
+
+                  <!-- ⭐ 塔的倒影：**关键修正**
+                       ❌ 第一版：倒影是一整块浅色矩形，把塔的下半截硬切成两半（非常生硬）
+                       ✅ 现在：倒影只在塔正下方，颜色比塔淡、越往下越碎、
+                           用横向水波线把倒影"打碎" —— 是水里的影子，不是贴了一块板 -->
+                  <g opacity=".38">
+                    <path d="M136 160 L168 160 L164 186 L140 186 Z" fill="#2a3038"/>
+                    <path d="M141.4 160 L162.6 160 L160 178 L144 178 Z" fill="#2a3038" opacity=".7"/>
+                  </g>
+                  <g stroke="#7e8a90" stroke-width="1.2" opacity=".42">
+                    <path d="M138 165 h28 M140 171 h24 M142 177 h21 M144 183 h18"/>
+                  </g>
+                  <g stroke="#38444c" stroke-width="1" opacity=".34">
+                    <path d="M139 168 h26 M141 174 h22 M143 180 h19"/>
+                  </g>
+
+                  <!-- 水面波纹：近处密、远处疏（透视） -->
+                  <g stroke="#a8b4b0" stroke-width=".7" opacity=".2">
+                    <path d="M0 168 h30 M44 168 h34 M96 168 h30 M146 168 h36 M192 168 h20"/>
+                    <path d="M8 190 h40 M70 190 h36 M126 190 h44 M186 190 h26"/>
+                    <path d="M0 214 h52 M72 214 h42 M132 214 h48"/>
+                    <path d="M16 240 h58 M94 240 h52 M166 240 h46"/>
+                  </g>
+
+                  <!-- 三潭印月：湖面上三个小石塔（左侧）
+                       ❌ 上一版画成"圆球 + 细杆"，放大后像三个棋子/小人
+                       ✅ 现在：**小球塔**的真实形制 —— 一个球形塔身 + 一圈透光小孔
+                           + 顶上一个小葫芦尖，整体**矮胖**（不是细高），
+                           并给每个塔加水面倒影 —— 这样才像石塔 -->
+                  <g fill="#242028" opacity=".74">
+                    <g transform="translate(30,160)">
+                      <!-- 球形塔身（矮胖） -->
+                      <ellipse cx="0" cy="0" rx="5.4" ry="5"/>
+                      <!-- 两侧的立耳（三潭印月的塔身两侧有小耳） -->
+                      <path d="M-5.4 -1 L-7 0.6 L-5.4 2.2 Z"/>
+                      <path d="M5.4 -1 L7 0.6 L5.4 2.2 Z"/>
+                      <!-- 塔基 -->
+                      <path d="M-4 4.6 L4 4.6 L3 7 L-3 7 Z"/>
+                      <!-- 塔刹：小葫芦尖 -->
+                      <path d="M0 -5 L0 -8.4" stroke="#242028" stroke-width="1.3"/>
+                      <circle cx="0" cy="-9.6" r="1.5"/>
+                      <!-- 球身上的五个透光孔（三潭印月点灯的地方） -->
+                      <g fill="#c8d2d0" opacity=".32">
+                        <circle cx="-1.9" cy="-0.6" r=".8"/><circle cx="1.9" cy="-0.6" r=".8"/>
+                        <circle cx="0" cy="-2.4" r=".8"/>
+                        <circle cx="-1.9" cy="2" r=".8"/><circle cx="1.9" cy="2" r=".8"/>
+                      </g>
+                      <!-- 倒影 -->
+                      <g fill="#1c262c" opacity=".3">
+                        <ellipse cx="0" cy="11" rx="4.4" ry="2.4"/>
+                      </g>
+                    </g>
+                    <g transform="translate(50,168) scale(.86)">
+                      <ellipse cx="0" cy="0" rx="5.4" ry="5"/>
+                      <path d="M-5.4 -1 L-7 0.6 L-5.4 2.2 Z"/>
+                      <path d="M5.4 -1 L7 0.6 L5.4 2.2 Z"/>
+                      <path d="M-4 4.6 L4 4.6 L3 7 L-3 7 Z"/>
+                      <path d="M0 -5 L0 -8.4" stroke="#242028" stroke-width="1.3"/>
+                      <circle cx="0" cy="-9.6" r="1.5"/>
+                      <g fill="#c8d2d0" opacity=".28">
+                        <circle cx="-1.9" cy="-0.6" r=".8"/><circle cx="1.9" cy="-0.6" r=".8"/>
+                        <circle cx="0" cy="2" r=".8"/>
+                      </g>
+                      <g fill="#1c262c" opacity=".26"><ellipse cx="0" cy="11" rx="4.4" ry="2.2"/></g>
+                    </g>
+                    <g transform="translate(13,172) scale(.7)">
+                      <ellipse cx="0" cy="0" rx="5.4" ry="5"/>
+                      <path d="M-5.4 -1 L-7 0.6 L-5.4 2.2 Z"/>
+                      <path d="M5.4 -1 L7 0.6 L5.4 2.2 Z"/>
+                      <path d="M-4 4.6 L4 4.6 L3 7 L-3 7 Z"/>
+                      <path d="M0 -5 L0 -8.4" stroke="#242028" stroke-width="1.3"/>
+                      <circle cx="0" cy="-9.6" r="1.5"/>
+                      <g fill="#1c262c" opacity=".24"><ellipse cx="0" cy="11" rx="4.4" ry="2.2"/></g>
+                    </g>
+                  </g>
+
+                  <!-- ⭐ 斜向雨丝：**去规整**（第一版是等距排布，像虚线）
+                       现在：长度不一、疏密有差、偶尔成串 —— 真雨是乱的 -->
+                  <g stroke="#e0eaf0" stroke-width=".9" opacity=".42" stroke-linecap="round">
+                    <path d="M16 16 L11 36 M40 8 L35 26 M66 22 L61 44 M92 12 L87 30
+                             M120 20 L115 40 M148 6 L143 26 M176 18 L171 38 M200 12 L195 30"/>
+                    <path d="M10 52 L6 68 M30 60 L26 74 M56 46 L52 66 M84 58 L80 76
+                             M112 44 L108 62 M140 56 L136 72 M168 48 L164 68 M196 40 L192 58"/>
+                    <path d="M6 84 L3 100 M36 78 L32 96 M70 88 L66 104 M104 74 L100 92
+                             M138 86 L134 102 M172 76 L168 94 M202 82 L198 98"/>
+                    <path d="M20 108 L17 122 M60 102 L57 118 M100 112 L97 126 M144 104 L141 120 M188 110 L185 124"/>
+                    <path d="M46 30 L43 44 M126 36 L123 50 M182 30 L179 44 M88 6 L85 18"/>
+                  </g>
+                  <!-- 雨丝上的高光点：雨滴打到近处水面的白点 -->
+                  <g fill="#e8f0f4" opacity=".3">
+                    <circle cx="24" cy="150" r=".9"/><circle cx="72" cy="146" r=".8"/>
+                    <circle cx="118" cy="152" r=".9"/><circle cx="176" cy="148" r=".8"/>
+                    <circle cx="52" cy="178" r=".8"/><circle cx="152" cy="176" r=".8"/>
+                  </g>
+
+                  <!-- 雨雾罩在最上层（把远山、塔的下半身都化进去 → 有纵深） -->
+                  <rect y="86" width="212" height="94" fill="url(#hz-mist)"/>
+                </svg>
+              </div>
+              <div class="c-bloom"></div>
+              <div class="c-aberr"></div>
+              <div class="c-blotch"></div>
+              <div class="c-vig"></div>
+              <span class="c-frame-n">02</span>
+              <span class="c-frame-stock">TM-400</span>
+              <div class="c-frame-body">
+                <span class="c-frame-t">杭州</span>
+                <span class="c-frame-d">停留 4 天<br>西湖边的雨</span>
+                <span class="c-frame-note">2021.04</span>
+              </div>
+            </div>
+
+            <!-- ============ 03 西安 ============ -->
+            <div class="c-frame" style="--fan-i:0"
+                 data-top="1" data-city="西安" role="button" tabindex="0"
+                 aria-label="西安 · 短期停留，城墙下走过">
+              <div class="c-photo" style="background-image:url('assets/landing-city-xian.jpg')"></div>
+              <div class="c-shot">
+    <svg viewBox="0 0 212 268" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+                  <defs>
+                    <!-- 西安的黄昏：土黄偏赭，和城墙的砖色同族 -->
+                    <linearGradient id="xa-sky" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%"   stop-color="#2c2438"/>
+                      <stop offset="38%"  stop-color="#5e4258"/>
+                      <stop offset="66%"  stop-color="#a86a4e"/>
+                      <stop offset="88%"  stop-color="#cd8a54"/>
+                      <stop offset="100%" stop-color="#ddaa6c"/>
+                    </linearGradient>
+                    <!-- 墙面：不是单一棕色块 —— 顶上受天光偏土黄，往下吃土、发暗、偏红锈 -->
+                    <linearGradient id="xa-wall" x1="0.15" y1="0" x2="0.85" y2="1">
+                      <stop offset="0%"   stop-color="#8a6647"/>
+                      <stop offset="22%"  stop-color="#6f5038"/>
+                      <stop offset="62%"  stop-color="#4e372a"/>
+                      <stop offset="100%" stop-color="#2e2019"/>
+                    </linearGradient>
+                    <radialGradient id="xa-glow">
+                      <stop offset="0%" stop-color="#ffce8a" stop-opacity=".9"/>
+                      <stop offset="48%" stop-color="#e89858" stop-opacity=".38"/>
+                      <stop offset="100%" stop-color="#e89858" stop-opacity="0"/>
+                    </radialGradient>
+                    <!-- 单块砖的明暗：随机几块偏亮/偏暗，破掉"整片同色"的塑料感 -->
+                    <linearGradient id="xa-brick-l" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stop-color="#a07850" stop-opacity=".5"/>
+                      <stop offset="100%" stop-color="#a07850" stop-opacity="0"/>
+                    </linearGradient>
+                    <linearGradient id="xa-brick-d" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stop-color="#1a1009" stop-opacity=".55"/>
+                      <stop offset="100%" stop-color="#1a1009" stop-opacity="0"/>
+                    </linearGradient>
+                  </defs>
+
+                  <rect width="212" height="268" fill="url(#xa-sky)"/>
+                  <!-- 落日挂在城楼右后方 -->
+                  <circle cx="122" cy="146" r="64" fill="url(#xa-glow)"/>
+                  <circle cx="122" cy="146" r="15" fill="#ffdca0" opacity=".9"/>
+
+                  <!-- 远景：钟楼方向的低矮屋脊（剪影，压在天际线上） -->
+                  <g fill="#3a2a24" opacity=".45">
+                    <path d="M0 138 L16 132 L30 138 L48 130 L64 138 L84 133 L100 140 L124 134 L146 141 L170 134 L190 140 L212 136 L212 146 L0 146 Z"/>
+                  </g>
+                  <!-- 更远一层：几乎融进天空的淡影 -->
+                  <g fill="#6a5060" opacity=".28">
+                    <path d="M0 128 L24 122 L44 128 L70 120 L96 128 L130 122 L158 130 L186 124 L212 130 L212 140 L0 140 Z"/>
+                  </g>
+
+                  <!-- ⭐⭐ 明代城墙：全格的主角。
+                       ⚠️ 比例修正：第一版墙从 y158 一直到 268（占 41%），下半画面全是墙。
+                          现在**墙顶下移到 y=170、墙脚下沿上提到 y=246**，天空拿到 55%，
+                          墙只占 28% —— 有"远望一面城墙"，不是"贴脸看砖"。 -->
+                  <rect y="170" width="212" height="76" fill="url(#xa-wall)"/>
+
+                  <!-- 墙面质感第一层：不规则的砖块明暗（随机几块亮、几块暗）
+                       ⚠️ 这是治"网格化"的关键 —— 有了明暗差，砖才像砖，不像瓷砖格 -->
+                  <g>
+                    <rect x="8"   y="172" width="34" height="18" fill="url(#xa-brick-l)"/>
+                    <rect x="86"  y="172" width="40" height="18" fill="url(#xa-brick-d)"/>
+                    <rect x="150" y="172" width="38" height="18" fill="url(#xa-brick-l)" opacity=".7"/>
+                    <rect x="42"  y="192" width="36" height="17" fill="url(#xa-brick-d)"/>
+                    <rect x="120" y="192" width="44" height="17" fill="url(#xa-brick-l)" opacity=".6"/>
+                    <rect x="2"   y="211" width="30" height="16" fill="url(#xa-brick-l)" opacity=".5"/>
+                    <rect x="70"  y="211" width="38" height="16" fill="url(#xa-brick-d)" opacity=".8"/>
+                    <rect x="168" y="211" width="42" height="16" fill="url(#xa-brick-d)"/>
+                    <rect x="36"  y="229" width="40" height="15" fill="url(#xa-brick-l)" opacity=".45"/>
+                    <rect x="130" y="229" width="34" height="15" fill="url(#xa-brick-d)" opacity=".7"/>
+                  </g>
+
+                  <!-- 垛口：墙顶上一排齿（城墙的灵魂）
+                       ⚠️ 城楼占 y 从 88 到 170、横向 82~130 —— 垛口避开这一段 -->
+                  <g fill="#7a5a40">
+                    <rect x="-2"  y="158" width="16" height="13"/>
+                    <rect x="20"  y="158" width="16" height="13"/>
+                    <rect x="42"  y="158" width="16" height="13"/>
+                    <rect x="64"  y="158" width="16" height="13"/>
+                    <rect x="136" y="158" width="16" height="13"/>
+                    <rect x="158" y="158" width="16" height="13"/>
+                    <rect x="180" y="158" width="16" height="13"/>
+                    <rect x="202" y="158" width="14" height="13"/>
+                  </g>
+                  <!-- 垛口受光面：每个齿的右侧一道亮边（有厚度） -->
+                  <g fill="#a8845c" opacity=".72">
+                    <rect x="12"  y="158" width="2" height="13"/>
+                    <rect x="34"  y="158" width="2" height="13"/>
+                    <rect x="56"  y="158" width="2" height="13"/>
+                    <rect x="78"  y="158" width="2" height="13"/>
+                    <rect x="150" y="158" width="2" height="13"/>
+                    <rect x="172" y="158" width="2" height="13"/>
+                    <rect x="194" y="158" width="2" height="13"/>
+                  </g>
+                  <!-- 垛口之间的凹槽（上沿的一道暗线，拉开前后的层次） -->
+                  <rect x="-2" y="158" width="212" height="1.6" fill="#241810" opacity=".5"/>
+                  <!-- 墙顶压边线：城楼两侧各一段 -->
+                  <rect x="0" y="169" width="82" height="2.2" fill="#a8845c" opacity=".85"/>
+                  <rect x="130" y="169" width="82" height="2.2" fill="#a8845c" opacity=".85"/>
+
+                  <!-- 砖缝：**故意做碎**（这是第二版的核心修正）
+                       ❌ 第一版：横缝整行贯通 + 竖缝等距 → 放大就是瓷砖网格
+                       ✅ 现在：横缝按"一行砖"的高度走，但每行断成 2~3 段、断点错开；
+                          竖缝短、不贯穿、间距不均（18~46px 混排） -->
+                  <g stroke="#1e130c" stroke-width=".85" opacity=".5">
+                    <!-- 第 1 行横缝（y≈190）：断成 3 段 -->
+                    <path d="M0 190 h58 M66 190 h84 M158 190 h54"/>
+                    <!-- 第 2 行（y≈210） -->
+                    <path d="M0 210 h34 M44 210 h96 M148 210 h64"/>
+                    <!-- 第 3 行（y≈228） -->
+                    <path d="M0 228 h72 M80 228 h60 M148 228 h64"/>
+                    <!-- 第 4 行（y≈243，接近墙脚，短促） -->
+                    <path d="M0 243 h48 M56 243 h104"/>
+                  </g>
+                  <!-- 竖缝：每行内短促的断线，间距刻意不均 -->
+                  <g stroke="#33231a" stroke-width=".65" opacity=".42">
+                    <path d="M13 170 v19 M52 170 v19 M97 170 v19 M146 170 v19 M189 170 v19
+                             M27 190 v19 M74 190 v19 M118 190 v19 M163 190 v19 M197 190 v19
+                             M41 210 v17 M88 210 v17 M133 210 v17 M176 210 v17
+                             M19 228 v14 M62 228 v14 M109 228 v14 M154 228 v14 M192 228 v14
+                             M33 243 v3 M92 243 v3 M141 243 v3"/>
+                  </g>
+                  <!-- 墙面顶部挨着垛口的一圈"吃光"（天光照在墙头上压） -->
+                  <rect y="170" width="212" height="22" fill="url(#xa-glow)" opacity=".3"/>
+
+                  <!-- 人为破损：几处剥落/风化（历史感，破掉"新砖"的整齐） -->
+                  <g fill="#3a2a20" opacity=".4">
+                    <ellipse cx="36" cy="199" rx="9" ry="3.4"/>
+                    <ellipse cx="152" cy="216" rx="12" ry="4"/>
+                    <ellipse cx="96" cy="237" rx="10" ry="3.2"/>
+                  </g>
+                  <g fill="#8a6647" opacity=".22">
+                    <ellipse cx="118" cy="183" rx="11" ry="2.6"/>
+                    <ellipse cx="60" cy="232" rx="13" ry="3"/>
+                  </g>
+
+                  <!-- ⭐ 城楼：立在墙顶，**比城墙窄**，两侧露出垛口
+                       尺寸：檐口最宽 48px（x 82~130） -->
+                  <g>
+                    <!-- 一层檐（出檐最宽） -->
+                    <path d="M82 158 L130 158 L124 148 L88 148 Z" fill="#3a2620"/>
+                    <!-- 一层楼身 -->
+                    <rect x="95" y="128" width="22" height="21" fill="#4a3028"/>
+                    <rect x="95" y="128" width="22" height="21" fill="none" stroke="#2a1c16" stroke-width=".7"/>
+                    <!-- 二层檐 -->
+                    <path d="M86 128 L126 128 L121 119 L91 119 Z" fill="#3a2620"/>
+                    <!-- 二层楼身 -->
+                    <rect x="98" y="104" width="16" height="16" fill="#4a3028"/>
+                    <!-- 顶檐与正脊 -->
+                    <path d="M89 104 L123 104 L117 95 L95 95 Z" fill="#3a2620"/>
+                    <rect x="102" y="90" width="8" height="6" fill="#3a2620"/>
+                    <!-- ✅ 翘角：只挑出去 3px、抬 3px —— 是"中国建筑的翘"，不是"牛角" -->
+                    <path d="M88 158 Q85 157 84 154" stroke="#3a2620" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+                    <path d="M124 158 Q127 157 128 154" stroke="#3a2620" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+                    <path d="M91 119 Q88 118 87 115" stroke="#3a2620" stroke-width="1.3" fill="none" stroke-linecap="round"/>
+                    <path d="M121 119 Q124 118 125 115" stroke="#3a2620" stroke-width="1.3" fill="none" stroke-linecap="round"/>
+                    <path d="M95 95 Q93 94 92 91.5" stroke="#3a2620" stroke-width="1.2" fill="none" stroke-linecap="round"/>
+                    <path d="M117 95 Q119 94 120 91.5" stroke="#3a2620" stroke-width="1.2" fill="none" stroke-linecap="round"/>
+                    <!-- 檐下的窗洞：透出暖光（城楼晚上会亮灯） -->
+                    <g fill="#e8a860" opacity=".82">
+                      <rect x="99" y="109" width="4" height="5"/>
+                      <rect x="106" y="109" width="4" height="5"/>
+                      <rect x="113" y="109" width="4" height="5"/>
+                      <rect x="99" y="134" width="5" height="7"/>
+                      <rect x="108" y="134" width="5" height="7"/>
+                    </g>
+                  </g>
+                  <!-- ⭐ 城楼的落影：在墙面上投一道暗影，把它"钉"在墙上 -->
+                  <rect x="82" y="158" width="48" height="6" fill="#110b07" opacity=".45"/>
+
+                  <!-- 墙脚：一条暗带把墙"压"在地上，然后虚化收边 -->
+                  <rect y="238" width="212" height="8" fill="#150e0a" opacity=".5"/>
+                  <rect y="246" width="212" height="22" fill="#0f0a07" opacity=".82"/>
+                </svg>
+              </div>
+              <div class="c-bloom"></div>
+              <div class="c-aberr"></div>
+              <div class="c-blotch"></div>
+              <div class="c-vig"></div>
+              <span class="c-frame-n">03</span>
+              <span class="c-frame-stock">TM-400</span>
+              <div class="c-frame-body">
+                <span class="c-frame-t">西安</span>
+                <span class="c-frame-d">短期停留<br>城墙下走过</span>
+                <span class="c-frame-note">2021.10</span>
+              </div>
+            </div>
+
+            <!-- ============ 04 成都 ============ -->
+            <div class="c-frame" style="--fan-i:1"
+                 data-top="0" data-city="成都" role="button" tabindex="0"
+                 aria-label="成都 · 出差三天，还没吃够">
+              <div class="c-photo" style="background-image:url('assets/landing-city-chengdu.jpg')"></div>
+              <div class="c-shot">
+    <svg viewBox="0 0 212 268" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+                  <defs>
+                    <!-- 茶馆内景：暖黄的灯泡光，从左上打下来 -->
+                    <linearGradient id="cd-room" x1="0.1" y1="0" x2="0.9" y2="1">
+                      <stop offset="0%"   stop-color="#6a5238"/>
+                      <stop offset="42%"  stop-color="#4a3826"/>
+                      <stop offset="100%" stop-color="#241a12"/>
+                    </linearGradient>
+                    <radialGradient id="cd-lamp" cx="0.28" cy="0.16" r="0.62">
+                      <stop offset="0%"   stop-color="#ffd898" stop-opacity=".62"/>
+                      <stop offset="55%"  stop-color="#e8a860" stop-opacity=".2"/>
+                      <stop offset="100%" stop-color="#e8a860" stop-opacity="0"/>
+                    </radialGradient>
+                    <linearGradient id="cd-tea" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%"   stop-color="#d8b878"/>
+                      <stop offset="100%" stop-color="#8a6a34"/>
+                    </linearGradient>
+                    <!-- 瓷碗的釉光：左上受光、右下转暗（这是"瓷"的关键，缺了就是纸片） -->
+                    <linearGradient id="cd-porcelain" x1="0.15" y1="0.1" x2="0.85" y2="0.95">
+                      <stop offset="0%"   stop-color="#f4ece0"/>
+                      <stop offset="38%"  stop-color="#e2d8c4"/>
+                      <stop offset="72%"  stop-color="#c4b8a2"/>
+                      <stop offset="100%" stop-color="#9a8e7a"/>
+                    </linearGradient>
+                    <!-- 桌面的木色：近处亮、往远处暗（把桌面推出去） -->
+                    <linearGradient id="cd-table" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%"   stop-color="#4a3626"/>
+                      <stop offset="50%"  stop-color="#33241a"/>
+                      <stop offset="100%" stop-color="#20160f"/>
+                    </linearGradient>
+                    <!-- 竹帘条：不是纯色线，是"上暗下亮"的一根竹 -->
+                    <linearGradient id="cd-bamboo" x1="0" y1="0" x2="1" y2="0">
+                      <stop offset="0%"   stop-color="#3c2e1e"/>
+                      <stop offset="42%"  stop-color="#7a6242"/>
+                      <stop offset="100%" stop-color="#2e2216"/>
+                    </linearGradient>
+                  </defs>
+
+                  <rect width="212" height="268" fill="url(#cd-room)"/>
+                  <rect width="212" height="268" fill="url(#cd-lamp)"/>
+
+                  <!-- ⭐ 竹帘：**重画**
+                       ❌ 第一版：等距竖线 + 三条等距横档 → 放大就是一个方格网，像"纱窗"
+                       ✅ 现在：竹条**宽窄不一、有明暗渐变**（每根是圆柱）、
+                           横档**只有顶部一根挂杆**（真竹帘是垂下来的，不该有横向分格）、
+                           整幅**斜挂**（竹帘被风吹得有点歪，才不是贴上去的贴图） -->
+                  <g transform="rotate(1.4 106 66)">
+                    <!-- 每根竹条：宽度 3~5px 混排、间距 6~11px 不等，用渐变让它是"圆的" -->
+                    <g>
+                      <rect x="2"   y="-6" width="4.4" height="146" fill="url(#cd-bamboo)" opacity=".82"/>
+                      <rect x="12"  y="-6" width="3.6" height="146" fill="url(#cd-bamboo)" opacity=".7"/>
+                      <rect x="23"  y="-6" width="4.8" height="146" fill="url(#cd-bamboo)" opacity=".85"/>
+                      <rect x="35"  y="-6" width="3.8" height="146" fill="url(#cd-bamboo)" opacity=".72"/>
+                      <rect x="45"  y="-6" width="4.6" height="146" fill="url(#cd-bamboo)" opacity=".84"/>
+                      <rect x="57"  y="-6" width="3.4" height="146" fill="url(#cd-bamboo)" opacity=".68"/>
+                      <rect x="67"  y="-6" width="4.8" height="146" fill="url(#cd-bamboo)" opacity=".86"/>
+                      <rect x="79"  y="-6" width="4"   height="146" fill="url(#cd-bamboo)" opacity=".74"/>
+                      <rect x="90"  y="-6" width="4.4" height="146" fill="url(#cd-bamboo)" opacity=".82"/>
+                      <rect x="101" y="-6" width="3.6" height="146" fill="url(#cd-bamboo)" opacity=".7"/>
+                      <rect x="112" y="-6" width="4.8" height="146" fill="url(#cd-bamboo)" opacity=".85"/>
+                      <rect x="124" y="-6" width="3.8" height="146" fill="url(#cd-bamboo)" opacity=".72"/>
+                      <rect x="134" y="-6" width="4.6" height="146" fill="url(#cd-bamboo)" opacity=".84"/>
+                      <rect x="146" y="-6" width="3.4" height="146" fill="url(#cd-bamboo)" opacity=".68"/>
+                      <rect x="156" y="-6" width="4.8" height="146" fill="url(#cd-bamboo)" opacity=".86"/>
+                      <rect x="168" y="-6" width="4"   height="146" fill="url(#cd-bamboo)" opacity=".74"/>
+                      <rect x="179" y="-6" width="4.4" height="146" fill="url(#cd-bamboo)" opacity=".82"/>
+                      <rect x="190" y="-6" width="3.6" height="146" fill="url(#cd-bamboo)" opacity=".7"/>
+                      <rect x="201" y="-6" width="4.8" height="146" fill="url(#cd-bamboo)" opacity=".85"/>
+                    </g>
+                    <!-- 竹节：每根竹条上 1~2 个小横纹（竹子的标志，缺了就像塑料条） -->
+                    <g stroke="#2a1e14" stroke-width=".9" opacity=".5">
+                      <path d="M2 26 h4.4 M23 44 h4.8 M45 20 h4.6 M67 38 h4.8 M90 24 h4.4
+                               M112 42 h4.8 M134 22 h4.6 M156 40 h4.8 M179 26 h4.4 M201 44 h4.8"/>
+                    </g>
+                    <!-- 顶部的挂杆：一根横着的粗竹（唯一应该有的横线） -->
+                    <rect x="-4" y="-4" width="220" height="7" rx="3.4" fill="#6a5238"/>
+                    <rect x="-4" y="-4" width="220" height="2.6" rx="1.3" fill="#9a7e54" opacity=".7"/>
+                    <!-- 竹帘垂到 y=140 就不再画（下面是暗部墙） -->
+                  </g>
+                  <!-- 帘子边缘的漏光：帘与帘之间透进来的暖光（"竹帘"最重要的一笔） -->
+                  <g stroke="#ffd898" stroke-width="1" opacity=".16">
+                    <path d="M8 0 v134 M29 0 v134 M51 0 v134 M73 0 v134 M95 0 v134
+                             M117 0 v134 M139 0 v134 M161 0 v134 M183 0 v134 M205 0 v134"/>
+                  </g>
+
+                  <!-- 挂着的鸟笼（成都茶馆的标配）
+                       ⚠️ 第一版挂在正中偏右、和竹帘同色，看不出是鸟笼。
+                       现在移到右上角、加深轮廓、加一根吊绳到画面顶。 -->
+                  <g>
+                    <path d="M170 0 v22" stroke="#2a1e14" stroke-width="1.8"/>
+                    <ellipse cx="170" cy="52" rx="16" ry="19" fill="#160f0b" opacity=".72"/>
+                    <g stroke="#0e0a07" stroke-width="1.2" fill="none">
+                      <path d="M154 44 h32 M154 52 h32 M154 60 h32 M170 33 v34"/>
+                      <path d="M156 36 Q170 30 184 36"/>
+                      <path d="M156 68 Q170 74 184 68"/>
+                      <path d="M154 44 h32" stroke-width="1.6"/>
+                    </g>
+                    <ellipse cx="170" cy="71" rx="9" ry="3" fill="#0e0a07"/>
+                    <path d="M164 33 Q170 29 176 33" stroke="#2a1e14" stroke-width="1.6" fill="none"/>
+                    <!-- 笼里一个小鸟的剪影（很淡，但有了就"活"了） -->
+                    <path d="M166 56 Q170 52 174 56 Q176 60 172 62 Q168 63 166 60 Z" fill="#3a2a1e" opacity=".8"/>
+                    <circle cx="171" cy="55" r=".8" fill="#e8d0a0" opacity=".6"/>
+                  </g>
+
+                  <!-- ⭐ 室内纵深：帘子以下不是"一块死墙"，而是
+                       远景墙（深）+ 窗洞（一盏灯）+ 近景桌面 —— 三层拉开空间 -->
+                  <rect y="134" width="212" height="46" fill="#1c1410"/>
+                  <!-- 墙上的一扇旧窗：透出院子里的暖光（画面从此有了"外面"） -->
+                  <g>
+                    <rect x="18" y="132" width="34" height="26" fill="#e8b070" opacity=".28"/>
+                    <rect x="18" y="132" width="34" height="26" fill="none" stroke="#2a1e14" stroke-width="1.6"/>
+                    <path d="M35 132 v26 M18 145 h34" stroke="#2a1e14" stroke-width="1.2" opacity=".8"/>
+                    <rect x="18" y="132" width="34" height="26" fill="#ffd898" opacity=".1"/>
+                  </g>
+                  <rect y="134" width="212" height="46" fill="url(#cd-lamp)" opacity=".42"/>
+
+                  <!-- 桌面：横贯画面、近大远小（上沿一条受光的亮边 = 桌沿） -->
+                  <path d="M-10 168 L222 168 L240 268 L-28 268 Z" fill="url(#cd-table)"/>
+                  <path d="M-10 168 L222 168 L223 173 L-11 173 Z" fill="#7a5c3c"/>
+                  <path d="M-10 168 L222 168 L222 169.4 L-10 169.4 Z" fill="#a8845c" opacity=".8"/>
+                  <!-- 桌面木纹（只在近处，两三条就够，带弧度才不像直线） -->
+                  <g stroke="#150e08" stroke-width="1" opacity=".45">
+                    <path d="M-8 232 Q70 227 140 234 Q180 238 226 231"/>
+                    <path d="M-16 254 Q80 249 150 256 Q196 260 236 253"/>
+                    <path d="M-12 208 Q60 205 120 210 Q170 213 224 208"/>
+                  </g>
+
+                  <!-- ⭐ 盖碗茶：**这一格的主视觉**
+                       ❌ 第一版：碗身是纯色 + 两条等距蓝弧 → 像塑料玩具
+                       ✅ 现在：瓷的釉光渐变（左上亮、右下暗）+ 手绘感的青花纹
+                           （线条粗细不一、有断笔）+ 碗沿的高光 + 碗内壁的暗 -->
+                  <g>
+                    <!-- 茶船（底托）：两层，上沿受光 -->
+                    <ellipse cx="74" cy="213" rx="43" ry="10.4" fill="#4a3626"/>
+                    <ellipse cx="74" cy="209.6" rx="43" ry="8.6" fill="#8a6c48"/>
+                    <ellipse cx="74" cy="208.6" rx="43" ry="8.6" fill="none" stroke="#c4a878" stroke-width="1.2" opacity=".7"/>
+                    <!-- 茶船内壁的阴影（碗放进去的凹） -->
+                    <ellipse cx="74" cy="209" rx="30" ry="5.6" fill="#3a2a1c" opacity=".6"/>
+
+                    <!-- 碗身：饱满的敞口碗，用瓷釉渐变 -->
+                    <path d="M42 170 Q45 205 74 209 Q103 205 106 170 Z" fill="url(#cd-porcelain)"/>
+                    <!-- 碗内的暗（口沿往里沉下去的一圈） -->
+                    <path d="M43 170 Q74 179 105 170 Q74 174 43 170 Z" fill="#8a7e6a" opacity=".55"/>
+
+                    <!-- 青花缠枝：三组**手绘感**的线（粗细不一、有断笔、不平行） -->
+                    <g stroke="#2e4a7a" fill="none" stroke-linecap="round">
+                      <path d="M47 187 Q60 193 74 192.4 Q90 191.6 101 186" stroke-width="1.9" opacity=".82"/>
+                      <path d="M50 197 Q62 201 75 200.8 Q89 200.4 99 196" stroke-width="1.4" opacity=".66"/>
+                      <path d="M54 178 Q66 183.6 76 183.2 Q88 182.6 97 177.6" stroke-width="1.5" opacity=".58"/>
+                      <!-- 缠枝的叶子：几个小点（"缠枝"不能只有主线） -->
+                      <g fill="#2e4a7a" stroke="none" opacity=".7">
+                        <ellipse cx="61" cy="192.6" rx="2.4" ry="1.2" transform="rotate(24 61 192.6)"/>
+                        <ellipse cx="88" cy="189.4" rx="2.4" ry="1.2" transform="rotate(-24 88 189.4)"/>
+                        <ellipse cx="70" cy="200.6" rx="2" ry="1" transform="rotate(12 70 200.6)"/>
+                        <ellipse cx="81" cy="198.4" rx="2" ry="1" transform="rotate(-14 81 198.4)"/>
+                      </g>
+                    </g>
+
+                    <!-- 碗口：一道厚边（外圈深、里圈浅 → 有厚度） -->
+                    <ellipse cx="74" cy="170" rx="32" ry="6.8" fill="#c4b8a2"/>
+                    <ellipse cx="74" cy="169.6" rx="32" ry="6.8" fill="none" stroke="#2e4a7a" stroke-width="2.2"/>
+                    <ellipse cx="74" cy="168.6" rx="27" ry="5.2" fill="#8a7e6a" opacity=".45"/>
+                    <!-- 碗沿高光：左上方一小段亮弧（这一笔最能"提亮"瓷器） -->
+                    <path d="M48 167.6 Q58 163.4 70 163.8" stroke="#fdf6e8" stroke-width="1.6" fill="none" opacity=".8" stroke-linecap="round"/>
+
+                    <!-- 盖子：斜搁在碗沿上（喝茶时的真实姿态） -->
+                    <g transform="rotate(-4 70 161)">
+                      <ellipse cx="70" cy="161" rx="30" ry="6.2" fill="#ddd2bc"/>
+                      <ellipse cx="70" cy="160.4" rx="30" ry="6.2" fill="none" stroke="#2e4a7a" stroke-width="1.7"/>
+                      <ellipse cx="70" cy="161" rx="20" ry="4" fill="#ece4d4"/>
+                      <ellipse cx="70" cy="161" rx="20" ry="4" fill="none" stroke="#2e4a7a" stroke-width="1" opacity=".6"/>
+                      <!-- 盖钮 -->
+                      <ellipse cx="70" cy="155.4" rx="4" ry="3.4" fill="#c8bca4"/>
+                      <ellipse cx="69" cy="154.6" rx="2" ry="1.6" fill="#f0e8d8" opacity=".8"/>
+                      <!-- 盖子的高光 -->
+                      <path d="M52 158.4 Q60 155.4 70 155.6" stroke="#fdf6e8" stroke-width="1.2" fill="none" opacity=".6" stroke-linecap="round"/>
+                    </g>
+
+                    <!-- 茶汤热气：三条上升的曲线（很淡，但是"热"的关键）
+                         改：线宽有变化、起点不齐、末端化开 -->
+                    <g stroke="#f0e4cc" fill="none" opacity=".4" stroke-linecap="round">
+                      <path d="M57 149 Q52 136 59 125 Q65 114 60 101" stroke-width="1.9"/>
+                      <path d="M76 147 Q71 133 78 121 Q84 110 79 97" stroke-width="1.5"/>
+                      <path d="M94 150 Q89 137 96 127 Q102 116 97 104" stroke-width="1.7"/>
+                      <path d="M67 148 Q64 140 68 133" stroke-width="1.1" opacity=".6"/>
+                    </g>
+                  </g>
+
+                  <!-- ⭐ 竹椅：右侧一把，靠背是弧形竹条（川式竹椅的标志）
+                       ⚠️ 补：加暗部 → 让椅子"退"到背景里，不跟茶碗抢主角 -->
+                  <g stroke="#7a5c32" fill="none" stroke-linecap="round" opacity=".8">
+                    <!-- 椅背外框：一根粗竹弯成的大弧 -->
+                    <path d="M136 268 L139 186 Q142 158 164 150 Q186 158 189 186 L192 268"
+                          stroke-width="4.4"/>
+                    <!-- 椅背内框 -->
+                    <path d="M148 268 L150 194 Q153 174 164 169 Q175 174 178 194 L180 268"
+                          stroke-width="3"/>
+                    <!-- 靠背的四根横档 -->
+                    <path d="M141 200 Q164 188 188 200" stroke-width="3"/>
+                    <path d="M143 218 Q164 207 187 218" stroke-width="3"/>
+                    <path d="M145 236 Q164 226 186 236" stroke-width="3"/>
+                    <path d="M147 254 Q164 245 184 254" stroke-width="3"/>
+                    <!-- 竹节的横纹（让竹条不像塑料管） -->
+                    <g stroke="#4a3620" stroke-width="1" opacity=".6">
+                      <path d="M140 176 h4 M140 230 h4 M189 176 h4 M189 230 h4
+                               M151 182 h3 M151 240 h3 M177 182 h3 M177 240 h3"/>
+                    </g>
+                  </g>
+
+                  <!-- 桌面上的光斑（灯泡打下来的一滩光，把茶托亮） -->
+                  <ellipse cx="84" cy="216" rx="86" ry="32" fill="#ffd898" opacity=".17"/>
+                  <!-- 近景压暗：画面最下一条暗带（把观者的视线推回茶碗） -->
+                  <rect y="244" width="212" height="24" fill="#0e0906" opacity=".5"/>
+                </svg>
+              </div>
+              <div class="c-bloom"></div>
+              <div class="c-aberr"></div>
+              <div class="c-blotch"></div>
+              <div class="c-vig"></div>
+              <span class="c-frame-n">04</span>
+              <span class="c-frame-stock">TM-400</span>
+              <div class="c-frame-body">
+                <span class="c-frame-t">成都</span>
+                <span class="c-frame-d">出差三天<br>还没吃够</span>
+                <span class="c-frame-note">2023.03</span>
+              </div>
+            </div>
+
+            <!-- ============ 05 西藏 ============ -->
+            <div class="c-frame" style="--fan-i:2"
+                 data-top="0" data-city="西藏" role="button" tabindex="0"
+                 aria-label="西藏 · 想去，还没去">
+              <div class="c-photo" style="background-image:url('assets/landing-city-tibet.jpg')"></div>
+              <div class="c-shot">
+    <svg viewBox="0 0 212 268" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+                  <defs>
+                    <!-- 高原的天：深得近乎靛蓝，这是海拔四千米以上才有的天色 -->
+                    <linearGradient id="xz-sky" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%"   stop-color="#141c3a"/>
+                      <stop offset="30%"  stop-color="#243a68"/>
+                      <stop offset="60%"  stop-color="#4a6a9a"/>
+                      <stop offset="84%"  stop-color="#8aa8c8"/>
+                      <stop offset="100%" stop-color="#c8d8e4"/>
+                    </linearGradient>
+                    <!-- 雪：不是纯白 —— 受光面白、背光面转青灰（雪山靠这个"立"起来） -->
+                    <linearGradient id="xz-snow" x1="0.35" y1="0" x2="0.75" y2="1">
+                      <stop offset="0%"   stop-color="#ffffff"/>
+                      <stop offset="34%"  stop-color="#eaf2f8"/>
+                      <stop offset="72%"  stop-color="#c2d2e0"/>
+                      <stop offset="100%" stop-color="#8a9cb4"/>
+                    </linearGradient>
+                    <!-- 背光的山体：雪线以下是深蓝紫 -->
+                    <linearGradient id="xz-mass" x1="0.15" y1="0" x2="0.9" y2="1">
+                      <stop offset="0%"   stop-color="#4a5c7c"/>
+                      <stop offset="55%"  stop-color="#2e3c5c"/>
+                      <stop offset="100%" stop-color="#161e34"/>
+                    </linearGradient>
+                    <!-- 主峰右侧的受光面（太阳在右后方，山脊被点亮） -->
+                    <linearGradient id="xz-lit" x1="0" y1="0" x2="1" y2="0.4">
+                      <stop offset="0%"   stop-color="#d8e6f2" stop-opacity=".1"/>
+                      <stop offset="62%"  stop-color="#d8e6f2" stop-opacity=".42"/>
+                      <stop offset="100%" stop-color="#f4fafe" stop-opacity=".62"/>
+                    </linearGradient>
+                    <!-- 山脚的雾：把山脚化进雾里（大气透视最重要的一笔） -->
+                    <linearGradient id="xz-haze" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%"   stop-color="#c8d8e4" stop-opacity="0"/>
+                      <stop offset="46%"  stop-color="#c8d8e4" stop-opacity=".55"/>
+                      <stop offset="100%" stop-color="#c8d8e4" stop-opacity=".12"/>
+                    </linearGradient>
+                  </defs>
+
+                  <rect width="212" height="268" fill="url(#xz-sky)"/>
+                  <!-- 几颗星（高原夜里/黎明前的残星） -->
+                  <g fill="#fff" opacity=".8">
+                    <circle cx="26" cy="22" r="1.3"/><circle cx="62" cy="14" r="1"/>
+                    <circle cx="94" cy="30" r="1.2"/><circle cx="140" cy="18" r="1"/>
+                    <circle cx="178" cy="34" r="1.4"/><circle cx="196" cy="12" r="1"/>
+                    <circle cx="46" cy="44" r="1"/><circle cx="112" cy="52" r="1.1"/>
+                  </g>
+
+                  <!-- ⭐⭐ 主雪峰（第三版 · 最终）
+                       ❌ 第一版：锯齿状雪冠 → 像圣诞树
+                       ❌ 第二版：更密的锯齿 → 像羽毛/星星
+                       ❌ 上一版：拆成左右两条雪坡 → 两条 path 交叉成一把剪刀/一个 X
+                       ✅ 现在：**一整片雪冠，一条 path 闭合**。
+                           关键是"底边"的形状 —— 真实雪山的雪线是**一条平缓的、微微下凹的弧**，
+                           左右两角略低、中间略高，而不是锯齿也不是交叉。 -->
+                  <path d="M52 182 L100 52 L112 76 L124 62 L152 182 Z" fill="url(#xz-mass)"/>
+
+                  <!-- 雪冠：单个闭合路径
+                       顶点 (100,52) → 沿右侧山脊下到 (146,166) → 底边平滑微凹地回到左侧 (76,164) → 回到顶点 -->
+                  <path d="M100 52
+                           C106 74 116 98 126 122
+                           C134 142 141 156 146 166
+                           C138 162 130 159 122 158
+                           C112 157 100 158 92 160
+                           C84 162 79 163 76 164
+                           C82 142 90 118 96 92
+                           C98 78 99 64 100 52 Z"
+                        fill="url(#xz-snow)" opacity=".96"/>
+
+                  <!-- 峰顶右侧的受光棱：一条窄亮带，贴着雪冠的右缘（不是一整片白） -->
+                  <path d="M100 52
+                           C106 74 116 98 126 122
+                           C134 142 141 156 146 166
+                           C142 164 138 162 134 161
+                           C129 140 121 116 113 94
+                           C107 78 102 64 100 52 Z"
+                        fill="#f4fafe" opacity=".38"/>
+
+                  <!-- 雪面上顺着山势的岩槽：三条**顺坡的长弧**（不与雪线交叉） -->
+                  <g stroke="#8496b0" stroke-width="1.1" fill="none" opacity=".38" stroke-linecap="round">
+                    <path d="M103 86 C104 108 106 128 108 146"/>
+                    <path d="M112 104 C117 124 123 144 129 160"/>
+                    <path d="M94 108 C95 130 97 148 99 160"/>
+                  </g>
+                  <!-- 雪线以下的裸岩：山体下半段压暗（雪线以下是岩石） -->
+                  <path d="M62 156 Q100 148 128 158 Q144 164 152 182 L62 182 Z" fill="#1a2236" opacity=".55"/>
+
+                  <!-- 左侧那座矮峰（形态与主峰明显不同：更宽更平、雪线更低） -->
+                  <path d="M78 182 L34 126 L-2 182 Z" fill="#25304a" opacity=".92"/>
+                  <path d="M34 126
+                           C40 146 46 162 50 174
+                           C42 172 36 171 30 171
+                           C26 156 26 140 34 126 Z"
+                        fill="url(#xz-snow)" opacity=".8"/>
+                  <path d="M34 126 C40 146 46 162 50 174 C45 173 41 172 37 171
+                           C34 156 33 140 34 126 Z" fill="#dfeaf4" opacity=".28"/>
+
+                  <!-- 右侧那座峰（比左侧高、比主峰矮 → "低-高-中"的节奏） -->
+                  <path d="M138 182 L176 106 L214 182 Z" fill="#25304a" opacity=".92"/>
+                  <path d="M176 106
+                           C181 128 186 148 190 166
+                           C182 164 174 163 166 164
+                           C168 144 171 124 176 106 Z"
+                        fill="url(#xz-snow)" opacity=".84"/>
+                  <path d="M176 106 C181 128 186 148 190 166 C185 165 180 164 176 164
+                           C176 144 176 124 176 106 Z" fill="#dfeaf4" opacity=".28"/>
+
+                  <!-- ⭐ 山脚的雾：把所有山脚一起化掉（这一层做了，"远"才成立） -->
+                  <rect y="140" width="212" height="52" fill="url(#xz-haze)"/>
+
+                  <!-- 山脚的雪原：起伏的雪坡（不是三条直横带） -->
+                  <path d="M0 182 Q40 174 78 180 Q120 187 158 179 Q188 173 212 180 L212 192 Q180 186 150 190 Q110 196 70 190 Q34 185 0 192 Z"
+                        fill="#c8d8e4" opacity=".66"/>
+                  <path d="M0 186 Q46 180 90 185 Q132 190 176 184 Q196 181 212 185 L212 190 Q170 186 130 190 Q86 194 44 189 Q20 187 0 190 Z"
+                        fill="#e4eef6" opacity=".4"/>
+
+                  <!-- ⭐ 经幡（改）
+                       ❌ 第一版：挂在一条几何弧线上 + 六面等大的旗 → 像一串彩色的便利贴
+                       ✅ 现在：绳是**悬链线**（两边高、中间自然下垂）；
+                           旗子**大小不一、倾斜角不同、被风吹得飘起**（下沿不是水平的） -->
+                  <path d="M-4 108 Q60 132 110 128 Q160 124 216 104"
+                        stroke="#3a3028" stroke-width="1.5" fill="none"/>
+                  <g stroke="#2a241c" stroke-width=".6">
+                    <!-- 蓝：最大、飘得最开 -->
+                    <path d="M14 113 L34 117 L30 140 Q22 143 14 137 Z" fill="#3a5a9a" opacity=".94"/>
+                    <!-- 白 -->
+                    <path d="M50 121 L70 124 L66 148 Q58 150 50 145 Z" fill="#e8e4dc" opacity=".94"/>
+                    <!-- 红：最小、被风吹得斜 -->
+                    <path d="M88 126 L106 128 L99 152 Q92 154 86 149 Z" fill="#b83a30" opacity=".94"/>
+                    <!-- 绿 -->
+                    <path d="M124 125 L144 125 L139 150 Q131 152 123 148 Z" fill="#3a7a5a" opacity=".94"/>
+                    <!-- 黄 -->
+                    <path d="M160 120 L180 118 L177 143 Q169 146 160 142 Z" fill="#d8b040" opacity=".94"/>
+                    <!-- 蓝（边缘的半面） -->
+                    <path d="M196 112 L214 109 L212 134 Q204 137 195 133 Z" fill="#3a5a9a" opacity=".94"/>
+                  </g>
+                  <!-- 经幡上的经文：小字块的暗示（跟着旗子的斜度走） -->
+                  <g fill="#1a1814" opacity=".3">
+                    <rect x="18" y="120" width="6" height="1.4" transform="rotate(3 18 120)"/>
+                    <rect x="18" y="125" width="9" height="1.4" transform="rotate(3 18 125)"/>
+                    <rect x="54" y="128" width="7" height="1.4" transform="rotate(2 54 128)"/>
+                    <rect x="54" y="133" width="5" height="1.4" transform="rotate(2 54 133)"/>
+                    <rect x="91" y="133" width="6" height="1.4" transform="rotate(4 91 133)"/>
+                    <rect x="91" y="138" width="8" height="1.4" transform="rotate(4 91 138)"/>
+                    <rect x="127" y="132" width="7" height="1.4"/>
+                    <rect x="127" y="137" width="5" height="1.4"/>
+                    <rect x="163" y="127" width="6" height="1.4" transform="rotate(-3 163 127)"/>
+                    <rect x="163" y="132" width="8" height="1.4" transform="rotate(-3 163 132)"/>
+                  </g>
+                  <!-- 经幡的暗影：幡投在雪原上的淡影 -->
+                  <g fill="#2a3a56" opacity=".16">
+                    <ellipse cx="24" cy="192" rx="12" ry="2.4"/>
+                    <ellipse cx="102" cy="196" rx="14" ry="2.4"/>
+                    <ellipse cx="170" cy="192" rx="12" ry="2.4"/>
+                  </g>
+
+                  <!-- 前景：近处的雪原，压暗（把观者放在山坡这一侧） -->
+                  <path d="M0 200 Q106 190 212 200 L212 268 L0 268 Z" fill="#161c30"/>
+                  <path d="M0 200 Q106 190 212 200 L212 208 Q106 198 0 208 Z" fill="#3a4a68" opacity=".7"/>
+                  <!-- 雪地上零星的碎石与雪坎 -->
+                  <g fill="#3a4a68" opacity=".55">
+                    <ellipse cx="36" cy="234" rx="7" ry="2.6"/>
+                    <ellipse cx="92" cy="248" rx="9" ry="3"/>
+                    <ellipse cx="158" cy="238" rx="6" ry="2.4"/>
+                    <ellipse cx="188" cy="258" rx="8" ry="2.8"/>
+                  </g>
+                  <g fill="#c8d8e4" opacity=".18">
+                    <ellipse cx="62" cy="222" rx="18" ry="2"/>
+                    <ellipse cx="140" cy="230" rx="14" ry="1.8"/>
+                  </g>
+                </svg>
+              </div>
+              <div class="c-bloom"></div>
+              <div class="c-aberr"></div>
+              <div class="c-blotch"></div>
+              <div class="c-vig"></div>
+              <span class="c-frame-n">05</span>
+              <span class="c-frame-stock">TM-400</span>
+              <div class="c-frame-body">
+                <span class="c-frame-t">西藏</span>
+                <span class="c-frame-d">想去<br>还没去</span>
+                <span class="c-frame-note">总有一天</span>
+              </div>
+            </div>
+
+            <button type="button" class="c-fanfold" id="c-fanfold">收拢</button>
+          </div>
+
+          <!-- ⭐ 最后一张"开始记录"卡：**独立分开**，不入扇 -->
+          <div class="c-frame c-frame--end">
+            <div class="c-end-inner">
+              <svg class="c-end-arrow" width="34" height="20" viewBox="0 0 34 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M2 10h28M24 3l7 7-7 7"></path>
+              </svg>
+              <p class="c-end-t">ROLL END<br>从此，由你自主前行</p>
+              <button type="button" class="c-cta" id="landing-enter">开始记录</button>
+            </div>
+          </div>
+        </div>
+       </div>
     </section>
 
     <!-- 视图 1：地图（Day 11 起**不再是**默认首屏，改由门面页开门） -->
@@ -469,7 +1533,7 @@
 
   <!-- ===== 本地配置：含高德 Key，不提交（模板见 config.example.js）=====
        找不到 config.js 时不会报错，只是地图加载不出来，页面其余部分照常可用 -->
-  <script src="config.js?v=68"
+  <script src="config.js?v=69"
           onerror="console.warn('[TripMemo] 未找到 config.js —— 地图将无法加载。请把 config.example.js 复制为 config.js 并填入 Key 与安全密钥。')"></script>
 
   <!-- ===== 项目脚本：顺序不能乱 =====
@@ -494,20 +1558,21 @@
           固定一个旧版本号会直接报 "getSession is not a function"。 -->
   <script src="https://static.cloudbase.net/cloudbase-js-sdk/latest/cloudbase.full.js"></script>
 
-  <script src="js/model.js?v=68"></script>
-  <script src="js/mock-data.js?v=68"></script>
-  <script src="js/store.js?v=68"></script>
+  <script src="js/model.js?v=69"></script>
+  <script src="js/mock-data.js?v=69"></script>
+  <script src="js/store.js?v=69"></script>
 
   <!-- 四态逻辑（空 / 加载 / 错误 / 正常）的**唯一实现** —— 两个列表视图共用（Day 13）
        ⚠️ 必须排在 timeline.js / places.js 之前：它们在 init() 里就要用它。
        ⭐ 为什么单独一个文件、而不是在两个视图里各写一份：
           那就是"同一个逻辑两种写法"，改的时候必然漏一个（原则 2）。 -->
-  <script src="js/view-state.js?v=68"></script>
-  <script src="js/detail.js?v=68"></script>
-  <script src="js/drawer.js?v=68"></script>
-  <script src="js/map.js?v=68"></script>
-  <script src="js/timeline.js?v=68"></script>
-  <script src="js/places.js?v=68"></script>
-  <script src="js/main.js?v=68"></script>
+  <script src="js/view-state.js?v=69"></script>
+  <script src="js/detail.js?v=69"></script>
+  <script src="js/drawer.js?v=69"></script>
+  <script src="js/map.js?v=69"></script>
+  <script src="js/timeline.js?v=69"></script>
+  <script src="js/places.js?v=69"></script>
+  <script src="js/main.js?v=69"></script>
+  <script src="js/landing-c.js?v=69"></script>
 </body>
 </html>

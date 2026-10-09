@@ -1,0 +1,827 @@
+/* ================================================================================
+   门面页 · 方案 C「胶卷冲印」的专属样式（2026-10-09）
+   --------------------------------------------------------------------------------
+   ⚠️ 这是**独立样式表**，只作用于 `#view-landing`（含其内部的 .c-* 元素）。
+      · 类名一律 `c-` 前缀 —— 已逐个查过，与 `style.css` **零冲突**
+      · 自带一套 `--c-*` 变量（暗房黑 + 显影橙），**刻意不套** 项目的
+        `--color-accent`（那是"奶油暖色 + 墨棕"的另一套视觉）—— 强套会把 C 变成另一个设计
+      · 字号用"看画面配"的那套（9~54px），**刻意不落** 项目的 7 档（12/14/16/18/20/28/40），
+        同理：强套会让卡片排版变形
+      · 门面页藏左侧导航靠 `style.css` 里的 `body.is-landing .app-nav { display:none }`，
+        那条**不在本文件里**，别删
+   ================================================================================ */
+
+/* ================================================================
+   方案 C · 胶卷冲印 Film & Darkroom
+   底：桌面静物实景照（重叠暗房黑）/ 主：相纸米 + 显影橙 / 字：等宽
+   布局：摊牌扇开（叠着 → 绕底边转开）/ 3D：绕底边旋转 + 胶片颗粒
+   ================================================================ */
+#view-landing {
+  --c-dark:  #14110f;
+  --c-dark-2:#221d1a;
+  --c-paper: #e8d9b5;
+  --c-paper-2:#cdbb92;
+  --c-amber: #e85d3d;
+
+  font-family: "Courier New", Consolas, "Noto Sans Mono CJK SC", monospace;
+  /* ⭐⭐ 整页背景 = 一张实景照片（桌面静物：木桌上的折叠地图 + 黄铜指南针 + 胶片卷）
+     ------------------------------------------------------------------
+     ⚠️ 这里**只放变量 / 字体 / 颜色**，**不放任何布局属性** ——
+        它本质上是 `.view`（`position:absolute; inset:0; overflow:auto; display:none`），
+        在 ID 上写 `display`/`position`/`overflow` 会**以 1-0-0 压掉 .view 的那几条**
+        （2026-10-09 四方案实测踩过：`.screen` 的显隐被 `#screen-a { display:flex }` 整条作废）。
+     ⚠️ 背景本身也不写在这里 —— 见下面 `.c-bg`，理由同 `.c-bg` 的注释（要绕开 transform）。 */
+  color: var(--c-paper);
+  background: var(--c-dark);   /* 兜底：内容滚出首屏后露出的底色 */
+}
+
+/* 内层负责撑满 + 纵向居中（⚠️ 见 .screen 上面那条注释） */
+.c-fit {
+  /* ⚠️ 演示页里这里要**减去顶部那条 Tab 栏的高度**（因为写它时父级 height 是 auto，
+       百分比解析不到，只能拿视口硬算）。项目里没有 Tab 栏，而且 `#view-landing` 就是 `.view`
+       （`position:absolute; inset:0`）→ **高度是确定的**，百分比能正常解析，直接用 100%。 */
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  /* ⚠️ 测过视口只有 ~905px（1600x1000 的窗口，chrome 吃掉 95px）。
+       标题 147 + 牌堆 466 = 613，center 会在上下各留 ~130px 死区，
+       而牌堆自己又只占 466 —— 视觉重心明显偏高。
+       改成 center 但让 .c-deck 用 flex:1 吃掉剩余高度、并把内容**纵向居中**，
+       这样牌堆的空白被自己吸收，标题与页脚贴住上下边。 */
+  /* ⚠️ 之前是 justify-content:center —— 内容 640px 在 905px 里居中后，
+       上下各甩出 ~130px 死区，而牌堆自己只占 466px，视觉重心明显偏高。
+       现在改成默认(Flex-start) + .c-deck { flex:1 } 让牌堆**吃掉全部余量**，
+       它的 align-items:center 再把卡片在自己盒里纵向居中 ——
+       空白被牌堆自己吸收，标题贴顶，整页撑满。 */
+  justify-content: flex-start;
+  padding: 14px 0 10px;
+}
+
+/* ------------------------------------------------------------------
+   暗房背景：三层
+   ① 安全灯暖光池（左上方一盏红灯在照）
+   ② 漏光 / 显影不均的斑驳
+   ③ 胶片颗粒
+   ------------------------------------------------------------------ */
+/* ⭐⭐ 背景层：单独一个元素，**不用 `background-attachment: fixed`**
+   ------------------------------------------------------------------
+   ⚠️ 为什么不直接写在 `#view-landing` 上：项目里 `.view.is-active` 带一条
+      `animation: page-turn-in`，而它是 `both` 填充 —— **动画结束后元素上仍留着 transform**，
+      而 transform 会新建 containing block → `background-attachment: fixed` **当场失效**
+      （表现：背景跟着内容滚，而不是锁在视口）。
+   ✅ 改成 `position:absolute; inset:0` 的独立元素：它相对 `.view`（padding box = 视口）定位，
+      **不依赖 fixed**，也不受祖先 transform 影响，效果等价且更稳。
+   四层的顺序不能错（CSS 多层背景"先写的盖在上面"）：
+     ④ 上部压暗 → 保标题对比度（照片左上有盏台灯，正落在标题上）
+     ③ 扇面区压暗 → 让五张卡跳出来，没有它卡片会被背景吃掉
+     ② 暖褐薄层 → 让照片退色、统一到暗房色调
+     ① 照片本体 → `62% 68%` 是取景位，把台灯光斑和右上干花推出画面，露出中间的折叠地图
+*/
+.c-bg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(180deg,
+      rgba(20,17,15,.56) 0%, rgba(20,17,15,.16) 24%, transparent 46%),
+    radial-gradient(60% 64% at 38% 54%,
+      rgba(20,17,15,.60) 0%, rgba(20,17,15,.38) 58%, rgba(20,17,15,.20) 100%),
+    linear-gradient(180deg, rgba(34,24,15,.24) 0%, rgba(20,17,15,.38) 100%),
+    url('../assets/landing-bg-desk.jpg') 62% 68% / cover no-repeat;
+  background-color: var(--c-dark);
+}
+.c-bg::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    /* 安全灯：左上一片红橙光，右侧渐暗 */
+    radial-gradient(52% 58% at 16% 22%, rgba(232,93,61,.22) 0%, rgba(232,93,61,.07) 38%, transparent 70%),
+    /* 另一盏弱光在右下，避免整片死黑 */
+    radial-gradient(46% 52% at 88% 82%, rgba(205,187,146,.10) 0%, transparent 68%);
+  z-index: 0;
+}
+/* 漏光的斑驳（底片放久了的那种不均匀） */
+.c-bg::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: .32;
+  z-index: 0;
+  background-image:
+    radial-gradient(38% 30% at 72% 12%, rgba(232,93,61,.12) 0%, transparent 70%),
+    radial-gradient(26% 34% at 8% 78%, rgba(232,93,61,.09) 0%, transparent 72%),
+    radial-gradient(44% 22% at 46% 96%, rgba(232,140,90,.07) 0%, transparent 70%);
+}
+
+/* 颗粒：单独一层，盖在所有内容之上才真实（老胶片颗粒是叠在画面上的） */
+.c-grain {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  pointer-events: none;
+  opacity: .035;
+  mix-blend-mode: screen;
+  /* ⚠️⚠️ 原来这里是三条 repeating-radial-gradient 画的**规则白点阵**
+     （每 6×8px 排一颗 0.6px 的白点），再用 screen 在暗底上提亮 ——
+     规则重复的图案在眼睛里就是"屏幕像素点"，不是胶片颗粒（他 2026-10-09 指出）。
+     ✅ 换成 SVG feTurbulence 生成的**真随机噪声**（fractalNoise + stitchTiles='stitch'
+        保证平铺无缝），再把 opacity 从 .07 降到 .035 —— 只在亮部留一点银盐质感。 */
+  background-image: url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23g)'/%3E%3C/svg%3E");
+}
+
+.c-head {
+  position: relative;
+  z-index: 2;
+  flex: 0 0 auto;
+  padding: 0 clamp(24px, 5vw, 64px);
+  margin-bottom: 4px;
+}
+.c-kicker {
+  margin: 0 0 9px;
+  font-size: 12px;
+  letter-spacing: 0.4em;
+  color: var(--c-amber);
+  text-shadow: 0 0 18px rgba(232,93,61,.5);
+}
+.c-title {
+  margin: 0;
+  font-size: clamp(32px, 4.8vw, 54px);
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  padding-left: 0.14em;
+  color: var(--c-paper);
+  text-shadow: 0 0 40px rgba(232,93,61,.26);
+}
+.c-sub {
+  margin: 10px 0 0;
+  font-size: clamp(12.5px, 1.4vw, 14px);
+  line-height: 1.7;
+  color: rgba(232,217,181,.66);
+  max-width: 46em;
+}
+
+/* ================================================================
+   ⭐⭐ 摊牌区（牌堆 → 扇开）
+   五张地点卡初始**叠成一摞、只露顶边**；点一下 → 五张绕**底边**转到各自角度，
+   像扇子一样铺开；最后那张"开始记录"卡**独立分开**在右侧，不入扇。
+   ================================================================ */
+.c-deck {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* ⚠️⚠️ gap 是加在"布局盒"之间的，而最外那张卡绕底边转 33° 后好大一部分
+       视觉是在**盒外**的（见 .c-fan 的出血 margin）—— gap 只管"两件东西的呼吸"。
+       ⚠️ 实测标定：1600 视口下扇面的**视觉**区间是 [-5, 1102]（宽 1107px），
+          而 .c-deck 内容区只有 1490px，减去独立卡 300 后剩 1190px，
+          再给扇面留 1107 就只剩 83px 给 gap —— 否则武汉卡左缘被切。
+       所以这里取 90px 左右（不是凭感觉的"呼吸距离"，是被几何挤出来的）。 */
+  gap: clamp(72px, 6vw, 96px);
+  /* ⚠️ flex:1 吃掉余量 + align-items:center 让牌堆在自己的盒里纵向居中 ——
+       否则盒高会被拉伸、卡片却贴在盒顶，下方留一片空。 */
+  flex: 1 1 auto;
+  min-height: 0;
+  align-items: center;
+  /* ⚠️ 下内边距必须 ≥ 卡片沉到枢轴下方的 (w/2)·sin33° ≈ 73px —— 否则外两张卡的角
+       压住页脚。
+       ⚠️ 左右不用给太多：横向出血已经由 .c-fan 自己的出血 margin 承担了，
+          padding 只负责"牌堆离视口边的硬边距"。
+       ⭐ 宽度账（1600 视口，见实测）：40 + 73 + 780(盒) + 73 + 200(gap) + 300(独立卡) + 40 = 1506 < 1570 ✅ */
+  padding: 12px 40px 82px;
+  overflow: visible;
+}
+
+/* 扇子的舞台：定宽定高，卡片绝对定位在其中、绕**底边**转
+   ⚠️ transform-origin 必须是 bottom center —— 这样才是"绕底边旋转" */
+.c-fan {
+  position: relative;
+  flex: 0 0 auto;
+  /* ⭐⭐⭐ 扇面几何 —— 只调这 4 个数，其余全部由它们推导
+   ------------------------------------------------------------------
+   定位方式：**真扇形**。底边只按 i·--fan-step 错开一丁点，
+   靠每张不同的旋转角把**顶端**铺开成一把扇。
+   卡片绕底边(bottom center)转 θ 后：
+     顶端横向摆出 = h·sinθ     ← 这一项才是"扇面宽度"的来源
+     顶端抬高     = h·(1−cosθ) ← 这一项决定 --fc-lift
+     底角下沉     = (w/2)·sinθ ← 这一项由 .c-deck 的 padding-bottom 吸收
+   卡片只带 --fan-i（-2..+2），--fan-x / --fan-rot 由 --fan-i 乘出来 ——
+   窄屏只改这里的 4 个数就够，不用动 5 处内联样式。 */
+  --fc-w: 268px;                    /* 卡宽 */
+  --fc-h: 340px;                    /* 卡高 */
+  --fan-step: 112px;                /* 相邻卡底边间隔（决定重叠程度）
+                                       ⚠️ 128 时整行的视觉宽度到 1107px，1600 视口
+                                          （实际 innerWidth 只有 1570）放不下 → 武汉卡被切。
+                                          112 后视觉宽 ≈ 1043px，配合 gap 96 + 独立卡 300
+                                          + padding 80 = 1519 < 1570 ✅ 留出安全余量。
+                                       ⚠️ 106 时五张压得太死（文字互相叠着看不清），112 是
+                                          读得清 + 放得下的折中。 */
+  --fan-angle: 33deg;               /* 最外那张的倾角 */
+  /* ⭐⭐ 盒宽 = **底边错开范围**，不是"视觉总宽"
+     ------------------------------------------------------------------
+     公式：盒宽 = 4 × --fan-step + --fc-w   （卡的 left:50% 是相对盒中心，
+           最外一张位移 ±2×step，再加半张卡宽 → 盒宽不够就会裁掉盒外那截）
+     ⚠️⚠️ 这个值**必须手写实数**，千万别用 calc 从 --fan-step / --fc-w 推导！
+        实测：`--fan-w: calc(var(--fan-step) * 4 + var(--fc-w))` 的 computed
+        值看起来是对的（`calc(128px * 4 + 268px)`），但套到 `width` 上时
+        **乘法那一项被算成 0**，实际宽度 = 268px（只剩 --fc-w）→
+        整个扇面偏左、武汉卡左缘跑到 -209px 被视口切掉。
+        换纯加法展开（step+step+step+step+fcw）同样无效。
+        在独立的最小复现文件里这写法是好的（780px），说明是本文件某个
+        上下文触发的解析差异 —— 不深究，**改用实数**最稳。
+     ⚠️ 改 --fc-w / --fan-step 时，**这三处必须一起改**：
+          .c-fan（桌面）· @media(901–1140px)（中档）· @media(≤900px)（纵向，不需要） */
+  --fan-w: 716px;                   /* = 112×4 + 268 */
+  --fc-lift: 40px;                  /* 盒高在卡高之上的余量，给悬停抬起留空间 */
+  width: var(--fan-w);
+  height: calc(var(--fc-h) + var(--fc-lift));
+  cursor: pointer;
+  perspective: 1400px;
+  /* ⭐⭐ 用 margin "预占"旋转出血，居中才会准
+     ------------------------------------------------------------------
+     最外两张卡绕**底边**转 --fan-angle/2 = 16.5° 后，卡的底角会横向甩到
+     **盒外** (w/2)·sin16.5° ≈ 0.284w ≈ 76px。这部分是 overflow:visible
+     溢出的、不占布局宽 → .c-deck 的 justify-content:center 只把"盒"居中了，
+     视觉内容整体偏左（1600 实测切边）。给盒左右各留一份出血 margin，
+     让"含出血的等效盒"被居中。
+     ⚠️ 系数 0.62 是**实测标定**的，不是纯几何推导：
+        几何上底角横甩 (w/2)·sin33° = 73px，但卡的**顶端**横甩
+        h·sin33° = 340×0.545 = 185px，两者叠加后最外卡的真实视觉出界量
+        约 0.62·(w/2) ≈ 83px/侧（1600 实测 武汉 L=-5）。
+        只按 sin16.5° 取 0.29 是不够的（实测切掉 154px）。 */
+  margin-left: calc(var(--fc-w) / 2 * 0.62);
+  margin-right: calc(var(--fc-w) / 2 * 0.62);
+}
+
+/* ⭐ 叠牌态：扇面盒收成一张卡的宽度（叠着时不需要 1019px 那么宽），
+   整摞更聚拢、视觉重心更稳；扇开时再展开回 1019。 */
+.c-deck.is-stacked .c-fan {
+  width: var(--fc-w);
+  /* ⚠️ 叠牌态卡只转 1.1°，几乎不横向出血 → margin 要收掉，
+        否则牌堆左右各多出 ~74px 空档，视觉上"飘"在中间。 */
+  margin-left: 0;
+  margin-right: 0;
+  transition: width .6s cubic-bezier(.18,.9,.22,1),
+              margin .6s cubic-bezier(.18,.9,.22,1);
+}
+.c-deck.is-open .c-fan {
+  /* ⚠️ 显式写回宽度，别依赖"基类恰好是满宽" —— 顺序一改就静默失效。 */
+  width: var(--fan-w);
+  transition: width .6s cubic-bezier(.18,.9,.22,1);
+}
+
+/* ⭐⭐ 叠牌态的**层序**要单独覆盖：
+   扇开态用 z-index:10+i 是对的（越外越上面，符合"摊开的一把扇"）；
+   但叠着时那样会让 i=+2 的西藏压在最上面 —— 而这一摞的**封面应该是西安**（data-top=1）。
+   做法：叠牌时把 z-index 改成"离 0 越近越上面"（|i| 的负值），西安(i=0) 自然登顶。 */
+.c-deck.is-stacked .c-fan .c-frame {
+  z-index: calc(20 - var(--fan-i, 0) * var(--fan-i, 0));
+}
+/* 严格说 |i| 相同（i=-2 与 i=+2）会撞 z-index，用一条"偏序"把它们岔开：
+   让 i<0 的稍高一点（先摊开的在下面，视觉上更顺） */
+.c-deck.is-stacked .c-fan .c-frame[data-top="1"] { z-index: 30; }
+
+/* 每张地点卡：绝对定位，底边对齐，绕底边旋转
+   ⭐ 叠牌态：全部贴在同一位置，只靠 --edge-* 错开一丁点 → "只露顶边" */
+.c-fan .c-frame {
+  position: absolute;
+  /* ⚠️ 不再用 left:50% + translateX(-50%) —— "百分比 + 自定义属性"混在
+     calc 里既难读又容易算错。改成定宽定负 margin，中心就落在 left:50%。 */
+  left: 50%;
+  margin-left: calc(var(--fc-w) / -2);
+  bottom: 0;
+  width: var(--fc-w);
+  height: var(--fc-h);
+  transform-origin: bottom center;
+  transform:
+    translateX(calc(var(--edge-x, 0px)))
+    translateY(calc(var(--edge-y, 0px) * -1))
+    rotate(var(--edge-rot, 0deg));
+  transition:
+    transform .82s cubic-bezier(.18,.9,.22,1),
+    box-shadow .34s ease,
+    filter .4s ease;
+  z-index: calc(10 + var(--fan-i, 0));
+  will-change: transform;
+  /* ⭐ 叠牌态（收拢）：每张往上错开 16px、转 1.1° → 一沓看得见厚度的底片堆
+     ⚠️ 错开量不能太小：13px 在 340 高的卡上几乎看不出"一摞"，截图里像单张（踩过）。
+     （.c-fan 的 --fan-i 是 -2..+2，这里直接拿来当错开序号） */
+  --edge-x: calc(var(--fan-i, 0) * 1px);
+  --edge-y: calc(var(--fan-i, 0) * 16px);
+  --edge-rot: calc(var(--fan-i, 0) * 1.1deg);
+  /* ⭐ 扇开态：底边按 --fan-i · --fan-step 错开；倾角 --fan-i · --fan-angle/2
+     ⚠️ 全部由 --fan-i 乘出来 —— 窄屏只需在媒体查询里改 --fan-step/--fan-angle，
+        不用去动 5 处内联样式（这是上一版最难受的地方）。 */
+  --fan-x: calc(var(--fan-i, 0) * var(--fan-step, 106px));
+  --fan-rot: calc(var(--fan-i, 0) * var(--fan-angle, 33deg) / 2);
+  /* ⚠️ 原来压到 brightness(.82) —— 被压暗的卡完全"沉"进背景里，
+       叠出来的厚度就看不见了。收到 .9 让每张还留一点存在感。 */
+  filter: brightness(.95) saturate(.94);
+}
+/* 最上面那张在叠牌时接近正常亮度（它是封皮） */
+.c-fan .c-frame[data-top="1"] { filter: brightness(1.02) saturate(.98); }
+
+/* ⭐ 扇开态：每张绕底边转到自己的角度 + 水平铺开 —— 像扇子一样转开 */
+.c-deck.is-open .c-fan .c-frame {
+  transform:
+    translateX(calc(var(--fan-x, 0px)))
+    translateY(0)
+    rotate(var(--fan-rot, 0deg));
+  filter: brightness(1) saturate(1);
+}
+
+/* 悬停：在当前扇开角度上再抬起、转正一些，并跳到最上层 */
+.c-deck.is-open .c-fan .c-frame:hover {
+  transform:
+    translateX(calc(var(--fan-x, 0px)))
+    translateY(-14px)
+    rotate(calc(var(--fan-rot, 0deg) * .5))
+    scale(1.05);
+  z-index: 60;
+  filter: brightness(1.08) saturate(1.12);
+  box-shadow:
+    inset 0 0 0 1px rgba(232,217,181,.36),
+    0 38px 58px -16px rgba(0,0,0,.98),
+    0 0 56px -6px rgba(232,93,61,.34);
+}
+/* 叠牌态悬停：整摞轻轻抬起（暗示"能点"） */
+.c-deck.is-stacked .c-fan:hover .c-frame[data-top="1"] {
+  transform:
+    translateX(calc(var(--edge-x, 0px)))
+    translateY(calc(var(--edge-y, 0px) * -1 + 13px))
+    rotate(var(--edge-rot, 0deg))
+    scale(1.03);
+}
+
+/* ⭐ 铺牌提示：叠着时浮在牌堆上，扇开后淡出 */
+.c-fanhint {
+  position: absolute;
+  left: 50%;
+  top: -18px;
+  transform: translateX(-50%);
+  z-index: 40;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 18px;
+  border: 1px dashed rgba(232,93,61,.6);
+  border-radius: 2px;
+  background: rgba(20,17,15,.74);
+  backdrop-filter: blur(3px);
+  color: var(--c-amber);
+  font: inherit;
+  font-size: 12px;
+  letter-spacing: 0.2em;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: opacity .34s, transform .34s;
+}
+.c-fanhint:hover { background: rgba(232,93,61,.16); border-color: var(--c-amber); }
+.c-fanhint:focus-visible { outline: 2px solid var(--c-amber); outline-offset: 3px; }
+.c-fanhint svg { animation: c-nudge 1.9s ease-in-out infinite; }
+.c-deck.is-open .c-fanhint {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-50%) translateY(-12px);
+}
+
+/* 收牌按钮：扇开后出现（想再看一次叠牌动画就点它） */
+.c-fanfold {
+  position: absolute;
+  left: 50%;
+  bottom: -34px;
+  transform: translateX(-50%) translateY(8px);
+  z-index: 40;
+  padding: 6px 15px;
+  border: 1px solid rgba(232,217,181,.24);
+  border-radius: 2px;
+  background: rgba(20,17,15,.7);
+  color: rgba(232,217,181,.66);
+  font: inherit;
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .34s .22s, transform .34s .22s, background .2s, color .2s;
+}
+.c-deck.is-open .c-fanfold { opacity: 1; pointer-events: auto; transform: translateX(-50%) translateY(0); }
+.c-fanfold:hover { background: rgba(232,93,61,.16); color: var(--c-amber); border-color: rgba(232,93,61,.5); }
+.c-fanfold:focus-visible { outline: 2px solid var(--c-amber); outline-offset: 3px; }
+
+/* ⭐ 最后那张"开始记录"卡：**独立分开**（不参与扇子，永远立着） */
+.c-deck .c-frame--end {
+  position: relative;
+  flex: 0 0 auto;
+  align-self: center;
+  width: 300px;
+  height: 300px;
+  margin: 0;
+  transform: none;
+  filter: none;
+  z-index: 20;
+  transition: transform .34s cubic-bezier(.2,.8,.3,1), box-shadow .34s;
+}
+.c-deck .c-frame--end:hover {
+  transform: translateY(-9px) scale(1.02);
+}
+
+/* ⭐ 城市卡的"照片"层：由生图工具产出的实景图打底，
+   上面仍叠暗角 / 斑驳 / 色差 / 颗粒 → 和手绘场景是同一套照片感语言 */
+.c-photo {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  /* ⚠️ 原来 brightness(.86) —— 再叠上 .c-vig + .c-frame::after 两层暗幕，
+       照片被压到几乎看不见细节（截出来是灰糊糊一片，踩过）。
+       收到 .98，让照片本身先"亮"起来，暗幕只留给需要压的地方。 */
+  /* ⚠️ 2026-10-09 他反馈"偏暗" → brightness .98 → 1.08，saturate .98 → 1.06，
+        sepia .04 → .02（少一点黄，颜色更正）。 */
+  filter: saturate(1.06) contrast(1.03) brightness(1.08) sepia(.02);
+  background-size: cover;
+  background-position: center 42%;
+  transition: transform .5s ease, filter .4s ease;
+}
+.c-frame:hover .c-photo { transform: scale(1.04); filter: saturate(1.14) contrast(1.05) brightness(1.14) sepia(.01); }
+
+.c-frame {
+  position: relative;
+  /* ⚠️ 这里原来有 `width: 212px; height: 268px; margin: 0 5px;` —— 是**横向滚动带旧版**
+     留下的尺寸，和现在的 268×340 扇面卡冲突：`.c-fan .c-frame` 只覆盖了
+     margin-left，**margin-right 的 5px 一直残留**（让卡片中心悄悄偏了 2.5px）。
+     尺寸现在由 `.c-fan .c-frame` 与 `.c-deck .c-frame--end` 各自声明。 */
+  background: #1a1512;
+  overflow: hidden;
+  box-shadow:
+    inset 0 0 0 1px rgba(232,217,181,.14),
+    0 10px 22px -10px rgba(0,0,0,.95);
+  transition: transform .34s cubic-bezier(.2,.8,.3,1), box-shadow .34s;
+  /* ⭐ 悬停时整格"浮起来"，像被镊子夹起一张底片 */
+  transform: translateZ(0);
+}
+.c-frame:hover {
+  transform: translateY(-9px) scale(1.02) rotate(.4deg);
+  box-shadow:
+    inset 0 0 0 1px rgba(232,217,181,.3),
+    0 30px 46px -14px rgba(0,0,0,.98),
+    0 0 44px -6px rgba(232,93,61,.28);
+  z-index: 5;
+}
+
+/* ⭐⭐ 每格里那幅"照片"：由内联 SVG 场景 + 四层叠加构成
+   —— 场景本体（SVG）/ 光学柔光 / 暗角 / 冲印斑驳
+   设计意图：让 SVG 场景**不像矢量图**，像一张真的冲印照片。 */
+/* ⭐ 手绘 SVG 场景：现在是**叠印在实景照片之上的极淡一层**
+   —— 保留"手作"的温度，又让生图实景当主角（这正是"记忆"叠加在"现实"上的隐喻） */
+.c-shot {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  /* ⚠️ .34 的 soft-light 叠印在已经偏暗的照片上，会把细节"糊平"。
+       收到 .22 —— 手作的笔触还在，但不抢实景照片的戏。 */
+  /* ⚠️ 2026-10-09 他要求"城市卡图片的画质和像素再提一下" → 这层矢量叠印
+     从 .13 再降到 .06：它是把**矢量线条压在实景照片上**，照片会显得不够干净，
+     也容易被误读成"图片不够清晰"。只留极淡一层当纹理，不参与成像。 */
+  opacity: .06;
+  mix-blend-mode: soft-light;
+  filter: saturate(1) contrast(1.04);
+  transition: opacity .4s, filter .4s, transform .5s;
+}
+.c-frame:hover .c-shot {
+  /* 悬停 = 显影：叠印退开、实景照片浮出来 */
+  opacity: .08;
+  transform: scale(1.035);
+}
+.c-shot svg { display: block; width: 100%; height: 100%; }
+
+/* ⭐ 光学柔光：模拟"镜头把高光糊开"
+   —— 用一层极淡的、放大过的同画面做 bloom，是照片感最重要的一笔。
+      这里用 mix-blend-mode 的 screen 叠一层径向暖光代替（零成本，效果接近）。 */
+.c-bloom {
+  position: absolute;
+  inset: -6%;
+  z-index: 4;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  opacity: .3;
+  background:
+    radial-gradient(38% 30% at 74% 34%, rgba(255,214,150,.4) 0%, transparent 72%),
+    radial-gradient(30% 24% at 16% 12%, rgba(214,226,240,.22) 0%, transparent 74%);
+}
+.c-frame:hover .c-bloom { opacity: .44; }
+
+/* 暗角：摄影的基本语言，四角压暗把视线收拢到画面中心 */
+.c-vig {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+  /* ⚠️ 0.74 的四角压暗在小卡上还行，放大后等于给每张卡罩了一只黑碗（踩过）。 */
+  background: radial-gradient(88% 78% at 50% 44%,
+    transparent 0%, rgba(10,8,7,.04) 60%, rgba(8,6,5,.28) 100%);
+}
+/* 冲印斑驳：显影液没摇匀留下的不均匀痕迹 */
+.c-blotch {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+  opacity: .3;
+  background-image:
+    radial-gradient(30% 24% at 22% 18%, rgba(232,140,90,.15) 0%, transparent 68%),
+    radial-gradient(24% 30% at 84% 76%, rgba(20,16,14,.34) 0%, transparent 70%),
+    radial-gradient(18% 16% at 62% 30%, rgba(232,217,181,.07) 0%, transparent 72%);
+}
+
+/* ⭐ 色差：真实镜头边角会把颜色"散开"
+   —— 左右各一条极淡的色边，是高级摄影感里最隐蔽也最有效的一笔 */
+.c-aberr {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+  opacity: .22;
+  box-shadow:
+    inset 1.5px 0 0 rgba(255,120,90,.5),
+    inset -1.5px 0 0 rgba(90,150,255,.45);
+}
+
+/* 帧号：像底片上打的那串小字 */
+.c-frame-n {
+  position: absolute;
+  top: 13px; left: 15px;
+  z-index: 3;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  color: rgba(232,217,181,.62);
+  text-shadow: 0 1px 4px rgba(0,0,0,.9);
+}
+/* 右下角的"胶卷型号"水印 —— 真底片边缘那串 Kodak/Ilford 之类 */
+.c-frame-stock {
+  position: absolute;
+  top: 13px; right: 14px;
+  z-index: 3;
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  color: rgba(232,217,181,.3);
+}
+
+/* 文案：压在画面下缘，加一层上浅下深的暗幕保证可读
+   ⚠️ 第一版暗幕占 52% 高度、最深处 .92 —— 把画面压掉了大半，"照片感"全没了。
+      现在收到 42%，最深处 .86，只在文字那几行真正需要的地方压暗。 */
+.c-frame::after {
+  content: '';
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: 44%;
+  z-index: 1;
+  pointer-events: none;
+  /* ⚠️ 最深处 .88 几乎是一块黑板。卡放大后文字本身也变大了，不需要那么重的底。 */
+  background: linear-gradient(0deg, rgba(8,6,5,.74) 0%, rgba(8,6,5,.28) 46%, transparent 100%);
+}
+.c-frame-t,
+.c-frame-d { position: relative; z-index: 3; }
+
+/* 文案容器：贴底排布 */
+.c-frame-body {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  z-index: 3;
+  padding: 0 20px 19px;
+  text-align: left;
+}
+.c-frame-t {
+  display: block;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--c-paper);
+  text-shadow: 0 1px 8px rgba(0,0,0,.95), 0 0 22px rgba(232,93,61,.3);
+}
+.c-frame-d {
+  display: block;
+  margin-top: 7px;
+  font-size: 13px;
+  line-height: 1.68;
+  letter-spacing: 0.05em;
+  color: rgba(232,217,181,.78);
+  text-shadow: 0 1px 6px rgba(0,0,0,.95);
+}
+/* ⭐ 手写标注：像用油笔在底片袋上补写的一行日期 */
+.c-frame-note {
+  display: inline-block;
+  margin-top: 10px;
+  padding: 2px 8px;
+  border-top: 1px solid rgba(232,93,61,.45);
+  font-family: "Ma Shan Zheng", "KaiTi", cursive;
+  font-size: 16px;
+  letter-spacing: 0.06em;
+  color: rgba(232,140,90,.9);
+  transform: rotate(-2deg);
+  text-shadow: 0 1px 6px rgba(0,0,0,.9);
+}
+
+/* 末端：入口在这里（横向带子的最后一格） */
+.c-frame--end {
+  width: 274px;
+  background:
+    radial-gradient(120% 90% at 50% 0%, rgba(232,93,61,.26), transparent 62%),
+    linear-gradient(168deg, #1d1310, #120c0a);
+  box-shadow:
+    inset 0 0 0 1px rgba(232,93,61,.55),
+    0 10px 24px -10px rgba(0,0,0,.95),
+    0 0 52px -12px rgba(232,93,61,.42);
+}
+.c-frame--end::after { display: none; }
+.c-end-inner {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 28px 24px;
+}
+.c-end-arrow {
+  margin-bottom: 18px;
+  color: var(--c-amber);
+  filter: drop-shadow(0 0 14px rgba(232,93,61,.7));
+  animation: c-nudge 1.9s ease-in-out infinite;
+}
+@keyframes c-nudge {
+  0%, 100% { transform: translateX(0); opacity: .78; }
+  50%      { transform: translateX(9px); opacity: 1; }
+}
+.c-end-t {
+  font-size: 15px;
+  letter-spacing: 0.11em;
+  color: var(--c-paper);
+  margin-bottom: 20px;
+  line-height: 1.6;
+}
+.c-cta {
+  padding: 15px 32px;
+  border: 1px solid var(--c-amber);
+  background: rgba(232,93,61,.14);
+  color: var(--c-paper);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  padding-left: calc(32px + 0.22em);
+  cursor: pointer;
+  transition: background .2s, transform .2s;
+}
+.c-cta:hover { background: rgba(232,93,61,.34); transform: translateY(-2px); }
+.c-cta:focus-visible { outline: 2px solid var(--c-amber); outline-offset: 3px; }
+
+/* ⭐ 无障碍：系统开了"减弱动态效果"就关掉全部过渡与漂浮动画。
+   ⚠️ 附带好处：无头浏览器截图时也可以用它把过渡一次性关掉 ——
+      否则 transform 会冻在过渡的起始帧上，截出来的图是"没摊开"的假象（踩过）。 */
+@media (prefers-reduced-motion: reduce) {
+  /* ⚠️⚠️ `.c-fan` **自己**也必须进来！
+     .c-deck.is-open/.is-stacked 里给 .c-fan 写了 `transition: width …`，
+     而下面这些后代选择器（.c-fan .c-frame 等）**管不到 .c-fan 自身**。
+     漏掉它的后果：无头截图时 .c-fan 的宽度过渡**冻在起始帧**上 ——
+     量到宽度永远是 268px（叠牌态的值）而不是 780px，于是误判成
+     "calc 推导失效"，白排查了十几轮（惨痛教训）。 */
+  .c-fan,
+  .c-fan .c-frame,
+  .c-fanhint, .c-fanfold,
+  .c-frame, .c-photo, .c-shot, .c-bloom, .c-end-arrow {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+/* ⚠️ 中屏（1130–1519px）：桌面几何放不下，就整体收一档。
+   ------------------------------------------------------------------
+   ⭐ 两个档位的宽度门槛是**算出来的**，不是拍的：
+      桌面档：扇面视觉宽 ≈ 1043 + gap 96 + 独立卡 300 + padding 80 = 1519
+      中档　：扇面视觉宽 ≈  688 + gap 96 + 独立卡 280 + padding 60 = 1124
+      → 低于 1130 就装不下任何横向扇形，必须切到"纵向牌列"（见下面 ≤1129 那档）。
+   ⚠️ 教训：之前断点写 1140 是错的 —— 1270/1170 这些宽度落在"桌面档"里
+      但桌面参数要 1519px，结果武汉卡左缘被切掉 155px（实测）。 */
+@media (max-width: 1519px) and (min-width: 1130px) {
+  .c-fan {
+    --fc-w: 200px;
+    --fc-h: 258px;
+    --fan-step: 60px;
+    --fan-angle: 24deg;
+    /* ⚠️ 手写实数 = 60×4 + 200。别用 calc 推导（见 .c-fan 里那段大坑注释）。 */
+    --fan-w: 440px;
+  }
+  .c-deck { gap: clamp(72px, 6vw, 96px); padding: 12px 30px 62px; }
+  .c-frame-t { font-size: 17px; }
+  .c-frame-d { font-size: 11.5px; }
+  .c-frame-note { font-size: 13px; }
+  .c-deck .c-frame--end { width: 280px; height: 264px; }
+}
+
+/* ⚠️⚠️ 窄屏（≤900px）**不再做横向扇形** —— 装不下了。
+   ------------------------------------------------------------------
+   算过：桌面扇形最低要 1120px（padding 80 + 盒 572 + gap 168 + 卡 300），
+   再小就先切最外两张、然后连独立卡也切（768px 实测：武汉整张消失）。
+   ⭐ 正解：窄屏换成**纵向展开的牌列** —— 卡片改成流内元素、上下叠 62px
+      （露出 128px 的卡头），展开时向下错开、左右各偏 ±9px 并轻转 3°。
+      "一摞 → 摊开"的语义完全保留，而且横向零溢出。
+   ⚠️ 要走纵向流式，就必须把 .c-frame 从 absolute 改回 relative 并去掉
+      transform-origin / rotate 的底边枢轴（那是给横向扇面用的）。
+   ------------------------------------------------------------------
+   ⚠️ 内侧还要覆盖 .c-deck 的 gap：桌面/中档是 72~96px（那是给横向出血的），
+      纵向排列时不需要那么大，40px 就够。
+   ⚠️ 断点 1129 是算出来的：任何横向扇形最低要 1130px（见上一档的宽度账）。 */
+@media (max-width: 1129px) {
+  .c-fan {
+    /* ⚠️ 卡宽用 clamp 跟着视口长 —— 固定 214px 在 1000px 视口里只有画面的 1/5，
+          整摞显得又小又孤零零（1000px 实测：牌列总宽仅 219px）。
+          ⚠️ 高度写死，**不要**用 calc(var(--fc-w) * 1.19) ——
+             这个文件里 calc 的乘法有解析坑（见 .c-fan 那段注释）。 */
+    --fc-w: clamp(210px, 30vw, 300px);
+    --fc-h: 288px;
+    --fan-w: auto;              /* 纵向流式：盒宽不需要定值 */
+    --fan-row: 84px;            /* 叠牌时每张向下错开的距离（露出卡头） */
+    --fan-row-open: 156px;      /* 展开时每张向下错开的距离 */
+    --fc-lift: 0px;
+    flex-direction: column;
+    height: auto;
+    width: auto;
+    /* ⚠️ 纵向牌列不需要"预占横向出血"的 margin —— 卡只左右偏 9px，
+          留着 margin 会把整列往中间挤、右侧还多出空档。 */
+    margin-left: 0;
+    margin-right: 0;
+  }
+  /* 卡片改流内：叠牌态每张只露 62px 的顶边 */
+  .c-fan .c-frame {
+    position: relative;
+    left: auto;
+    bottom: auto;
+    margin-left: 0;
+    margin-top: calc(var(--fan-row) - var(--fc-h));  /* 负 margin 叠起来 */
+    transform: rotate(calc(var(--fan-i, 0) * 1.5deg));
+    transform-origin: center center;
+    box-shadow: 0 -14px 26px -12px rgba(0,0,0,.9);
+  }
+  .c-fan .c-frame:first-of-type { margin-top: 0; }
+  /* 展开态：纵向摊开 + 左右轻错 + 轻转 —— 一沓牌在桌上铺开的样子 */
+  .c-deck.is-open .c-fan .c-frame {
+    margin-top: calc(var(--fan-row-open) - var(--fc-h));
+    transform:
+      translateX(calc(var(--fan-i, 0) * 9px))
+      rotate(calc(var(--fan-i, 0) * 3deg));
+  }
+  .c-deck.is-open .c-fan .c-frame:first-of-type { margin-top: 0; }
+  .c-deck.is-open .c-fan .c-frame:hover {
+    transform: translateX(calc(var(--fan-i, 0) * 9px)) translateY(-6px)
+               rotate(calc(var(--fan-i, 0) * 3deg)) scale(1.02);
+  }
+  .c-deck.is-stacked .c-fan:hover .c-frame[data-top="1"] {
+    transform: rotate(0deg) translateY(-6px) scale(1.015);
+  }
+
+  /* ⚠️ 覆盖桌面 gap（168~224px 是给横向出血留的，纵向排列用不到） */
+  .c-deck {
+    flex-direction: column;
+    gap: 40px;
+    padding: 16px 16px 36px;
+  }
+  .c-deck .c-frame--end { width: 232px; height: 222px; }
+  .c-frame-t { font-size: 17px; }
+  .c-frame-d { font-size: 12px; }
+  .c-frame-note { font-size: 13px; }
+  .c-frame-body { padding: 0 14px 13px; }
+  .c-end-t { font-size: 13px; }
+  .c-cta { padding: 12px 24px; font-size: 13px; }
+  .c-title { font-size: 29px; }
+  .c-sub br { display: none; }
+  .c-sub { font-size: 12.5px; padding-right: 8px; }
+  .c-fanhint { top: -24px; font-size: 11px; padding: 7px 13px; }
+  .c-fanfold { top: auto; bottom: -26px; }   /* 纵向牌列里"收拢"从底下出来 */
+}
+
+/* ⚠️ 手机（≤560px）：卡再收一档，错开量也要跟着收 —— 否则五张卡纵向撑出屏幕。
+   算过（卡高 232、露 62px）：5 张展开后总高 ≈ 4×118 + 232 = 704px，
+   加上标题区 200 + 独立卡 230 + 页脚 ≈ 1200px，在 844 高的手机上要滚动，
+   但**不会横向溢出**（这是纵向布局的最大好处）。 */
+@media (max-width: 560px) {
+  .c-fan {
+    --fc-w: clamp(168px, 46vw, 214px);
+    --fc-h: 232px;
+    --fan-row: 62px;
+    --fan-row-open: 118px;
+  }
+  .c-deck .c-frame--end { width: 208px; height: 202px; }
+  .c-frame-t { font-size: 15px; }
+  .c-frame-d { font-size: 11px; }
+  .c-frame-note { font-size: 12px; }
+  .c-frame-body { padding: 0 12px 11px; }
+  .c-end-t { font-size: 12px; }
+  .c-title { font-size: 26px; }
+}
