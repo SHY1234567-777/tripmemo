@@ -1,7 +1,12 @@
 # 环境变量与密钥 —— 绝对不上传
+# ⚠️ 为什么不是一条条列（原来写的是 .env / .env.local / .env.*.local）：
+#    那样只有"以 .local 结尾"的变体挡得住 ——
+#    ⭐ .env.production / .env.staging / .env.development 全都会漏网（2026-10-09 实测确认）
+# ⭐ 所以用 .env.* 一把全挡，再单独把"模板"放回来。
+#    ⚠️ 顺序不能反：先挡后放（! 开头的规则要写在下面才生效）。
 .env
-.env.local
-.env.*.local
+.env.*
+!.env.example
 
 # 密钥类文件
 *.pem

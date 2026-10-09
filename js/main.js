@@ -31,9 +31,8 @@
   /* 当前正在显示的视图名 */
   var currentView = DEFAULT_VIEW;
 
-  /* 示例数据按钮的两个文案 */
-  var SAMPLE_LABEL_LOAD = '载入示例数据';
-  var SAMPLE_LABEL_CLEAR = '清空示例数据';
+  /* ⭐ Day 23 移除：「示例数据按钮」的两个文案常量 —— 跟着按钮一起删了。
+     详见下面「示例数据按钮」那一段（现在只剩说明注释）。 */
 
   /**
    * 切换视图
@@ -229,64 +228,22 @@
   }
 
   /* ------------------------------------------------------------
-     示例数据按钮（Day 8）
+     ⭐ Day 23 移除：「载入示例数据」按钮的整套前端代码
 
-     一个按钮两种作用，靠数据层记录的 sampleLoaded 判断该做哪个。
-     为什么要弹确认框：载入会"换掉"当前数据，虽然是可还原的，
-                      但用户必须知道发生了什么，不能默默替换。
+     ⚠️ 为什么删：这是**开发和演示用的工具** —— 访客点一下，
+        界面就会被 13 条**假地点**填满，而他并不知道那些是假的。
+        ⭐ 一个"给所有人用"的站点不该有这个入口。
+
+     ⭐ 删掉的只是「入口」这一层，**能力还在**：
+        · `js/store.js` 里 `loadSampleData()` / `clearSampleData()` 都还在
+        · `js/mock-data.js` 里的 13 条示例数据也还在
+        ⚠️ 将来做演示 / 自测，直接在浏览器 Console 里调：
+             TripMemoStore.loadSampleData()      ← 载入示例
+             TripMemoStore.clearSampleData()     ← 还原原有数据
+
+     ⚠️ 一起删掉的还有 `refreshSampleLabel()`（刷新按钮文案）——
+        按钮都没了，它只会去操作一个不存在的 DOM，纯死代码。
      ------------------------------------------------------------ */
-
-  /** 按当前状态刷新按钮文案 */
-  function refreshSampleLabel() {
-    var label = document.getElementById('btn-sample-label');
-    var Store = window.TripMemoStore;
-    if (!label || !Store || !Store.isSampleLoaded) {
-      return;
-    }
-    label.textContent = Store.isSampleLoaded() ? SAMPLE_LABEL_CLEAR : SAMPLE_LABEL_LOAD;
-  }
-
-  /** 点示例数据按钮 */
-  function handleSampleClick() {
-    var Store = window.TripMemoStore;
-    if (!Store || !Store.loadSampleData) {
-      window.alert('数据层尚未就绪，暂时无法操作示例数据。');
-      return;
-    }
-
-    if (Store.isSampleLoaded()) {
-      /* 当前是示例模式 → 清空并还原 */
-      var okClear = window.confirm(
-        '将清空示例数据，恢复你载入示例前原有的数据。\n\n继续吗？'
-      );
-      if (!okClear) {
-        return;
-      }
-      var cleared = Store.clearSampleData();
-      if (cleared.ok) {
-        refreshSampleLabel();
-        window.alert('已清空示例数据，恢复原有数据（' + cleared.count + ' 个地点）。');
-      }
-      return;
-    }
-
-    /* 当前是正常模式 → 载入示例 */
-    var okLoad = window.confirm(
-      '载入示例数据会把当前的地点替换成 13 条示例地点。\n\n'
-      + '你现有的数据会先自动备份 —— 随时点「清空示例数据」就能还原。\n\n继续吗？'
-    );
-    if (!okLoad) {
-      return;
-    }
-    var result = Store.loadSampleData();
-    if (result.ok) {
-      refreshSampleLabel();
-      window.alert('已载入 ' + result.count + ' 条示例地点。\n'
-        + '可以去「时间轴」「地点列表」看看效果。');
-    } else {
-      window.alert('载入失败：' + result.reason);
-    }
-  }
 
   /* ------------------------------------------------------------
      全局错误提示（Day 8）
@@ -306,6 +263,15 @@
      ------------------------------------------------------------ */
 
   var ALERT_OK_HIDE_MS = 3000;
+  /* ⭐ 错误提示的停留时长（Day 23 新增）
+     ⚠️ 原来是"永不消失"，初衷是"怕用户没看见就丢了数据"。
+     ⚠️ 但实测后果更糟（2026-10-09 实测）：
+        只要出现过一次失败，这条红字就**永远挂在屏幕上**；
+        ⭐ 而且它还会**吞掉后面所有的成功提示**（见 showAlert 里那句 alertKind 判断）——
+        于是网络恢复之后，用户每次保存成功都看不到「已保存」，会以为一直在失败。
+     ⭐ 所以改成：停留 8 秒（成功提示 3 秒的两倍多，足够看见），然后自动淡出；
+        另外配了一个「关闭 ×」，想立刻收掉就点它。 */
+  var ALERT_ERROR_HIDE_MS = 8000;
   var alertTimer = null;
   var alertKind = null;   /* 当前挂着的那条是 'ok' 还是 'error' */
 
@@ -359,15 +325,28 @@
     }
 
     alertKind = kind;
-    bar.textContent = text;
+    /* ⭐ Day 23：文字写进**内部的 span**，不要写整条 `bar.textContent` ——
+       那样会把里面的「关闭 ×」按钮**一起抹掉**（给浮层加按钮最容易踩的坑）。 */
+    var textEl = document.getElementById('app-alert-text');
+    if (textEl) {
+      textEl.textContent = text;
+    } else {
+      bar.textContent = text;   /* 兜底：万一 HTML 还是旧结构，至少文字显示得出来 */
+    }
     /* ⚠️ 用 classList 只切「成功态」这一个类，**不重置整个 className** ——
        重置会把 is-in 一起抹掉，连续操作时就会闪一下。 */
     bar.classList.toggle('app-alert--ok', isOk);
+    /* ⭐ 重新显示前先清掉"淡出态" —— 否则上一次留下的 --out 还挂着，
+       新提示会一出现就是透明的（连续操作时必踩）。 */
+    bar.classList.remove('app-alert--out');
     bar.removeAttribute('hidden');
 
     if (!isOk) {
-      /* 错误态没有出现动画 —— 它需要立刻被看到 */
+      /* 错误态没有**出现**动画 —— 它需要立刻被看到（原设计意图保留） */
       bar.classList.remove('is-in');
+      /* ⭐ 但它不会永远挂着（Day 23）：ALERT_ERROR_HIDE_MS 之后自动收掉。
+         ⚠️ 这里原来直接 return —— 等于"错误条从此长在屏幕上"，见常量的说明。 */
+      alertTimer = setTimeout(hideAlert, ALERT_ERROR_HIDE_MS);
       return;
     }
 
@@ -380,17 +359,43 @@
     }
     bar.classList.add('is-in');
 
+    alertTimer = setTimeout(hideAlert, ALERT_OK_HIDE_MS);
+  }
+
+  /**
+   * ⭐ 把当前挂着的提示条收掉（Day 23 新增）
+   *
+   * ⚠️ 两个触发来源：
+   *    ① 计时到了（成功 3 秒 / 错误 8 秒）
+   *    ② ⭐ 用户点了「关闭 ×」
+   *    ⭐ 两条路都走这里 —— **收尾逻辑只能有一处**，
+   *       分开写必然会漏掉某个状态没清（本项目"状态同步要集中在一个函数收尾"那条坑）。
+   */
+  function hideAlert() {
+    var bar = document.getElementById('app-alert');
+    if (!bar) {
+      return;
+    }
+    if (alertTimer) {
+      clearTimeout(alertTimer);
+      alertTimer = null;
+    }
+
     var fadeMs = cssDurationMs('--duration-normal', 180);
+
+    /* 先开始淡出……
+       ⚠️ 成功态：移除 is-in 就回到"透明 + 上移 8px"的起始态；
+       ⭐ 错误态：它本来就没有 is-in（是瞬间出现的），
+          所以额外加一个 --out 类，让它也走同一个淡出过渡。 */
+    bar.classList.remove('is-in');
+    bar.classList.add('app-alert--out');
+
     alertTimer = setTimeout(function () {
-      /* 先开始淡出…… */
-      bar.classList.remove('is-in');
-      alertTimer = setTimeout(function () {
-        /* ……等淡出播完再真正隐藏，否则会"淡到一半突然没了" */
-        bar.setAttribute('hidden', '');
-        alertKind = null;
-        alertTimer = null;
-      }, fadeMs);
-    }, ALERT_OK_HIDE_MS);
+      /* ……等淡出播完再真正隐藏，否则会"淡到一半突然没了" */
+      bar.setAttribute('hidden', '');
+      alertKind = null;
+      alertTimer = null;
+    }, fadeMs);
   }
 
   /**
@@ -502,15 +507,17 @@
       importFile.addEventListener('change', handleImportFile);
     }
 
-    /* ---- 示例数据按钮（Day 8）----
-       ⚠️ 错误提示的监听必须**尽早注册**：数据层出错时会广播
-          `store:error`，如果监听装晚了，早期错误就漏掉了。
-          所以这里紧跟导出按钮，先于各视图的初始化。 */
-    var sampleBtn = document.getElementById('btn-sample');
-    if (sampleBtn) {
-      sampleBtn.addEventListener('click', handleSampleClick);
-    }
+    /* ⚠️ 错误提示的监听必须**尽早注册**：数据层出错时会广播
+       `store:error`，如果监听装晚了，早期错误就漏掉了。
+       ⭐ 这一条原来紧跟在「示例数据按钮」的绑定后面 —— Day 23 那个按钮删掉了，
+          注释单独留在这里，说明**为什么它必须排在这些位置**：先于各视图初始化。 */
     document.addEventListener('store:error', showStoreError);
+    /* ⭐ 提示条上的「关闭 ×」（Day 23）：手动收掉当前这条。
+       ⚠️ 它是真 <button> —— Tab / 回车 / 空格都是浏览器自带行为，不用接管键盘。 */
+    var alertCloseBtn = document.getElementById('app-alert-close');
+    if (alertCloseBtn) {
+      alertCloseBtn.addEventListener('click', hideAlert);
+    }
     /* 数据变更 → 成功提示（Day 11 重做）。和上面一样，尽早注册。 */
     document.addEventListener('data:change', showDataChangeAlert);
     initGlobalErrorWatch();
@@ -583,9 +590,6 @@
     if (window.TripMemoPlaces) {
       window.TripMemoPlaces.init();
     }
-
-    // 按钮文案要和当前状态一致（刷新后不能显示错的那个词）
-    refreshSampleLabel();
 
     console.log('[TripMemo] 骨架已就绪，当前视图：' + currentView);
   }

@@ -1231,6 +1231,10 @@ body.is-landing .app-nav {
   left: 0;
   right: 0;
   z-index: 30;
+  /* ⭐ Day 23：文字与「关闭 ×」排成一行 */
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
   padding: var(--space-3) var(--space-4);
   border-bottom: 1px solid rgba(91, 70, 54, 0.35);
   background: #fdf3e3;
@@ -1239,6 +1243,11 @@ body.is-landing .app-nav {
   line-height: 1.7;
   box-shadow: 0 2px 10px rgba(61, 52, 40, 0.08);
   /* 这条不设 pointer-events:none —— 用户可能要选中复制错误信息 */
+  /* ⭐ Day 23 补：错误态原来是"瞬间出现 + 瞬间消失"。
+     出现**仍保持瞬间**（它需要立刻被看到，这是原设计意图）；
+     但**消失**补上淡出 —— "出现/消失要有过渡"是他 2026-09-25 亲口提的。
+     ⚠️ 成功态自己有一份更完整的 transition（带 transform），会覆盖这一行。 */
+  transition: opacity var(--duration-normal) var(--ease-out);
 }
 
 /* ---------- 成功态（Day 11 重做 · 新增）----------
@@ -1297,6 +1306,60 @@ body.is-landing .app-nav {
 
 .app-alert[hidden] {
   display: none;
+}
+
+/* ---------- 提示条内部：文字 与 「关闭 ×」（Day 23 新增）----------
+
+   ⚠️ 为什么文字要单独一个 span：
+      JS 显示提示时只往"文字容器"里写 textContent ——
+      如果还像原来那样写整条 `bar.textContent`，就会把按钮**一起抹掉**，
+      点都点不到。⭐ 这是"给浮层加按钮"最容易踩的一个坑。
+   ⚠️ `min-width: 0` 不能省：flex 子项默认不肯缩到"内容宽度"以下，
+      放长文字时会**把按钮顶出屏幕**（本项目 flex 三连之一）。 */
+.app-alert__text {
+  flex: 1;
+  min-width: 0;
+}
+
+/* 「关闭 ×」（Day 23）
+   ⭐ 它是真 <button> —— Tab / 回车 / 空格都是浏览器自带行为，
+      不用自己接键盘事件（本项目"可点 ≠ 可聚焦"那条坑的正面对照） */
+.app-alert__close {
+  flex: none;
+  margin-top: 1px;              /* 与第一行文字的视觉基线对齐 */
+  padding: 0 var(--space-2);
+  border: 1px solid rgba(91, 70, 54, 0.3);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: inherit;
+  font-family: inherit;
+  font-size: var(--text-lg);
+  line-height: 1.2;
+  cursor: pointer;
+}
+
+.app-alert__close:hover {
+  background: rgba(91, 70, 54, 0.08);
+}
+
+/* ⚠️ 焦点环用 outline、用 :focus-visible（DESIGN.md 的规矩）；
+   禁止只写 outline:none —— 那等于把键盘用户的路堵死 */
+.app-alert__close:focus-visible {
+  outline: 2px solid var(--color-accent-text);
+  outline-offset: 2px;
+}
+
+/* 淡出态（Day 23）—— JS 收起前加上它，等过渡播完再设 hidden。
+   ⚠️ 不这么做的话，错误条会"啪"地一下消失，和成功态的淡出不一致。
+   ⚠️ 触发的两个来源：① 8 秒计时到 ② 用户点「关闭 ×」 */
+.app-alert--out {
+  opacity: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-alert {
+    transition: none;
+  }
 }
 
 /* ---------- 通用内容面板（时间轴 / 地点列表的容器） ---------- */

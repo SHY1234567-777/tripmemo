@@ -44,11 +44,15 @@ const toApiPlace = placesRepo.toApiPlace;
       ③ ⭐ 云函数把 token 转给平台问"这人是谁"（`/auth/v1/user/me`）
       ④ 拿到 uid → 拿它当 ownerId 做筛选
 
-   ⚠️ 兜底：**没带 token / 验证失败** 时用 FALLBACK_USER_ID ——
-      这样"没登录也能看到数据"，不至于页面直接空白。
-      ⭐ 但注意这**只是过渡措施**：理论上应该改成直接返回 401（记在待办里）。
+   ⚠️⚠️ 兜底：**没有了**（Day 23 改）
+      ⭐ 原来这里会兜底成 `FALLBACK_USER_ID = 'u_shy'`，后果是 ——
+         **不带 token 也能看到 `u_shy` 名下的一切数据**。
+         ⚠️ 这不是"理论上的风险"：2026-10-09 实测，在浏览器地址栏敲一下
+            `/api/places` 就返回了 **200 + 11 条真实地点（含坐标）**，
+            不需要登录、不需要任何工具。⭐ 这是**真实的数据泄露**。
+      ⭐ 现在改成：**解析不出身份 → 直接返回 401**，谁的数据都不给。
+      ⚠️ 白名单只有两个：`GET /api/health` 和 `GET /api/whoami`（都不返回用户数据）。
    ------------------------------------------------------------ */
-const FALLBACK_USER_ID = 'u_shy';
 
 /**
  * ⭐ 从请求头里取出 access token（去掉 `Bearer ` 前缀）
@@ -115,6 +119,24 @@ function sendError(res, status, code, message) {
   res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' });
   res.end(JSON.stringify({ ok: false, error: { code: code, message: String(message) } }));
 }
+
+/**
+ * ⭐ 服务端错误的统一中文提示（Day 23）
+ *
+ * ⚠️ 为什么抽成一个常量：6 处 500 必须说**同一句话** ——
+ *    散着写一定会改漏一处，然后用户在不同操作上看到不同的说法。
+ *
+ * ⚠️ 为什么不能透传 `err.message`（原来就是那么写的：
+ *    `sendError(res, 500, 'SERVER_ERROR', (err && err.message) || err)`）：
+ *    · 那是给**开发者**看的英文原文，比如 `connect ECONNREFUSED 120.53.x.x:27017`
+ *    · 用户看不懂，只会以为"网站坏了"，而且**他做任何事都没用**（不是他的错）
+ *    · ⚠️⚠️ 更严重：**会泄露服务器内部信息**（数据库地址、端口、库名、堆栈）——
+ *      ⭐ 这是安全审计里公认的"信息泄露"类问题，不只是"不好看"
+ *
+ * ⭐ 原文**没丢**：每个 catch 里都有一行 `console.error(...)`，
+ *    去 CloudBase 控制台 → 云函数 → 日志里能看完整堆栈。
+ */
+const SERVER_ERROR_MESSAGE = '服务器处理出错，请稍后重试。';
 
 /**
  * ⭐ 校验一个"新增地点"的请求体（Day 18）
@@ -249,6 +271,56 @@ function validatePlacePatch(body) {
 }
 
 /**
+ * ⭐ 校验"改设置"的请求体（Day 23 新增，契约 §四.7）
+ *
+ * ⭐ 可改的字段只有两个：`mainCity` / `sampleLoaded`。
+ *
+ * ⚠️⚠️ 判断"传没传"一律用 `'x' in body`，**不是**判断值的真假 ——
+ *    因为 `{ mainCity: null }` 是**合法且有意义的**（用户要清除锚点、让地图不画线），
+ *    用真假判断会把它当成"没传"，⭐ 结果就是"主城市永远清不掉"。
+ *
+ * ⚠️ `mainCity` 传了**非 null 对象**时，`city` / `lng` / `lat` **三个都要有**（契约规定）。
+ */
+function validateMetaPatch(body) {
+  const b = (body && typeof body === 'object') ? body : {};
+  const patch = {};
+
+  if ('mainCity' in b) {
+    const mc = b.mainCity;
+    if (mc === null || mc === undefined) {
+      patch.mainCity = null;                   /* ⭐ 传 null = 清除锚点（合法） */
+    } else if (typeof mc === 'object' && !Array.isArray(mc)) {
+      const city = (typeof mc.city === 'string') ? mc.city.trim() : '';
+      const lng = Number(mc.lng);
+      const lat = Number(mc.lat);
+
+      if (!city) {
+        return { ok: false, message: '主城市缺少「城市名」，请传 { city, lng, lat }。' };
+      }
+      if (!isFinite(lng) || !isFinite(lat)) {
+        return { ok: false, message: '主城市缺少有效坐标，请传 { city, lng, lat }。' };
+      }
+      if (lng < -180 || lng > 180 || lat < -90 || lat > 90) {
+        return { ok: false, message: '主城市的坐标超出合理范围（经度 ±180 / 纬度 ±90）。' };
+      }
+      patch.mainCity = { city: city, lng: lng, lat: lat };
+    } else {
+      return { ok: false, message: 'mainCity 要么是 { city, lng, lat }，要么是 null。' };
+    }
+  }
+
+  if ('sampleLoaded' in b) {
+    patch.sampleLoaded = !!b.sampleLoaded;
+  }
+
+  if (Object.keys(patch).length === 0) {
+    return { ok: false, message: '没有要改的字段。可以传 mainCity 或 sampleLoaded。' };
+  }
+
+  return { ok: true, data: patch };
+}
+
+/**
  * ⭐ 读取并解析请求体（Day 18 加）
  *
  * ⚠️⚠️ 这里有个很容易踩的点：
@@ -298,14 +370,47 @@ const server = http.createServer(async (req, res) => {
   const url = new URL(req.url || '/', 'http://127.0.0.1');
   const path = url.pathname;
 
-  /* ⭐⭐ 每个请求先解出"这是谁"（Day 20）
-     ⚠️ 必须先于所有路由 —— 后面每个查询都要用它做筛选。
-     ⭐ 解析失败不报错、用兜底用户，保证"至少能看到东西"（过渡措施，见上面的说明）。 */
+  /* ------------------------------------------------------------
+     ⭐⭐ 身份门禁（Day 23 修）—— 没有身份，就什么都不给
+     ------------------------------------------------------------
+     ⚠️ 必须先于所有业务路由 —— 后面每个查询都要用它做筛选。
+
+     ⭐ 改之前：解析失败会**兜底成 `u_shy`** → 于是"没登录的人"看到的是
+        `u_shy` 的真实数据（已实测，见文件上方那段说明）。
+     ⭐ 改之后：**解析不出身份 → 401**。
+
+     ⭐ 为什么不影响正常使用：前端打开页面就自动匿名登录，
+        每个请求都带 `Authorization: Bearer`，**永远有身份**；
+        只有"登录真的失败了"才会 401 —— 那时候本来就该报错，
+        而不是悄悄把别人的数据端上来。
+
+     ⚠️ 白名单（只有这两个不需要身份）：
+        · `GET /api/health`  —— 只探"云函数活着吗"，不碰任何数据
+        · `GET /api/whoami`  —— 排查工具，价值就是"把身份解析结果原样吐出来"，
+                                 挡掉就没用了（⚠️ 它不返回任何用户数据）
+     ⚠️ `/api/db-check` **不在白名单** —— 它会吐出数据库条数和地点名，
+        本来就该先有身份。
+     ------------------------------------------------------------ */
+
+  /* ⚠️ `isHealth` 的定义**从下面挪到了这里** ——
+     因为"这个请求要不要放行"必须在解析身份**之前**就判断出来。
+     ⚠️ 三个路径都放行，因为不确定平台转发过来时 URL 长什么样：
+        · 开了「路径透传」→ 收到的是原始的 /api/health
+        · 没开 → 可能被剥成 / */
+  const isHealth = (path === '/api/health' || path === '/health' || path === '/');
+  const isPublic = isHealth || path === '/api/whoami';
+
   const who = await resolveUserId(req);
-  if (!who.ok && who.reason !== 'no_token') {
-    console.warn('[TripMemo] 身份解析失败（用兜底用户）：' + who.reason);
+
+  if (!who.ok && !isPublic) {
+    console.warn('[TripMemo] 身份无效，已拒绝（' + who.reason + '）：'
+      + req.method + ' ' + path);
+    sendError(res, 401, 'UNAUTHORIZED', '请先登录后再操作。');
+    return;
   }
-  const userId = who.ok ? who.uid : FALLBACK_USER_ID;
+
+  /* ⭐ 走到这儿 = 要么有身份，要么走的是白名单 */
+  const userId = who.ok ? who.uid : null;
 
   /* ⭐ 临时接口：把"云函数看到的身份"原样吐出来（Day 20 实测用）
      ⚠️ 它的唯一作用是**看清除 token 验证后到底返回了什么字段** ——
@@ -317,6 +422,9 @@ const server = http.createServer(async (req, res) => {
       tokenLength: (getBearerToken(req) || '').length,
       resolved: who.ok,
       userId: userId,
+      /* ⚠️ 这个字段名是 Day 20 留下的 —— 那时"没身份"会兜底成 `u_shy`。
+         ⭐ 现在"没身份直接 401"，所以**还能走到这里**只可能是"根本没带 token"。
+            它现在的含义是「**身份无效**」，不存在任何兜底用户了。 */
       usedFallback: !who.ok,
       reason: who.reason || null,
       freshPlaceCount: 0,
@@ -329,11 +437,10 @@ const server = http.createServer(async (req, res) => {
      职责只有一个：证明「云函数 + 公网访问」这条链路是通的。
      ⚠️ 不连数据库、不写业务逻辑。
 
-     ⚠️ 三个路径都放行，因为不确定平台转发过来时 URL 长什么样：
-        · 开了「路径透传」→ 收到的是原始的 /api/health
-        · 没开 → 可能被剥成 /
-       先都兼容，稳一点。 */
-  const isHealth = (path === '/api/health' || path === '/health' || path === '/');
+     ⚠️ `isHealth` 的**定义已挪到上面**（身份门禁之前）——
+        "要不要放行"必须在解析身份之前就判出来，这里直接用它。
+     ⭐ 它同时也在**免登录白名单**里：健康检查本来就不该要登录，
+        而且它是"探活"用的 —— 加登录反而看不出云函数活没活。 */
 
   if (isHealth && req.method === 'GET') {
     res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
@@ -373,13 +480,21 @@ const server = http.createServer(async (req, res) => {
       }));
       return;
     } catch (err) {
-      /* ⚠️ 把错误原文吐出来 —— 这是本接口存在的意义 */
+      /* ⭐ Day 23：这个接口是**开发者诊断**用的（不在契约里、前端也不调它）——
+         它的价值就是"看清楚错误原文"，所以原文必须留着。
+         ⚠️ 但**形状要和别处一致**：`message` 给中文人话，原文挪到 `detail`（契约外扩展字段）。
+         ⚠️ 为什么不保留原来那种"message 直接放英文原文"的写法：
+            违背契约 §3.1 的意图（message 是给用户看的），
+            而且哪天有人把它接到界面上，英文原文就漏出去了。
+         ⭐ 原文三重保险：控制台日志 + 响应里的 detail + name。 */
+      console.error('[TripMemo] /api/db-check 失败：', err);
       res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
       res.end(JSON.stringify({
         ok: false,
         error: {
           code: 'DB_CHECK_FAILED',
-          message: String((err && err.message) || err),
+          message: SERVER_ERROR_MESSAGE,
+          detail: String((err && err.message) || err),
           name: String((err && err.name) || ''),
         },
       }));
@@ -442,7 +557,7 @@ const server = http.createServer(async (req, res) => {
       return;
     } catch (err) {
       console.error('[TripMemo] GET /api/places 失败：', err);
-      sendError(res, 500, 'SERVER_ERROR', (err && err.message) || err);
+      sendError(res, 500, 'SERVER_ERROR', SERVER_ERROR_MESSAGE);
       return;
     }
   }
@@ -480,7 +595,7 @@ const server = http.createServer(async (req, res) => {
       return;
     } catch (err) {
       console.error('[TripMemo] GET /api/place 失败：', err);
-      sendError(res, 500, 'SERVER_ERROR', (err && err.message) || err);
+      sendError(res, 500, 'SERVER_ERROR', SERVER_ERROR_MESSAGE);
       return;
     }
   }
@@ -540,7 +655,7 @@ const server = http.createServer(async (req, res) => {
       return;
     } catch (err) {
       console.error('[TripMemo] ' + req.method + ' /api/place 失败：', err);
-      sendError(res, 500, 'SERVER_ERROR', (err && err.message) || err);
+      sendError(res, 500, 'SERVER_ERROR', SERVER_ERROR_MESSAGE);
       return;
     }
   }
@@ -582,7 +697,7 @@ const server = http.createServer(async (req, res) => {
       return;
     } catch (err) {
       console.error('[TripMemo] DELETE /api/place 失败：', err);
-      sendError(res, 500, 'SERVER_ERROR', (err && err.message) || err);
+      sendError(res, 500, 'SERVER_ERROR', SERVER_ERROR_MESSAGE);
       return;
     }
   }
@@ -653,7 +768,7 @@ const server = http.createServer(async (req, res) => {
       return;
     } catch (err) {
       console.error('[TripMemo] POST /api/places 失败：', err);
-      sendError(res, 500, 'SERVER_ERROR', (err && err.message) || err);
+      sendError(res, 500, 'SERVER_ERROR', SERVER_ERROR_MESSAGE);
       return;
     }
   }
@@ -671,7 +786,52 @@ const server = http.createServer(async (req, res) => {
       return;
     } catch (err) {
       console.error('[TripMemo] GET /api/meta 失败：', err);
-      sendError(res, 500, 'SERVER_ERROR', (err && err.message) || err);
+      sendError(res, 500, 'SERVER_ERROR', SERVER_ERROR_MESSAGE);
+      return;
+    }
+  }
+
+  /* ------------------------------------------------------------
+     ⭐ PUT /api/meta —— 改设置（契约 §四.7）｜ Day 23 实现
+     ------------------------------------------------------------
+     ⭐ 为什么必须做它：在此之前**设置只能读、不能写** ——
+        前端 `setMainCity` 只改了内存（`persistSettings` 连 localStorage 都没写），
+        ⭐ **刷新一下就丢**。而地图上**所有连线都从主城市出发**
+        → ⭐ **一刷新，连线全没了**。
+        这正是 Day 20 接云时漏掉的"写"路径，在待办里挂了好几天。
+
+     ⚠️ 方法：**PUT 和 PATCH 都接受**（和 `/api/place` 保持一致）——
+        契约里登记的名字是 PUT；而它做的其实是"部分更新"（只改传了的字段），
+        ⭐ 那正是 PATCH 的语义。两个都留着，谁都不会坏。
+
+     ⚠️ 路由**不用在控制台新配**：`/api/meta` 这条路由 GET 已经在用了，
+        HTTP 访问是**按路径**配的，方法不限 👍 */
+  if (path === '/api/meta' && (req.method === 'PUT' || req.method === 'PATCH')) {
+    try {
+      let body;
+      try {
+        body = await readJsonBody(req);
+      } catch (e) {
+        sendError(res, 400, 'INVALID_INPUT', '请求体解析失败：' + e.message);
+        return;
+      }
+
+      const checked = validateMetaPatch(body);
+      if (!checked.ok) {
+        sendError(res, 400, 'INVALID_INPUT', checked.message);
+        return;
+      }
+
+      const settings = await settingsRepo.updateSettings(userId, checked.data);
+
+      console.log('[TripMemo] 改设置成功 owner=' + userId
+        + ' mainCity=' + JSON.stringify(settings.mainCity));
+
+      sendOk(res, settings);
+      return;
+    } catch (err) {
+      console.error('[TripMemo] ' + req.method + ' /api/meta 失败：', err);
+      sendError(res, 500, 'SERVER_ERROR', SERVER_ERROR_MESSAGE);
       return;
     }
   }

@@ -151,18 +151,79 @@
         function (json) { return { status: res.status, json: json }; },
         function () { return { status: res.status, json: null }; }   /* 应答不是 JSON */
       );
+    }).catch(function (err) {
+      /* ⭐⭐ Day 23：把"网络层失败"翻译成中文人话
+         ⚠️ 先分清一件事 —— 什么会走到这个 catch：
+            · ✅ 会：断网 / DNS 解析不了 / 被代理拦了 / 云函数域名不可达 / 请求被 CORS 挡掉
+            · ❌ 不会：HTTP 400 / 409 / 500 —— fetch **不把"服务器答了错误码"当失败**，
+                     那些照常走上面的 then，由 errorMessageOf 按状态码翻译
+         ⚠️ 浏览器给的原文是英文：Chrome 是 `Failed to fetch`，
+            Firefox 是 `NetworkError when attempting to fetch resource` ——
+            ⭐ 直接抛给用户等于没说，所以这里统一换成中文。
+         ⭐ 原文照旧打进 Console（排查时不丢信息）。 */
+      console.error('[TripMemo] 网络请求失败（' + method + ' ' + path + '）：', err);
+      throw makeFriendlyError(
+        'network',
+        '网络连不上服务器，请检查网络后重试。',
+        (err && err.message) ? err.message : String(err)
+      );
     });
   }
 
   /**
-   * ⭐ 从接口应答里取出"错误提示"（给用户看的中文）
+   * ⭐ 造一个"给人看的"错误（Day 23）
+   *
+   * ⚠️ 为什么需要它：原来各处直接 `new Error(英文原文)`，而 reportError 会把
+   *    `err.message` **原样显示在页面顶部** → 用户看到的是 `Failed to fetch`。
+   * ⭐ 这里统一成一种形状：
+   *    · `message` = 中文人话（这个会被显示出去）
+   *    · `kind`    = 'network' / 'input' / 'server'，方便上层分辨是哪一类
+   *    · `raw`     = 技术原文（只进 Console，不给用户看）
+   */
+  function makeFriendlyError(kind, message, raw) {
+    var e = new Error(message);
+    e.kind = kind;
+    e.raw = raw || '';
+    return e;
+  }
+
+  /**
+   * ⭐ 从接口应答里取出"给用户看的中文提示"（Day 23 重写）
+   *
+   * ⚠️ 为什么要按状态码分开说，而不是一句"出错了"糊过去：
+   *    三类错误的"用户能做什么"完全不同 ——
+   *    · 输入错（400/409）→ 是**用户自己填错了**，服务端已经给了准确的中文
+   *                          （比如"名称不能为空"），⭐ 照原样显示，用户能照着改
+   *    · 服务端错（500+） → ⚠️ 是**我们这边的锅**，用户改什么都没用。
+   *                          服务端返的是给开发者看的英文原文（如 connect ECONNREFUSED），
+   *                          ⭐ **绝不能透传** —— 用户看不懂，而且**可能泄露服务器内部信息**
+   *    · 形状不认识        → 兜底中文 + 状态码（方便对着 F12 的 Network 面板查）
+   *
    * ⚠️ 契约 §3.1 规定的错误形状是 { ok:false, error:{ code, message } }
    */
   function errorMessageOf(result) {
     var j = result && result.json;
+    var status = (result && result.status) || 0;
+
+    /* ⭐ 服务端错：不管它返的是什么，一律换成中文人话；
+       原文只写进 Console（开发者排查用），不进界面。 */
+    if (status >= 500) {
+      var rawServer = (j && j.error && (j.error.message || j.error)) || '(服务端没给原因)';
+      console.warn('[TripMemo] 服务端出错（HTTP ' + status + '），原文只给开发者看：', rawServer);
+      return '服务器处理出错，请稍后重试。';
+    }
+
+    /* ⭐ 服务端主动给的业务提示（400 校验 / 409 重复 / 404 找不到）——
+       这些本来就是中文、而且是**准确的**，直接用（用户照着它就能改对） */
     if (j && j.error && j.error.message) return j.error.message;
     if (j && j.error && typeof j.error === 'string') return j.error;
-    return '接口返回异常（HTTP ' + ((result && result.status) || '?') + '）';
+
+    /* ⭐ 兜底：走到这说明应答的形状我们不认识（比如网关自己返回了错误页）。
+       带上状态码，方便对着 F12 的 Network 面板查。 */
+    if (!j) {
+      return '服务器没有返回可识别的内容，请稍后重试。（HTTP ' + (status || '未知') + '）';
+    }
+    return '请求没有成功，请稍后重试。（HTTP ' + (status || '未知') + '）';
   }
 
   /* ⚠️ Day 20 起：地点和设置都存云数据库了，不再用 localStorage ——
@@ -511,7 +572,7 @@
         /* ⚠️ 409 = 云端已经有同坐标了；400 = 参数不合法。
            两种情况都说明"没存上"，必须回滚。 */
         if (r.json && r.json.ok === true) return null;
-        return new Error(errorMessageOf(r));
+        throw new Error(errorMessageOf(r));
       });
     } else if (action === 'update') {
       /* ⭐ 这里用 **PATCH**（Day 22 把名字改对了）。
@@ -523,7 +584,7 @@
       promise = requestJson('PATCH', '/api/place?id=' + encodeURIComponent(place.id), place)
         .then(function (r) {
           if (r.json && r.json.ok === true) return null;
-          return new Error(errorMessageOf(r));
+          throw new Error(errorMessageOf(r));
         });
     } else if (action === 'remove') {
       /* ⭐ Day 22：删除接口做好了（DELETE /api/place?id=）。
@@ -533,7 +594,7 @@
       promise = requestJson('DELETE', '/api/place?id=' + encodeURIComponent(place.id))
         .then(function (r) {
           if (!r.json || r.json.ok !== true) {
-            return new Error(errorMessageOf(r));
+            throw new Error(errorMessageOf(r));
           }
           var imgs = (r.json.place && r.json.place.images)
             || (place && place.images)
@@ -551,22 +612,39 @@
     });
   }
 
-  /** ⭐ 把一次失败的改动撤销掉（把本地数据恢复成改动前的样子） */
+  /**
+   * ⭐ 把一次失败的改动撤销掉（把本地数据恢复成改动前的样子）
+   *
+   * ⚠️⚠️ 注意：这里广播的 action 是 **'rollback'**，不是 add / remove / update（Day 23 改）
+   *
+   * ⭐ 为什么必须换掉原来的写法（原来"撤销新增"发的是 'remove'、"撤销删除"发的是 'add'）：
+   *    `main.js` 的 `showDataChangeAlert` 监听 `data:change`，
+   *    它把 'remove' 理解成"用户删掉了一条" → 会弹「**已删除：xxx**」。
+   *    ⚠️ 可那时候**什么都没删**，只是回滚 —— 这句话是**假的**，
+   *       用户会以为自己的数据被删了（**比不提示更糟**）。
+   *    （这个坑原来一直没暴露，是因为"错误提示永久挂着"把它盖住了 ——
+   *      Day 23 修好提示条之后它才露出来。）
+   *
+   * ⭐ 换成 'rollback' 之后各方反应：
+   *    · 时间轴 / 地点列表：`addEventListener('data:change', render)` → **任何 action 都会重绘** ✅
+   *    · 地图：`action === 'add' ? 编排 : refresh()` → 非 add 走 refresh ✅
+   *    · 提示逻辑：只认 add / update / remove 三个值 → **自然被忽略** ✅
+   */
   function rollback(action, place, before) {
     var list = listPlaces();
     if (action === 'add') {
       for (var i = 0; i < list.length; i++) {
         if (list[i].id === place.id) { list.splice(i, 1); break; }
       }
-      broadcastChange('remove', place);
+      broadcastChange('rollback', place);
     } else if (action === 'remove') {
       list.push(place);
-      broadcastChange('add', place);
+      broadcastChange('rollback', place);
     } else if (action === 'update' && before) {
       for (var j = 0; j < list.length; j++) {
         if (list[j].id === place.id) { list[j] = before; break; }
       }
-      broadcastChange('update', before);
+      broadcastChange('rollback', before);
     }
   }
 
@@ -720,14 +798,43 @@
     return settingsCache;
   }
 
+  /**
+   * ⭐ 把设置同步到云端（Day 23 实装）
+   *
+   * ⚠️⚠️ 这里以前是**空的** —— 只广播一个事件、什么都没保存。
+   *    注释写的是"等 PUT /api/meta 做好再补"，结果一直没补。
+   *    ⭐ 而且**实际后果比注释写的更严重**：
+   *       注释说"换设备会丢"，其实连 localStorage 都没有 → **刷新一下就丢**。
+   *    ⭐ 地图上**所有连线都从主城市出发** → ⭐ **一刷新，连线全没了**。
+   *
+   * ⭐ 做法和地点一样：**先广播、后台同步**（乐观更新）——
+   *    界面立刻有反馈，不必等服务器。
+   * ⚠️ 失败时**不回滚**（设置只有一个值，回滚反而容易错乱）：
+   *    改为**如实报错**，让顶部提示条说清"可能没保存"。
+   */
   function persistSettings() {
-    /* ⚠️ 设置目前**只存在本地内存里** ——
-       因为写设置的接口（PUT /api/meta）还没实现（契约里登记了，代码没写）。
-       ⭐ 后果：主城市**换设备会丢**。已记在 api-contract.md 的待办里。
-       ⚠️ 等 PUT 做了之后，这里补一个 requestJson('PUT', '/api/meta', ...) 即可。 */
+    /* ① 先广播 —— 界面立刻重画（切主城市要马上看见锚点和线跟着动） */
     document.dispatchEvent(new CustomEvent('settings:change', {
       detail: { mainCity: getMainCity() }
     }));
+
+    /* ② 再后台写云端 */
+    var settings = readSettings();
+    requestJson('PUT', '/api/meta', {
+      mainCity: settings.mainCity || null,
+      sampleLoaded: !!settings.sampleLoaded
+    }).then(function (r) {
+      /* ⚠️ 这里必须 `throw`，不能 `return` ——
+         `return new Error(...)` **不会**触发下面的 catch（今天刚在 syncToCloud 上修掉这个坑）。 */
+      if (!r.json || r.json.ok !== true) {
+        throw new Error(errorMessageOf(r));
+      }
+      /* ⭐ 用服务端返回的值回填 —— 以服务端为准（它可能做了规整） */
+      settingsCache.mainCity = r.json.mainCity || null;
+      settingsCache.sampleLoaded = !!r.json.sampleLoaded;
+    }).catch(function (err) {
+      reportError('保存设置', err);
+    });
   }
 
   /**
@@ -838,6 +945,17 @@
 
   /* ------------------------------------------------------------
      五、示例数据（Day 8）
+
+     ⚠️⚠️ **Day 23：UI 入口已移除** —— 左侧那个「载入示例数据」按钮删掉了。
+         ⭐ 原因：它是**开发和演示用的工具**，不该出现在"给所有人用"的站点上 ——
+            访客点一下界面就会被 13 条**假地点**填满，而他不知道那是假的。
+         ⭐ 但**这一层保留**（没有删代码）：
+            · 将来做演示 / 自测时，Console 里调一下就能用：
+                TripMemoStore.loadSampleData()     ← 载入
+                TripMemoStore.clearSampleData()    ← 还原
+            · 也因为下面的 `replaceAllPlaces()` 是**导入 JSON 共用的**，不能删。
+         ⚠️ 代价（要诚实记住）：这几个函数现在**没有任何 UI 调用方** ——
+            如果将来确认永远不再需要，可以整段删除（连带 `KEY_BACKUP`）。
 
      为什么要它：项目原本是空的，必须手动录 5 分钟才看得到界面。
                 有了它，一载入就能看到完整效果，也方便以后改代码时自测。

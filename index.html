@@ -17,7 +17,7 @@
   <link rel="preconnect" href="https://fonts.loli.net" crossorigin>
   <link rel="stylesheet"
         href="https://fonts.loli.net/css2?family=Noto+Serif+SC:wght@600;700&family=Ma+Shan+Zheng&display=swap">
-  <link rel="stylesheet" href="css/style.css?v=64">
+  <link rel="stylesheet" href="css/style.css?v=68">
 </head>
 <body>
 
@@ -81,10 +81,15 @@
       </button>
     </div>
 
-    <button type="button" class="nav-btn nav-btn--action" id="btn-sample">
-      <span class="nav-icon" aria-hidden="true">✨</span>
-      <span class="nav-label" id="btn-sample-label">载入示例数据</span>
-    </button>
+    <!-- ⭐ Day 23 移除：「载入示例数据」按钮（Day 8 加的）
+         ⚠️ 为什么删：它是**开发和演示用的工具** —— 访客点一下，
+            界面就会被 13 条**假地点**填满，而他不知道那些是假的。
+            ⭐ 一个"给所有人用"的站点不该有这个入口。
+         ⭐ 数据层的能力**还在**（`js/store.js` 的 loadSampleData / clearSampleData、
+            `js/mock-data.js` 的示例数据）—— 只是没有按钮了。
+            ⚠️ 将来做演示 / 自测，在 Console 里手动调：
+               TripMemoStore.loadSampleData()
+               TripMemoStore.clearSampleData() -->
 
       <!-- 导入：给「导出 JSON」补上"回程"（Day 11 重做补）
            ⚠️ 以前只有导出、没有导入 —— 导出的文件等于死在硬盘上回不来，
@@ -115,7 +120,15 @@
           用户看到的是一片空白，完全不知道发生了什么。
           错误状态是"最容易被忽略"的一种页面状态 —— 本地开发时
           它永远不会自己出现，所以最容易漏掉。 -->
-  <div class="app-alert" id="app-alert" hidden></div>
+  <!-- ⭐ Day 23：提示条里分成两块 —— 文字 + 「关闭 ×」
+       ⚠️ 文字必须放进**自己的 span** 里：原来 JS 是直接写 `bar.textContent`，
+          那样会把这个按钮一起抹掉（加按钮时最容易踩的一点）。
+       ⭐ 「关闭」其实只有错误态需要（成功提示 3 秒自己就走），但留着不影响。 -->
+  <div class="app-alert" id="app-alert" hidden>
+    <span class="app-alert__text" id="app-alert-text"></span>
+    <button type="button" class="app-alert__close" id="app-alert-close"
+            aria-label="关闭提示">×</button>
+  </div>
 
   <main class="app-main">
 
@@ -456,7 +469,7 @@
 
   <!-- ===== 本地配置：含高德 Key，不提交（模板见 config.example.js）=====
        找不到 config.js 时不会报错，只是地图加载不出来，页面其余部分照常可用 -->
-  <script src="config.js?v=64"
+  <script src="config.js?v=68"
           onerror="console.warn('[TripMemo] 未找到 config.js —— 地图将无法加载。请把 config.example.js 复制为 config.js 并填入 Key 与安全密钥。')"></script>
 
   <!-- ===== 项目脚本：顺序不能乱 =====
@@ -481,20 +494,20 @@
           固定一个旧版本号会直接报 "getSession is not a function"。 -->
   <script src="https://static.cloudbase.net/cloudbase-js-sdk/latest/cloudbase.full.js"></script>
 
-  <script src="js/model.js?v=64"></script>
-  <script src="js/mock-data.js?v=64"></script>
-  <script src="js/store.js?v=64"></script>
+  <script src="js/model.js?v=68"></script>
+  <script src="js/mock-data.js?v=68"></script>
+  <script src="js/store.js?v=68"></script>
 
   <!-- 四态逻辑（空 / 加载 / 错误 / 正常）的**唯一实现** —— 两个列表视图共用（Day 13）
        ⚠️ 必须排在 timeline.js / places.js 之前：它们在 init() 里就要用它。
        ⭐ 为什么单独一个文件、而不是在两个视图里各写一份：
           那就是"同一个逻辑两种写法"，改的时候必然漏一个（原则 2）。 -->
-  <script src="js/view-state.js?v=64"></script>
-  <script src="js/detail.js?v=64"></script>
-  <script src="js/drawer.js?v=64"></script>
-  <script src="js/map.js?v=64"></script>
-  <script src="js/timeline.js?v=64"></script>
-  <script src="js/places.js?v=64"></script>
-  <script src="js/main.js?v=64"></script>
+  <script src="js/view-state.js?v=68"></script>
+  <script src="js/detail.js?v=68"></script>
+  <script src="js/drawer.js?v=68"></script>
+  <script src="js/map.js?v=68"></script>
+  <script src="js/timeline.js?v=68"></script>
+  <script src="js/places.js?v=68"></script>
+  <script src="js/main.js?v=68"></script>
 </body>
 </html>
