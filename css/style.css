@@ -588,6 +588,16 @@ body.is-landing .app-nav {
   display: none;
 }
 
+/* ⭐ 2026-10-10：门面页**不显示** app 的错误提示条（#app-alert）
+   ⚠️ 为什么：门是"门"，顶上盖一条「数据出错了…」就不像门了
+      （旧门面页也有这个毛病，一直没人提）。
+   ⚠️ 用 .is-landing 类控制 —— 它由 main.js 的 switchView() 维护：
+      用户点「开始记录」进门后这个类就被摘掉，#app-alert 照常显示，
+      ⭐ **不会漏掉任何信息**。 */
+body.is-landing .app-alert {
+  display: none;
+}
+
 /* ---------- 地图视图 ---------- */
 
 /* 地图画布：铺满整个视图区 */
