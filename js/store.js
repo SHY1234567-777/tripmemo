@@ -103,9 +103,42 @@
       return Promise.resolve(false);
     }
 
+    return ensureSession().then(function () {
+      console.log('[TripMemo] 已有身份，token 长度 ' + accessToken.length);
+      return true;
+    }).catch(function (err) {
+      authError = '登录失败：' + ((err && err.message) || err);
+      console.error('[TripMemo] 认证失败：', err);
+      return false;
+    });
+  }
+
+  /**
+   * ⭐⭐ 确保拿到一个**可用的**会话（2026-10-10 新增，修一个真实事故）
+   *
+   * 🔴 事故现象：**老访客打开页面就报「请先登录后再操作。」，无痕窗口却完全正常。**
+   *    排查了半天才落到这里 —— 病根是下面这**一行看似合理的判断**：
+   *      `if (r && r.data && r.data.session) return null;`   // 有会话就不再登录
+   *    ⚠️ 它把"**有 session 对象**"当成了"**这个 session 还能用**"。这两件事不一样：
+   *       浏览器里可能躺着一个**已过期**、或者是**旧版 SDK 写下的**会话 ——
+   *       它照样是个对象、`access_token` 字段也照样在，但拿去请求会被云函数判无效 → 401。
+   *    ⭐ 识别特征：**无痕正常、普通窗口报错**（唯一差异就是 localStorage 里那个旧会话）。
+   *
+   * ✅ 现在的判据是"**有没有可用的 access_token**"：
+   *      · 没有 session              → 重新匿名登录
+   *      · 有 session 但缺 token     → 重新匿名登录
+   *      · 有 session 且 token 齐全  → 先用它
+   *        ⚠️ 这种情况下 token 仍可能"看着齐、实际已过期" —— 那一层交给 `requestJson`
+   *           的 **401 自愈**兜底（收到 401 会重登一次再重试），两层合起来才没有死角。
+   */
+  function ensureSession() {
+    if (!cbaAuth || typeof cbaAuth.signInAnonymously !== 'function') {
+      return Promise.reject(new Error('认证还没初始化好（cloudbase SDK 未就绪）'));
+    }
     return cbaAuth.getSession().then(function (r) {
-      /* ⭐ 已有会话 = 之前登录过，直接用，不要重复登录 */
-      if (r && r.data && r.data.session) return null;
+      var s = r && r.data && r.data.session;
+      if (s && s.access_token) return null;      /* 会话看起来是完整的，先拿来用 */
+      console.log('[TripMemo] 本地没有可用的会话，重新匿名登录');
       return cbaAuth.signInAnonymously();
     }).then(function () {
       return cbaAuth.getSession();
@@ -113,12 +146,7 @@
       var s = r && r.data && r.data.session;
       if (!s || !s.access_token) throw new Error('登录后没拿到 access_token');
       accessToken = s.access_token;
-      console.log('[TripMemo] 已有身份，token 长度 ' + accessToken.length);
       return true;
-    }).catch(function (err) {
-      authError = '登录失败：' + ((err && err.message) || err);
-      console.error('[TripMemo] 认证失败：', err);
-      return false;
     });
   }
 
@@ -136,7 +164,7 @@
    *          ⚠️ **即使 HTTP 状态是 400/409 也 resolve** —— 因为那是接口的正常应答，
    *             不是"网络坏了"。真连不上才 reject。
    */
-  function requestJson(method, path, body) {
+  function requestJson(method, path, body, _retried) {
     var opts = { method: method, headers: {} };
     /* ⭐ 带上身份 —— 云函数靠它判断"这是谁"，而不是靠写死的用户 */
     if (accessToken) {
@@ -151,6 +179,31 @@
         function (json) { return { status: res.status, json: json }; },
         function () { return { status: res.status, json: null }; }   /* 应答不是 JSON */
       );
+    }).then(function (result) {
+      /* ⭐⭐ 401 自愈（2026-10-10 新增）
+         ------------------------------------------------------------------
+         🔴 修的什么：老访客浏览器里留着一个**失效的旧会话**，
+            `initAuth()` 那层看它"有 token"就放行了，结果每次请求都是 401
+            → 页面显示「请先登录后再操作。」，用户**完全不知道该怎么办**。
+         ✅ 做法：**收到 401 = 这个 token 不管用了** → 丢掉它、重新匿名登录、
+            再把**同一个请求**重放一次。用户什么都没做，页面自己就好了。
+         ⚠️ `_retried` 是防死循环的闸：**只自动重试一次**。
+            万一重登后还是 401（比如匿名登录被控制台关了），就把原始的 401
+            原样交回上层，让 errorMessageOf 照常给出中文提示 ——
+            ⭐ **不能吞掉**，否则用户会看到一片空白而没有任何解释。
+         ⚠️ 只在 `accessToken` 本来就有值时才重试：如果压根没登录过，
+            说明问题不在"token 失效"，重登也是白搭。 */
+      if (result.status === 401 && !_retried && accessToken) {
+        console.warn('[TripMemo] 收到 401 —— 本地会话可能已失效，重新登录后重试一次：' + method + ' ' + path);
+        accessToken = null;
+        return ensureSession().then(function () {
+          return requestJson(method, path, body, true);
+        }).catch(function (err) {
+          console.error('[TripMemo] 401 后重新登录失败：', err);
+          return result;    /* 兜底：交回原始 401，别让用户面对"无解释的空白" */
+        });
+      }
+      return result;
     }).catch(function (err) {
       /* ⭐⭐ Day 23：把"网络层失败"翻译成中文人话
          ⚠️ 先分清一件事 —— 什么会走到这个 catch：
