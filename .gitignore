@@ -28,3 +28,7 @@ Thumbs.db
 
 # 工具目录（不是项目代码）
 .workbuddy/
+
+# Python（verify-project.py 这类工具脚本会生成字节码缓存）
+__pycache__/
+*.pyc
