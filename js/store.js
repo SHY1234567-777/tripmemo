@@ -191,10 +191,19 @@
             万一重登后还是 401（比如匿名登录被控制台关了），就把原始的 401
             原样交回上层，让 errorMessageOf 照常给出中文提示 ——
             ⭐ **不能吞掉**，否则用户会看到一片空白而没有任何解释。
-         ⚠️ 只在 `accessToken` 本来就有值时才重试：如果压根没登录过，
-            说明问题不在"token 失效"，重登也是白搭。 */
-      if (result.status === 401 && !_retried && accessToken) {
-        console.warn('[TripMemo] 收到 401 —— 本地会话可能已失效，重新登录后重试一次：' + method + ' ' + path);
+         ⭐⭐ 2026-10-12 又补了一次（shy 微信真机测出）：**去掉了"必须 accessToken 有值"这个前提**。
+            🔴 新修的场景：**登录还没完成时用户就操作了** ——
+               微信第一次打开是全新环境，`initAuth()` 还在异步登录中，
+               用户已经点了「删除」。此时 `accessToken` 还是 `null`，
+               请求不带 Authorization 头 → 云函数回 401 →
+               ⚠️ 而老条件是 `&& accessToken`，一看是 null 就**不重试**，直接失败。
+               ⭐ 用户看到「同步到云端：请先登录后再操作。」——**第二次点又好了**
+                  （那时登录已经完成）。这就是"第一次失败、重试正常"的真面目。
+            ⭐ 现在：**401 一律重试一次**（无论当时有没有 token）——
+               `ensureSession()` 里本来就包含"没会话就去登录"的逻辑，
+               所以这条路径对"没 token"和"token 失效"两种情况都成立。 */
+      if (result.status === 401 && !_retried) {
+        console.warn('[TripMemo] 收到 401 —— 会话可能还没就绪/已失效，重新登录后重试一次：' + method + ' ' + path);
         accessToken = null;
         return ensureSession().then(function () {
           return requestJson(method, path, body, true);
@@ -303,16 +312,72 @@
                 完全不知道发生了什么。现在把它记下来，由界面显示出来。 */
   var lastError = null;
 
+  /* ------------------------------------------------------------
+     ⭐⭐ 失败日志（2026-10-12 加，遗留清单 B2）
+     ------------------------------------------------------------
+     🔴 以前的问题：写入失败只 `console.error` 一行 ——
+        用户一刷新页面，**控制台就清空了**，事后根本查不出"刚才失败过几次、失败在哪一步"。
+        ⚠️ 对"偶发失败"（比如微信第一次登录那个竞态）尤其致命：等你打开控制台，现场早没了。
+     ✅ 现在把**最近 20 次**失败留在 localStorage，刷新也不丢。
+     ⭐ 查看：F12 里跑 `TripMemoStore.getErrorLog()` ｜ 清空：`TripMemoStore.clearErrorLog()`
+     ⚠️ 只记“哪个环节 + 哪条操作 + 什么错误”，**不存任何用户内容**（地点正文、照片都不进这里）。 */
+  var ERROR_LOG_KEY = 'tripmemo_error_log';
+  var ERROR_LOG_MAX = 20;
+
+  function recordError(scope, err, extra) {
+    try {
+      var log = [];
+      try {
+        log = JSON.parse(global.localStorage.getItem(ERROR_LOG_KEY) || '[]');
+        if (!Array.isArray(log)) log = [];
+      } catch (e) {
+        log = [];   /* 存储里是坏数据 → 当空的从头开始，不让它拖垮主流程 */
+      }
+      log.unshift({
+        at: new Date().toISOString(),
+        scope: scope,
+        message: (err && err.message) ? err.message : String(err),
+        extra: extra || null
+      });
+      if (log.length > ERROR_LOG_MAX) {
+        log.length = ERROR_LOG_MAX;
+      }
+      global.localStorage.setItem(ERROR_LOG_KEY, JSON.stringify(log));
+    } catch (e) {
+      /* ⚠️ “记日志”本身失败（比如隐私模式禁了 localStorage）绝不能影响主流程 */
+    }
+  }
+
+  /** 读失败日志（最近的在最前） */
+  function getErrorLog() {
+    try {
+      return JSON.parse(global.localStorage.getItem(ERROR_LOG_KEY) || '[]');
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function clearErrorLog() {
+    try {
+      global.localStorage.removeItem(ERROR_LOG_KEY);
+    } catch (e) {
+      /* 同上，失败就失败 */
+    }
+  }
+
   /**
    * 记一次数据层错误，并广播出去让界面显示
    * @param {string} scope 出错的环节（读地点 / 写地点 / 读设置 / 写设置）
    * @param {Error} err
+   * @param {object} [extra] 补充信息（写操作的 action / 地点 id 等），**只进日志、不上界面**
    */
-  function reportError(scope, err) {
+  function reportError(scope, err, extra) {
     lastError = {
       scope: scope,
       message: (err && err.message) ? err.message : String(err)
     };
+    /* ⭐ 落盘一份（刷新不丢）—— 见上面 recordError 的说明 */
+    recordError(scope, err, extra);
     console.error('[TripMemo] 数据层出错（' + scope + '）：', err);
     document.dispatchEvent(new CustomEvent('store:error', {
       detail: lastError
@@ -490,7 +555,16 @@
       return Promise.reject(new Error('只能上传图片文件'));
     }
 
-    return compressImage(file).then(function (compressed) {
+    /* ⭐ 2026-10-12：**先确保登录会话可用**，再交给 SDK 直传。
+       ⚠️ 为什么必须加：`cbaApp.uploadFile` 是 **SDK 直传云存储**，
+          **不经过 `requestJson`** → 享受不到那层的 401 自动重试。
+          而 `initAuth()` 是异步的：微信第一次打开是全新环境、登录还没完成，
+          用户就点了「保存」→ SDK 没有有效会话 → 直接失败。
+          ⭐ shy 微信真机实测的现象："第一次提示数据错误，第二次就好了"。
+       ⭐ `ensureSession()` 里包含"没会话就去登录"的逻辑，这一句就把竞态堵住了。 */
+    return ensureSession().then(function () {
+      return compressImage(file);
+    }).then(function (compressed) {
       /* ⚠️ cloudPath 规则：只允许字母数字 / ! - _ . 空格 * 和中文，用 / 分层。
          这里按地点分目录，⭐ 将来"删地点时顺手删照片"能找到它们。 */
       var cloudPath = 'places/' + placeId + '/'
@@ -521,8 +595,13 @@
     if (!list.length) return Promise.resolve([]);
     if (!cbaApp) return Promise.resolve([]);
 
-    return cbaApp.getTempFileURL({
-      fileList: list.map(function (id) { return { fileID: id, maxAge: 3600 }; }),
+    /* ⭐ 2026-10-12：同样先确保会话可用（SDK 直传不受 `requestJson` 的 401 自愈保护）。
+       ⚠️ 这条失败会被下面的 catch 吞掉、返回空数组 → 表现是"照片显示不出来（露出色块打底）"，
+          不会报错。所以它也是"第一次失败"的隐形来源之一。 */
+    return ensureSession().then(function () {
+      return cbaApp.getTempFileURL({
+        fileList: list.map(function (id) { return { fileID: id, maxAge: 3600 }; }),
+      });
     }).then(function (res) {
       return ((res && res.fileList) || []).map(function (f) {
         return { fileID: f.fileID, url: f.tempFileURL || f.download_url || '' };
@@ -547,7 +626,13 @@
     var list = (fileIDs || []).filter(function (x) { return !!x; });
     if (!list.length || !cbaApp) return;
 
-    cbaApp.deleteFile({ fileList: list }).then(function (res) {
+    /* ⭐ 2026-10-12：同 uploadPhoto —— SDK 直传**不受** `requestJson` 的 401 自愈保护，
+       所以调 SDK 前先确保会话可用。
+       ⚠️ 这条失败不报给用户（地点已删掉，只是留孤儿文件），但**仍要修** ——
+          否则每次"第一次删除"都会静默留下删不掉的照片，白占云存储额度。 */
+    ensureSession().then(function () {
+      return cbaApp.deleteFile({ fileList: list });
+    }).then(function (res) {
       /* ⚠️ 官方文档提醒：要**逐条检查**返回结果，别假设全成功 */
       var failed = ((res && res.fileList) || []).filter(function (f) {
         return f.code !== 'SUCCESS';
@@ -661,7 +746,8 @@
 
     promise.catch(function (err) {
       rollback(action, place, before);
-      reportError('同步到云端', err);
+      /* ⭐ 带上 action 和 placeId：事后翻失败日志时能一眼看出"是加 / 改 / 删哪一步失败了" */
+      reportError('同步到云端', err, { action: action, placeId: place && place.id });
     });
   }
 
@@ -1159,7 +1245,10 @@
     isSampleLoaded: isSampleLoaded,
     loadSampleData: loadSampleData,
     clearSampleData: clearSampleData,
-    getLastError: function () { return lastError; }
+    getLastError: function () { return lastError; },
+    /* ⭐ 2026-10-12（B2）：失败日志 —— F12 里跑 TripMemoStore.getErrorLog() 看最近 20 次失败 */
+    getErrorLog: getErrorLog,
+    clearErrorLog: clearErrorLog
   };
 
 }(window));

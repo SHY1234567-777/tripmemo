@@ -166,19 +166,21 @@
   }
 
   /* ---------------- ① 健康状态 ---------------- */
+  /* ⭐ 2026-10-12 改：原来这里调 `/api/db-check`，它会吐出**全库条数 + 一个真实地点名** ——
+     任何匿名访客都能拿到（属于实际的数据暴露）。⭐ 那个接口已经删掉了。
+     ✅ 现在改成调 `/api/health`：它只证明"云函数活着"，**不碰任何数据**。
+     ⭐ 想看"数据库读写到底通不通"：跑前端检查脚本 `verify-project.py` 的第 13 项 ——
+        它跑的是真实的「写 → 读回 → 删 → 确认删干净」链路，比数条数有意义得多。 */
   function checkHealth() {
     setBadge('healthBadge', '检查中…', '');
-    return request('GET', '/api/db-check').then(function (r) {
+    return request('GET', '/api/health').then(function (r) {
       var body = $('healthBody');
-      var d = r.json && r.json.data;
-      if (r.json && r.json.ok === true && d) {
+      if (r.json && r.json.ok === true) {
         setBadge('healthBadge', '正常', 'ok');
         body.innerHTML =
           '<div class="kv">' +
-          '<div><span>地点条数（全库）</span><b>' + d.placesCount + '</b></div>' +
-          '<div><span>用户条数</span><b>' + d.usersCount + '</b></div>' +
-          '<div><span>设置条数</span><b>' + d.settingsCount + '</b></div>' +
-          '<div><span>第一条地点</span><b>' + (d.firstPlaceName || '（无）') + '</b></div>' +
+          '<div><span>云函数</span><b>活着（' + (r.json.service || 'TripMemo') + '）</b></div>' +
+          '<div><span>数据库读写</span><b>见 verify-project.py 第 13 项</b></div>' +
           '</div>';
       } else {
         setBadge('healthBadge', '异常', 'bad');

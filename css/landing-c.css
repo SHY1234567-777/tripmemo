@@ -37,6 +37,14 @@
 
 /* 内层负责撑满 + 纵向居中（⚠️ 见 .screen 上面那条注释） */
 .c-fit {
+  /* ⭐ 2026-10-12 新增 `position: relative`：让 `.c-bg` 和 `.c-grain` 以**它**为定位父级。
+     ⚠️ 为什么必须加：那两层都是 `position:absolute; inset:0`。之前 .c-fit 是 static，
+        它们的定位父级是 `.view`（= **一屏高**），所以内容一超屏、滚下去就没背景了
+        （他手机实测到的"下半截全是棕色"）。
+     ✅ 加完之后它们跟着 .c-fit 的**内容高度**一起长 —— .c-fit 是 `min-height:100%`，
+        内容多高它就多高，滚到哪背景铺到哪。
+     ⚠️ 对 flex 布局零影响：这两层都是 absolute（脱离文档流），不参与 flex 排列。 */
+  position: relative;
   /* ⚠️ 演示页里这里要**减去顶部那条 Tab 栏的高度**（因为写它时父级 height 是 auto，
        百分比解析不到，只能拿视口硬算）。项目里没有 Tab 栏，而且 `#view-landing` 就是 `.view`
        （`position:absolute; inset:0`）→ **高度是确定的**，百分比能正常解析，直接用 100%。 */
@@ -748,11 +756,15 @@
     --fc-h: 288px;
     --fan-w: auto;              /* 纵向流式：盒宽不需要定值 */
     --fan-row: 84px;            /* 叠牌时每张向下错开的距离（露出卡头） */
-    --fan-row-open: 156px;      /* 展开时每张向下错开的距离 */
+    --fan-row-open: 156px;      /* ⚠️ 已废弃（2026-10-12）：展开态改用 `--fc-h + 12px` 算，不再读这个值 */
     --fc-lift: 0px;
     flex-direction: column;
     height: auto;
     width: auto;
+    /* ⭐ 2026-10-12：展开后卡片之间用 gap 留 14px —— 干净的"一张一张分开"。
+       ⚠️ 叠牌态不受影响：那里靠每张的负 margin 压在一起，gap 只是额外垫 14px，
+          叠起来的效果照样是"只露卡头"。 */
+    gap: 14px;
     /* ⚠️ 纵向牌列不需要"预占横向出血"的 margin —— 卡只左右偏 9px，
           留着 margin 会把整列往中间挤、右侧还多出空档。 */
     margin-left: 0;
@@ -771,16 +783,29 @@
   }
   .c-fan .c-frame:first-of-type { margin-top: 0; }
   /* 展开态：纵向摊开 + 左右轻错 + 轻转 —— 一沓牌在桌上铺开的样子 */
+  /* ⭐⭐ 2026-10-12 改（shy 手机实测："第 2、3 张点不中"）：
+     ------------------------------------------------------------------
+     🔴 原来：`margin-top: calc(--fan-row-open - --fc-h)` = 118 - 232 = **-114px**
+        → 每张只露出 **118px**（卡高的一半），**再叠加 translateX(±9px) 和 rotate(±3°)**
+        → 中间那几张只剩一条窄边能点，手机上根本点不准。
+     ✅ 现在：**错开一整张卡高 + 12px 间隙** → **完全不重叠**，每张卡都能完整看到、独立点到。
+     ⚠️ 代价（要知道）：5 张完全摊开后总高 ≈ 4×(232+12) + 232 ≈ **1208px**，
+        手机上**必须滚动**才能看全。⭐ 这个代价是值得的 ——
+        门面页可以滚，"点不中"没法忍。
+     ⚠️ 同时**去掉了 translateX / rotate**：纵向排列时横向错开只会让卡片对不齐、
+        更难判断点的是哪一张（原来那套旋转是给**横向扇形**用的，纵向布局不需要）。 */
   .c-deck.is-open .c-fan .c-frame {
-    margin-top: calc(var(--fan-row-open) - var(--fc-h));
-    transform:
-      translateX(calc(var(--fan-i, 0) * 9px))
-      rotate(calc(var(--fan-i, 0) * 3deg));
+    /* ⚠️ 展开时 **margin-top 归零**，改用 .c-fan 的 gap 控制间距。
+       为什么不用 `calc(var(--fc-h) + 12px)`：卡片的**实际渲染高度**比 --fc-h 小
+       （--fc-h 是给叠牌错位算的"名义高度"），相减后会多留出一截空白
+       （实测间距看着像 40px，而不是想要的 12px）。归零 + gap 最干净。 */
+    margin-top: 0;
+    transform: none;                        /* ⭐ 不偏、不转，每张对齐 */
   }
   .c-deck.is-open .c-fan .c-frame:first-of-type { margin-top: 0; }
   .c-deck.is-open .c-fan .c-frame:hover {
-    transform: translateX(calc(var(--fan-i, 0) * 9px)) translateY(-6px)
-               rotate(calc(var(--fan-i, 0) * 3deg)) scale(1.02);
+    /* ⭐ 2026-10-12：跟着展开态一起去掉了 translateX / rotate（纵向布局用不上） */
+    transform: translateY(-6px) scale(1.02);
   }
   .c-deck.is-stacked .c-fan:hover .c-frame[data-top="1"] {
     transform: rotate(0deg) translateY(-6px) scale(1.015);
@@ -815,7 +840,7 @@
     --fc-w: clamp(168px, 46vw, 214px);
     --fc-h: 232px;
     --fan-row: 62px;
-    --fan-row-open: 118px;
+    --fan-row-open: 118px;      /* ⚠️ 已废弃（2026-10-12）：展开态改用 `--fc-h + 12px` */
   }
   .c-deck .c-frame--end { width: 208px; height: 202px; }
   .c-frame-t { font-size: 15px; }

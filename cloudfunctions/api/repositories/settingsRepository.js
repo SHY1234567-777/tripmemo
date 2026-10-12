@@ -95,7 +95,9 @@ function newSettingsId() {
 }
 
 /**
- * ⭐ 数条数（给 `/api/db-check` 那个临时接口用）
+ * ⭐ 数条数
+ *
+ * ⚠️ 2026-10-12：原调用方 `/api/db-check` 已删（它泄露全库统计），**本方法目前暂无调用方**；保留给后续「统计面板」或账号体系用。
  * @returns {Promise<number>}
  */
 async function countAll() {

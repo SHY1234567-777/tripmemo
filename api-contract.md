@@ -359,7 +359,8 @@ https://tripmemo-d3gd23bd14a396d1d-148733444.ap-shanghai.app.tcloudbase.com/api/
 >
 > ⚠️ **注意**：`PUT` / `DELETE` 现在也要走 `?id=`（见 §3.4 第 1 条），
 > 所以**"改那条已有记录"目前还没有接口** —— 要等 Day 19 的 `PUT`。
-> ⭐ 在 `PUT` 做出来之前，用户遇到 409 时只能去数据库里改 —— ⚠️ **记入待办**。
+> ✅ **2026-10-12 已解决**：`PATCH /api/place?id=`（Day 22）已经实现"改那条已有记录"，
+> 所以 409 时**不再需要去数据库里改** —— 用户直接编辑那条即可。（原"记入待办"已办结）
 
 **请求**
 
@@ -623,8 +624,7 @@ https://tripmemo-d3gd23bd14a396d1d-148733444.ap-shanghai.app.tcloudbase.com/api/
 | ⭐ **6** | ⭐ **`GET /api/meta`** | ✅ ⭐ **已实现（Day 17）** |
 | ⭐ **7** | ⭐ **`PUT /api/meta`**（也接受 `PATCH`） | ✅ ⭐ **已实现（Day 23）** —— 部分更新 + upsert；⭐ 修掉"主城市刷新就丢 → 连线全没" |
 | 8、9 | 其余两个 | ⚠️ **仍是占位** —— 批量写入 / 清空全部 |
-| — | ⚠️ `GET /api/db-check` | ⚠️ **临时接口，不在契约里**（Day 17 加，验"云函数能不能连数据库"）。已验证通过，**留还是删待定** |
-| — | ⚠️ `GET /api/whoami` | ⚠️ **临时接口，不在契约里**（Day 20 加，验"云函数能不能从 token 解出身份"）。已验证通过，**留还是删待定** |
+| — | `GET /api/whoami` | ⭐ **保留**（排查工具，免登录白名单）。⚠️ **2026-10-12 已瘦身**：去掉了 `tokenLength` 和 `upstreamRaw`（平台原始应答）两个字段 —— 它们只是调试细节，不该长期挂在公网。现在只回 `hasToken / resolved / userId / usedFallback / reason` |
 
 ### ⭐ 已上线的完整地址（⭐ 复制用，不省略前缀）
 
@@ -647,7 +647,6 @@ https://tripmemo-d3gd23bd14a396d1d-148733444.ap-shanghai.app.tcloudbase.com/api/
 https://tripmemo-d3gd23bd14a396d1d-148733444.ap-shanghai.app.tcloudbase.com/api/whoami
 ```
 ```
-https://tripmemo-d3gd23bd14a396d1d-148733444.ap-shanghai.app.tcloudbase.com/api/db-check
 ```
 
 ⭐ **另外**：公网检查台（⭐ 一个页面，不是接口）

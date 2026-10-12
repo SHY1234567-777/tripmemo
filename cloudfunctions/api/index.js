@@ -388,8 +388,10 @@ const server = http.createServer(async (req, res) => {
         · `GET /api/health`  —— 只探"云函数活着吗"，不碰任何数据
         · `GET /api/whoami`  —— 排查工具，价值就是"把身份解析结果原样吐出来"，
                                  挡掉就没用了（⚠️ 它不返回任何用户数据）
-     ⚠️ `/api/db-check` **不在白名单** —— 它会吐出数据库条数和地点名，
-        本来就该先有身份。
+     ⭐ 2026-10-12：原白名单说明里还提到过 `/api/db-check` —— **那个接口已经删了**
+        （它会吐出全库条数 + 一个真实地点名，任何匿名访客都能拿到，属实际数据暴露）。
+        现在"数据库连通性"由前端检查脚本 `verify-project.py` 的第 13 项负责
+        （它跑的是真实的"写 → 读回 → 删"链路，比数条数更有意义）。
      ------------------------------------------------------------ */
 
   /* ⚠️ `isHealth` 的定义**从下面挪到了这里** ——
@@ -412,14 +414,18 @@ const server = http.createServer(async (req, res) => {
   /* ⭐ 走到这儿 = 要么有身份，要么走的是白名单 */
   const userId = who.ok ? who.uid : null;
 
-  /* ⭐ 临时接口：把"云函数看到的身份"原样吐出来（Day 20 实测用）
-     ⚠️ 它的唯一作用是**看清除 token 验证后到底返回了什么字段** ——
-        确认之后就可以删掉它（或留着当排查工具）。
-     ⚠️ 它不在契约里，不是正式接口。 */
+  /* ⭐ 排查接口：告诉调用者"你这次请求被认成谁"（Day 20 加，**2026-10-12 瘦身**）
+     ⚠️ 它的价值：**出身份问题时能一眼看出是"没带 token"还是"token 无效"**。
+
+     ⭐⭐ 2026-10-12 瘦身（遗留清单 B 组）—— **去掉了两个字段**：
+        · `tokenLength` —— 把 token 长度暴露在公网上没有任何意义，只给攻击者信息
+        · `upstreamRaw` —— 它是**平台 `/auth/v1/user/me` 的原始应答**，
+          原样吐出来等于连"平台内部返回了什么"也暴露。排查时看控制台日志就够了。
+     ⚠️ 保留字段的说明：`userId` 是**调用者自己**的 uid（不带 token 时是 null），
+        不涉及任何别人的数据，所以可以留 —— 这也是它还留在"免登录白名单"里的原因。 */
   if (path === '/api/whoami' && req.method === 'GET') {
     sendOk(res, {
       hasToken: !!getBearerToken(req),
-      tokenLength: (getBearerToken(req) || '').length,
       resolved: who.ok,
       userId: userId,
       /* ⚠️ 这个字段名是 Day 20 留下的 —— 那时"没身份"会兜底成 `u_shy`。
@@ -427,8 +433,6 @@ const server = http.createServer(async (req, res) => {
             它现在的含义是「**身份无效**」，不存在任何兜底用户了。 */
       usedFallback: !who.ok,
       reason: who.reason || null,
-      freshPlaceCount: 0,
-      upstreamRaw: who.raw || null,
     });
     return;
   }
@@ -446,60 +450,6 @@ const server = http.createServer(async (req, res) => {
     res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
     res.end(JSON.stringify({ ok: true, service: 'TripMemo' }));
     return;
-  }
-
-  /* ⭐ GET /api/db-check —— 数据库连通性检查（Day 17 第 0 步）
-
-     ⭐ 它的唯一目的：**在写正式读接口之前，先证明云函数真能读到数据库。**
-
-     ⚠️ 为什么不直接写 /api/places？因为那样一旦失败，你分不清是
-        · 接口代码写错了
-        · 还是连不上数据库（权限 / 环境 ID / SDK 没装）
-     ⭐ 先用一个"只数条数"的接口把"能不能连"这件事单独验掉 ——
-        这就是「先打通、再加载」。
-
-     ⚠️ 它会把**错误的原文**返回出来（而不是笼统地说"失败了"）——
-        因为这一步唯一的价值就是看清楚错误信息。
-     ⭐ 验证通过后，这个接口可以留着（当健康检查用），也可以删。 */
-  if (path === '/api/db-check' && req.method === 'GET') {
-    try {
-      /* ⭐ 三个集合各数一次 —— 具体怎么数由 repository 负责，这里只拿结果 */
-      const placesStat = await placesRepo.countAll();
-      const usersCount = await usersRepo.countAll();
-      const settingsCount = await settingsRepo.countAll();
-
-      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-      res.end(JSON.stringify({
-        ok: true,
-        data: {
-          placesCount: placesStat.count,
-          usersCount: usersCount,
-          settingsCount: settingsCount,
-          firstPlaceName: placesStat.first ? placesStat.first.name : null,
-        },
-      }));
-      return;
-    } catch (err) {
-      /* ⭐ Day 23：这个接口是**开发者诊断**用的（不在契约里、前端也不调它）——
-         它的价值就是"看清楚错误原文"，所以原文必须留着。
-         ⚠️ 但**形状要和别处一致**：`message` 给中文人话，原文挪到 `detail`（契约外扩展字段）。
-         ⚠️ 为什么不保留原来那种"message 直接放英文原文"的写法：
-            违背契约 §3.1 的意图（message 是给用户看的），
-            而且哪天有人把它接到界面上，英文原文就漏出去了。
-         ⭐ 原文三重保险：控制台日志 + 响应里的 detail + name。 */
-      console.error('[TripMemo] /api/db-check 失败：', err);
-      res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
-      res.end(JSON.stringify({
-        ok: false,
-        error: {
-          code: 'DB_CHECK_FAILED',
-          message: SERVER_ERROR_MESSAGE,
-          detail: String((err && err.message) || err),
-          name: String((err && err.name) || ''),
-        },
-      }));
-      return;
-    }
   }
 
   /* ------------------------------------------------------------

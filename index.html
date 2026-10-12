@@ -17,8 +17,8 @@
   <link rel="preconnect" href="https://fonts.loli.net" crossorigin>
   <link rel="stylesheet"
         href="https://fonts.loli.net/css2?family=Noto+Serif+SC:wght@600;700&family=Ma+Shan+Zheng&display=swap">
-  <link rel="stylesheet" href="css/style.css?v=72">
-  <link rel="stylesheet" href="css/landing-c.css?v=72">
+  <link rel="stylesheet" href="css/style.css?v=77">
+  <link rel="stylesheet" href="css/landing-c.css?v=77">
 </head>
 <body>
 
@@ -61,7 +61,7 @@
            只有真按钮才能被 Tab 走到、能按回车/空格触发，
            也才吃得到全站那条 `:focus-visible` 规则。 -->
     <h1 class="app-title">
-      <button type="button" class="app-home" id="nav-home">TripMemo</button>
+      <button type="button" class="app-home" id="nav-home" title="回到首页（门面页）">TripMemo</button>
     </h1>
 
     <div class="nav-items">
@@ -148,8 +148,15 @@
             两个文件都**只服务这一屏**，与 app 其它部分完全隔离（.c-* 前缀零冲突）。
             那两张表自带一套暗房色调，**刻意不套**项目的 --color-* 与字号 7 档。 -->
     <section class="view is-active" id="view-landing">
-          <div class="c-bg" aria-hidden="true"></div>
        <div class="c-fit">
+        <!-- ⭐ 2026-10-12：背景层**必须放在 .c-fit 里面**（不能放外面当 .view 的直接子元素）。
+             ⚠️ 原因：`.c-bg` 是 `position:absolute; inset:0`，它相对**最近的定位祖先**定位。
+                放 `.view` 外面时，那个祖先就是 `.view`（`inset:0` = **正好一屏高**）——
+                桌面扇形不超一屏时看不出问题，⭐ **但手机上门面页改成纵向长列表后，
+                内容超出一屏 → 滚下去就没背景了，露出纯棕底色**（他 2026-10-12 手机实测）。
+             ✅ 移进 `.c-fit`（`min-height:100%` + 新增 `position:relative`）后，
+                背景跟着**内容高度**一起长，滚到哪都有。 -->
+          <div class="c-bg" aria-hidden="true"></div>
         <!-- 颗粒层：盖在所有内容之上（老胶片颗粒是叠在画面上的，不是垫在底下） -->
         <div class="c-grain" aria-hidden="true"></div>
 
@@ -1533,7 +1540,7 @@
 
   <!-- ===== 本地配置：含高德 Key，不提交（模板见 config.example.js）=====
        找不到 config.js 时不会报错，只是地图加载不出来，页面其余部分照常可用 -->
-  <script src="config.js?v=72"
+  <script src="config.js?v=77"
           onerror="console.warn('[TripMemo] 未找到 config.js —— 地图将无法加载。请把 config.example.js 复制为 config.js 并填入 Key 与安全密钥。')"></script>
 
   <!-- ===== 项目脚本：顺序不能乱 =====
@@ -1558,21 +1565,21 @@
           固定一个旧版本号会直接报 "getSession is not a function"。 -->
   <script src="https://static.cloudbase.net/cloudbase-js-sdk/latest/cloudbase.full.js"></script>
 
-  <script src="js/model.js?v=72"></script>
-  <script src="js/mock-data.js?v=72"></script>
-  <script src="js/store.js?v=72"></script>
+  <script src="js/model.js?v=77"></script>
+  <script src="js/mock-data.js?v=77"></script>
+  <script src="js/store.js?v=77"></script>
 
   <!-- 四态逻辑（空 / 加载 / 错误 / 正常）的**唯一实现** —— 两个列表视图共用（Day 13）
        ⚠️ 必须排在 timeline.js / places.js 之前：它们在 init() 里就要用它。
        ⭐ 为什么单独一个文件、而不是在两个视图里各写一份：
           那就是"同一个逻辑两种写法"，改的时候必然漏一个（原则 2）。 -->
-  <script src="js/view-state.js?v=72"></script>
-  <script src="js/detail.js?v=72"></script>
-  <script src="js/drawer.js?v=72"></script>
-  <script src="js/map.js?v=72"></script>
-  <script src="js/timeline.js?v=72"></script>
-  <script src="js/places.js?v=72"></script>
-  <script src="js/main.js?v=72"></script>
-  <script src="js/landing-c.js?v=72"></script>
+  <script src="js/view-state.js?v=77"></script>
+  <script src="js/detail.js?v=77"></script>
+  <script src="js/drawer.js?v=77"></script>
+  <script src="js/map.js?v=77"></script>
+  <script src="js/timeline.js?v=77"></script>
+  <script src="js/places.js?v=77"></script>
+  <script src="js/main.js?v=77"></script>
+  <script src="js/landing-c.js?v=77"></script>
 </body>
 </html>

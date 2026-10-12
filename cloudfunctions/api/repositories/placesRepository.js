@@ -10,7 +10,7 @@
         · findPlaceById(...)     查单个
         · existsAtCoordinate(...) 按坐标查重
         · insertPlace(...)       插入
-        · countAll()             数条数（给 db-check 用）
+        · countAll()             数条数（⚠️ 2026-10-12 起暂无调用方，见方法上的说明）
 
    ⭐⭐ 「Day 19 要掌握」的答案就在这个文件：
        **"查数据库"那段代码，从 index.js 的路由分支里，搬到了这里。**
@@ -252,13 +252,15 @@ async function deletePlace(id, ownerId) {
 }
 
 /**
- * ⭐ 数条数 + 取第一条（给 `/api/db-check` 那个临时接口用）
+ * ⭐ 数条数 + 取第一条
+ *
+ * ⚠️ 2026-10-12：原调用方 `/api/db-check` 已删（它泄露全库统计），**本方法目前暂无调用方**；保留给后续「统计面板」或账号体系用。
  * @returns {Promise<{count:number, first:object|null}>} first 是**原始文档**
  */
 async function countAll() {
   const result = await db.collection(COLLECTION).get();
   const list = result.data || [];
-  /* ⭐ 补上接口形状的字段，让 db-check 拿到的也是干净的对象 */
+  /* ⭐ 补上接口形状的字段，让拿到的也是干净的对象（原调用方 db-check 已删，保留这个形状） */
   return {
     count: list.length,
     first: list[0] ? toApiPlace(list[0]) : null,

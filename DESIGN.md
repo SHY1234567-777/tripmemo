@@ -613,7 +613,7 @@
 - [ ] 铺满容器的浮层都带 `pointer-events: none`
 - [ ] 用了 `display: flex/grid` 的元素同时处理了 `[hidden]`（浏览器的 `[hidden]` 会被盖掉）
 - [ ] 每一处 `backdrop-filter` 都配了 `-webkit-backdrop-filter`
-- [ ] **改完 css / js 后，`index.html` 里 12 个资源的 `?v=` 数字一起 +1**
+- [ ] **改完 css / js 后，`index.html` 里 14 处 `?v=` 的数字一起 +1**（⚠️ 2026-10-12 校正：原来写"12 个资源"，实际是 **14 处** —— 门面页改版新增了 `css/landing-c.css` 和 `js/landing-c.js`，加上原有的 12 个）
 
 ---
 
