@@ -2,7 +2,14 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- ⭐ 2026-10-13：显式声明「允许缩放」。
+       ⚠️ 原来的写法是 `width=device-width, initial-scale=1.0` —— 看着没问题，
+          但它**只是"没说禁止"**，而微信的 X5 内核（安卓微信内置浏览器）
+          **默认就是禁双指缩放的**，你不显式说"允许"，它就用它的默认值（禁）。
+       ⭐ 加上 `user-scalable=yes` + 上下限之后，X5 才会放行。
+       ⚠️ 另外 `initial-scale` 从 `1.0` 改成 `1`：旧版 X5 对 `1.00` 这种写法解析不稳。
+       ⚠️ 这条 meta **必须在 head 里且是第一个** —— X5 只认第一个 viewport，后面的静默丢弃。 -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=0.5, maximum-scale=5, user-scalable=yes">
   <title>TripMemo · 人生记忆地图</title>
   <!-- 给样式表加版本号，防止浏览器拿旧的缓存（改了 CSS 后把 v 的数字 +1 即可） -->
   <!-- ⭐ 手账改版的字体（2026-09-28 美术重设计）
@@ -17,8 +24,8 @@
   <link rel="preconnect" href="https://fonts.loli.net" crossorigin>
   <link rel="stylesheet"
         href="https://fonts.loli.net/css2?family=Noto+Serif+SC:wght@600;700&family=Ma+Shan+Zheng&display=swap">
-  <link rel="stylesheet" href="css/style.css?v=77">
-  <link rel="stylesheet" href="css/landing-c.css?v=77">
+  <link rel="stylesheet" href="css/style.css?v=79">
+  <link rel="stylesheet" href="css/landing-c.css?v=79">
 </head>
 <body>
 
@@ -1540,7 +1547,7 @@
 
   <!-- ===== 本地配置：含高德 Key，不提交（模板见 config.example.js）=====
        找不到 config.js 时不会报错，只是地图加载不出来，页面其余部分照常可用 -->
-  <script src="config.js?v=77"
+  <script src="config.js?v=79"
           onerror="console.warn('[TripMemo] 未找到 config.js —— 地图将无法加载。请把 config.example.js 复制为 config.js 并填入 Key 与安全密钥。')"></script>
 
   <!-- ===== 项目脚本：顺序不能乱 =====
@@ -1565,21 +1572,21 @@
           固定一个旧版本号会直接报 "getSession is not a function"。 -->
   <script src="https://static.cloudbase.net/cloudbase-js-sdk/latest/cloudbase.full.js"></script>
 
-  <script src="js/model.js?v=77"></script>
-  <script src="js/mock-data.js?v=77"></script>
-  <script src="js/store.js?v=77"></script>
+  <script src="js/model.js?v=79"></script>
+  <script src="js/mock-data.js?v=79"></script>
+  <script src="js/store.js?v=79"></script>
 
   <!-- 四态逻辑（空 / 加载 / 错误 / 正常）的**唯一实现** —— 两个列表视图共用（Day 13）
        ⚠️ 必须排在 timeline.js / places.js 之前：它们在 init() 里就要用它。
        ⭐ 为什么单独一个文件、而不是在两个视图里各写一份：
           那就是"同一个逻辑两种写法"，改的时候必然漏一个（原则 2）。 -->
-  <script src="js/view-state.js?v=77"></script>
-  <script src="js/detail.js?v=77"></script>
-  <script src="js/drawer.js?v=77"></script>
-  <script src="js/map.js?v=77"></script>
-  <script src="js/timeline.js?v=77"></script>
-  <script src="js/places.js?v=77"></script>
-  <script src="js/main.js?v=77"></script>
-  <script src="js/landing-c.js?v=77"></script>
+  <script src="js/view-state.js?v=79"></script>
+  <script src="js/detail.js?v=79"></script>
+  <script src="js/drawer.js?v=79"></script>
+  <script src="js/map.js?v=79"></script>
+  <script src="js/timeline.js?v=79"></script>
+  <script src="js/places.js?v=79"></script>
+  <script src="js/main.js?v=79"></script>
+  <script src="js/landing-c.js?v=79"></script>
 </body>
 </html>

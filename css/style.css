@@ -527,6 +527,27 @@ body::after {
   to   { opacity: 1; transform: none; }
 }
 
+/* ⭐ 2026-10-13：显式允许「双指缩放」
+   ------------------------------------------------------------------
+   🔴 他反馈的问题：**时间轴 / 地点列表在微信里放不大**。
+   🔴 根因：`.view` 是 `overflow: auto` 的**滚动容器** ——
+      移动端浏览器默认把容器内的双指手势**优先解释成"滚动"**，缩放就被吃掉了。
+      ⭐ 为什么地图页不受影响：**高德地图容器自己声明了手势处理**，它把手势抢过去了。
+   ✅ `touch-action: pan-y pinch-zoom` = **纵向滚动照旧 + 双指缩放放行**。
+
+   ⚠️ 为什么**不**加在地图页：地图需要**横向平移**（pan-x），
+      而 `pan-y` 会把横向手势也禁掉 —— 所以地图仍用默认的 `auto`（全允许）。
+   ⚠️ 代价：这三个视图里**双击缩放会失效**（`pinch-zoom` 不含双击）——
+      不过双指能缩就够用，而且禁用双击缩放反而让"点卡片"不容易误触。
+
+   ⚠️ 注意 `touch-action` 的继承规则：**子元素取的是"父级限制 ∩ 自己声明"** ——
+      所以这里给容器加了限制后，容器内所有元素都受它约束（这是我们要的效果）。 */
+#view-landing,
+#view-timeline,
+#view-places {
+  touch-action: pan-y pinch-zoom;
+}
+
 /* ⚠️ 地图：只淡入，**不动位置**（理由见上）
    ⭐ 选择器带 id，权重(1,0,0)天然高过 `.view.is-active` 的(0,2,0)，所以这份一定生效。 */
 #view-map.is-active {
@@ -2957,17 +2978,26 @@ body.is-landing .app-alert {
     display: none;
   }
 
-  /* 时间轴卡片改上下堆叠：图片位变成顶部横幅 */
+  /* ⭐ 2026-10-13 改：手机上看「缩略图在左 + 文字在右」，不再用"通栏大图"
+     ------------------------------------------------------------------
+     🔴 原来这里是 `flex-direction: column` + `.timeline-thumb { width: 100% }` ——
+        图片变成**通栏横幅**，又保持 `aspect-ratio: 4/3`：
+        375px 屏上 **图片高 = 343×3/4 ≈ 257px**，加文字后单卡 ≈ 400px，
+        ⚠️ **一屏只能放 1.5 个**（他 2026-10-13 手机实测："卡片特别大，一个占满整屏"）。
+     ✅ 改成"缩略图在左"：**96×72**（⭐ **仍是 4:3**，不破坏 PRD 指定的比例），
+        单卡高度降到 ≈110px → ⭐ **一屏能放 5-6 个**。
+     ⚠️ 为什么不做"上下堆叠 + 图片限高"：通栏 + 限高就**不再是 4:3** 了，
+        会直接违背原始需求；**挪到左边**才能"卡片变小"和"保住 4:3"两头都要。 */
   .timeline-card {
-    flex-direction: column;
-    gap: var(--space-2);
+    flex-direction: row;            /* ⭐ 回到左右两栏（原来的 column 会撑高卡片） */
+    gap: var(--space-3);
   }
 
   .timeline-thumb {
-    flex: 0 0 auto;
-    width: 100%;                   /* 堆叠后通栏 */
-    /* ⚠️ **不写 height** —— 保持基础规则里的 `aspect-ratio: 4 / 3`
-       （"4:3 拍立得照片区"是原始需求指定的比例）。 */
+    flex: 0 0 96px;                 /* ⭐ 固定宽 96px（不再通栏） */
+    width: 96px;
+    /* ⚠️ **不写 height** —— 保持基础规则里的 `aspect-ratio: 4 / 3`，
+       96px 宽会自动算出 72px 高，比例不破。 */
   }
 
   /* 堆叠后左边没地方放圆点了，藏掉，竖线保留 */
@@ -2977,6 +3007,42 @@ body.is-landing .app-alert {
 
   .timeline-year-list {
     padding-left: var(--space-3);
+  }
+
+  /* ⭐ 2026-10-13：地点列表的「城市卡片」同样改成"照片在左"（和时间轴是同一个病根）
+     ------------------------------------------------------------------
+     🔴 原来 `.city-head` 的 grid 第一行是 `'photo photo'`（照片**横跨整行**），
+        而照片区是 `aspect-ratio: 4/3`（`.city-head::before`）：
+        375px 屏上照片高 ≈ 239px → ⚠️ **单卡（收起态）就 ≈340px**，一屏只放得下 2 个。
+     ✅ 改成"左照片 + 右文字"：照片固定 96px 宽（4:3 → 72px 高），
+        单卡高度降到 ≈110px → ⭐ **一屏能放 6 个左右**。
+     ⚠️ 三个要点：
+       ① `grid-template-columns` 从 `1fr auto` 改成 `auto 1fr auto`
+          —— 第一列让给固定宽的照片，第二列才是会自动伸缩的文字
+       ② `grid-template-areas` 重排 —— 照片只占**左边一列**，不再是 `'photo photo'`
+       ③ 照片要 `align-self: start` —— 不然会被 grid **拉伸到跟文字一样高**，
+          那就又不是 4:3 了（这是最容易忘的一条）*/
+  .city-head {
+    grid-template-columns: auto 1fr auto;
+    grid-template-areas:
+      'photo  name   count'
+      'photo  sub    sub'
+      'toggle toggle toggle';
+    align-items: start;
+  }
+
+  .city-head::before {
+    width: 96px;                    /* ⭐ 固定宽 → `aspect-ratio: 4/3` 自动算出 72px 高 */
+    align-self: start;              /* ⚠️ 防止被 grid 拉伸破坏比例 */
+    font-size: var(--text-lg);      /* 首字水印跟着缩 —— 96px 格子里塞 28px 的字会溢出 */
+  }
+
+  /* ⚠️ 真实照片是另一个元素（`<img class="city-head-img">`），也得单独管 ——
+     它基础样式里写的是 `height: 100%`，在变窄的 photo 格里会**撑变形**。 */
+  .city-head-img {
+    align-self: start;
+    height: auto;
+    aspect-ratio: 4 / 3;            /* ⭐ 跟 `::before` 保持同一套比例 */
   }
 
   /* ---------- 地图工具条：窄屏下把横向空间用满 ----------
