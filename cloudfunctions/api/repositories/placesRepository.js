@@ -267,6 +267,74 @@ async function countAll() {
   };
 }
 
+/**
+ * ⭐⭐ 批量「整体替换」某个用户的全部地点（Day 28 新增）
+ *
+ * ⭐ 存在的理由（补一个挂了很久的缺口）：
+ *    前端「导入 JSON」和「装示例数据」原来只改浏览器内存，
+ *    **刷新一下就没了**（`js/store.js` 的 `replaceAllPlaces` 里写着"批量接口还没做"）。
+ *    ⭐ 这个方法就是那个一直缺的接口背后的实现。
+ *
+ * ⚠️ 语义是 **replace（整体替换）**，对应契约 §四.8：
+ *    **先清空这个用户的全部地点，再把新的整批写进去。**
+ *    ⭐ 为什么不做"追加"：导入的语义是「还原一份完整快照」——
+ *       做成追加的话，同一份文件导两次数据就翻倍了。
+ *
+ * ⚠️ 只动 `ownerId` 自己的数据，别人一条都不碰。
+ * ⭐ `_id` 沿用传进来的 `id`（契约 §3.4：旧导出文件导进来 id 不变）；
+ *    万一撞了（同一份文件导进另一个账号），**自动换一个新 id 重试**，不让整批失败。
+ *
+ * @param {string} ownerId 当前用户（⭐ 归属强制盖成它，不接受客户端传）
+ * @param {Array}  places  要写入的地点数组
+ * @returns {Promise<{ok:boolean, count:number}>}
+ */
+async function replaceAllForOwner(ownerId, places) {
+  const list = Array.isArray(places) ? places : [];
+
+  /* ① 先清空这个用户现有的全部地点 */
+  const existing = await db.collection(COLLECTION)
+    .where({ ownerId: ownerId })
+    .get();
+  const old = existing.data || [];
+
+  for (let i = 0; i < old.length; i++) {
+    await db.collection(COLLECTION).doc(old[i]._id).remove();
+  }
+
+  /* ② 再把新的整批写进去 */
+  let written = 0;
+  for (let i = 0; i < list.length; i++) {
+    const p = list[i] || {};
+    const doc = {
+      _id: p.id || newPlaceId(),
+      ownerId: ownerId,                       /* ⭐ 强制盖成当前用户 */
+      name: (p.name || '').trim(),
+      city: (p.city || '').trim(),
+      lng: Number(p.lng),
+      lat: Number(p.lat),
+      type: p.type || '',
+      startMonth: p.startMonth || '',
+      endMonth: p.endMonth || '',
+      note: p.note || '',
+      tags: Array.isArray(p.tags) ? p.tags : [],
+      images: Array.isArray(p.images) ? p.images : [],
+      createdAt: p.createdAt ? new Date(p.createdAt) : new Date(),
+    };
+
+    try {
+      await db.collection(COLLECTION).add(doc);
+    } catch (err) {
+      /* ⚠️ 大概率是 `_id` 撞了（同一份文件导进了另一个账号）——
+         换一个新 id 重试一次，不让一条坏数据毁掉整批导入。 */
+      doc._id = newPlaceId();
+      await db.collection(COLLECTION).add(doc);
+    }
+    written++;
+  }
+
+  return { ok: true, count: written };
+}
+
 module.exports = {
   VALID_PLACE_TYPES: VALID_PLACE_TYPES,
   toApiPlace: toApiPlace,
@@ -277,5 +345,6 @@ module.exports = {
   updatePlace: updatePlace,
   deletePlace: deletePlace,
   insertPlace: insertPlace,
+  replaceAllForOwner: replaceAllForOwner,
   countAll: countAll,
 };

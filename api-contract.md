@@ -114,7 +114,7 @@
 | 5 | **DELETE** | `/api/place?id=` | `removePlace` | 删除 |
 | 6 | **GET** | `/api/meta` | `getMainCity` / `isSampleLoaded` | 读设置 |
 | 7 | **PUT** | `/api/meta` | `setMainCity` | 改设置 |
-| 8 | **POST** | `/api/places/bulk` | `importJSON` / `loadSampleData` | 批量写入（导入 / 装示例） |
+| ⭐ **8** | **POST** | `/api/places/bulk` | `importJSON` / `loadSampleData` | ✅ **已实现（Day 28）** —— 批量写入（导入 / 装示例）|
 | 9 | **DELETE** | `/api/places` | `clearSampleData` | 清空全部（⚠️ 危险操作） |
 
 > ⭐ **`filterByType` 不需要接口** —— 前端本来就能筛（`places.filter(p => p.type === t)`），

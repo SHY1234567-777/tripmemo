@@ -1118,15 +1118,38 @@
    * @param {Array} places 原始数据（可以是 mock-data.js 里那种"只填了部分字段"的）
    */
   function replaceAllPlaces(places) {
-    placesCache = (places || []).map(function (item) {
+    var normalized = (places || []).map(function (item) {
       return Model.createPlace(item);
     });
-    /* ⚠️⚠️ 已知缺口（Day 20）：这里**只改本地，不会同步到云端**。
-       原因：批量写入的接口（POST /api/places/bulk）还没做。
-       ⭐ 后果：「导入 JSON」和「装示例数据」这两个功能**页面上看起来有效，
-          但刷新一下就没了**（因为刷新会从云端重新拉）。
-       ⚠️ 等批量接口做了之后，这里补一次 requestJson('POST', '/api/places/bulk', ...)。 */
+    placesCache = normalized;
+
+    /* ⭐ 先广播 —— 界面立刻反应，不用等网络 */
     persist();
+
+    /* ⭐⭐ 再同步到云端（**Day 28 补上**）
+       ------------------------------------------------------------------
+       ⚠️⚠️ 原来这里是空的缺口：`replaceAllPlaces` 只改浏览器内存，
+           「导入 JSON」和「装示例数据」**页面上看着成功、刷新就没了**
+           （因为刷新会从云端重新拉）。原因就是 `POST /api/places/bulk` 没做。
+       ✅ 现在接口补上了，这里接一次。
+
+       ⭐ 失败怎么办：**本地照旧生效**（用户已经看到导入成功），
+           只是把错误记进失败日志 —— 不做整批回滚。
+           理由：这是"整体替换"，回滚要恢复整份旧数据、代价大；
+           而且导入是用户主动动作，让他看到提示、再点一次更自然。
+       ⭐ 为什么要 `mode: 'replace'`：导入的语义是"还原一份完整快照"，
+           服务端据此**先清空自己的、再整批写入**。 */
+    return requestJson('POST', '/api/places/bulk', {
+      mode: 'replace',
+      places: normalized,
+    }).then(function (r) {
+      if (!r.json || r.json.ok !== true) {
+        throw new Error(errorMessageOf(r));
+      }
+      console.log('[TripMemo] 已同步 ' + normalized.length + ' 条到云端');
+    }).catch(function (err) {
+      reportError('批量导入到云端', err, { count: normalized.length });
+    });
   }
 
   /**

@@ -51,7 +51,27 @@
     var bucket = {};
     var order = [];
 
+    /* ⭐ 2026-10-14：「想去」的地点**不参与城市分组**
+       ------------------------------------------------------------
+       🔴 原来它们混在各城市组里 —— 用户看到「拉萨 → 布达拉宫」会以为**去过拉萨**，
+          但布达拉宫其实只是「想去」。这是会误导人的显示（他 2026-10-14 指出）。
+       ✅ 现在先把 wishlist 挑出来，最后单独成一组（组名「想去的地方」）。
+
+       ⭐ 一致性：地图上「想去」本来就有三条特殊处理
+          （点固定最小号 / 不参与连线 / 不进时间轴），
+          只有地点列表漏了 —— 这次补齐。 */
+    var wishlist = [];
+    var visited = [];
+
     places.forEach(function (place) {
+      if (place.type === 'wishlist') {
+        wishlist.push(place);
+      } else {
+        visited.push(place);
+      }
+    });
+
+    visited.forEach(function (place) {
       /* 城市为空的归到一个「城市待补」组，不让它们凭空消失
          （对应 TECH_DESIGN 待反馈 PRD 的问题 #1、#2） */
       var raw = place.city || '城市待补';
@@ -64,7 +84,7 @@
       bucket[key].places.push(place);
     });
 
-    return order
+    var groups = order
       .map(function (key) { return bucket[key]; })
       .sort(function (a, b) {
         if (b.places.length !== a.places.length) {
@@ -72,6 +92,13 @@
         }
         return a.city.localeCompare(b.city);
       });
+
+    /* ⭐ 「想去」单独成一组，**永远排在所有城市之后** */
+    if (wishlist.length) {
+      groups.push({ city: '想去的地方', places: wishlist, isWishlist: true });
+    }
+
+    return groups;
   }
 
   /* ------------------------------------------------------------
@@ -241,7 +268,9 @@
       /* 用浏览器原生的 details/summary 实现"展开 / 收起"，
          不用自己写状态管理 —— 少写代码，少出 bug */
       var box = document.createElement('details');
-      box.className = 'city-group';
+      /* ⭐ 2026-10-14：「想去」那一组多带一个类，CSS 据此换一套外观
+         （虚线边框 + 更淡的色调 —— 一眼看出"这些还没去过"，不用读文字） */
+      box.className = 'city-group' + (group.isWishlist ? ' is-wishlist' : '');
 
       /* ⚠️ Day 10：改成**默认收起**（原来是 `true`）。
          为什么改：Grid 的每一行高度天生 = 那一排最高的卡片，
@@ -333,14 +362,24 @@
       var timeText = monthsLabel(totalMonths);
       var timeSpan = document.createElement('span');
       timeSpan.className = 'city-months';
-      if (timeText) {
+      if (group.isWishlist) {
+        /* ⭐ 2026-10-14：「想去」那一组**不算停留时长** —— 还没去过，哪来的时长？
+           ⚠️ 为什么不能沿用下面那条逻辑：`monthsOfStay` 对 wishlist 返回 0，
+              于是会显示「未填时长」—— 而**「未填」和「没去过」是两回事**：
+              前者是用户漏填了，后者是本来就还没有。
+           ⭐ 所以这里直接说清楚它是什么。 */
+        timeSpan.textContent = group.places.length + ' 个想去的地方';
+      } else if (timeText) {
         timeSpan.textContent = timeText;
       } else {
         /* 显示"0 个月"没意义 —— 要么说"不足 1 个月"，要么老实说没填 */
         timeSpan.textContent = hasAnyMonth ? '不足 1 个月' : '未填时长';
       }
       sub.appendChild(timeSpan);
-      sub.appendChild(bar);
+      /* ⭐「想去」没有时长，所以不画占比条（画了就是一条空条，反而误导） */
+      if (!group.isWishlist) {
+        sub.appendChild(bar);
+      }
 
       head.appendChild(sub);
       box.appendChild(head);

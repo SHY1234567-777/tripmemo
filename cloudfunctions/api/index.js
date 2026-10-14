@@ -724,6 +724,78 @@ const server = http.createServer(async (req, res) => {
   }
 
   /* ------------------------------------------------------------
+     ⭐⭐ POST /api/places/bulk —— 批量写入（契约 §四.8，**Day 28 补上**）
+     ------------------------------------------------------------
+     ⭐ 对应前端两个功能：「导入 JSON」和「装示例数据」。
+     ⚠️⚠️ 这个接口**挂了很久没做** —— 前端那两处一直只改浏览器内存，
+        刷新就没了（`js/store.js` 的 `replaceAllPlaces` 里写着"批量接口还没做"）。
+        ⭐ Day 28 补上它，那两处才真正落到云端。
+
+     ⭐ 语义：`mode: 'replace'` = **整体替换**（先清空自己的，再整批写入），
+        对应"还原一份完整快照"。
+        ⚠️ 不做 append —— 否则同一份文件导两次，数据就翻倍了。
+
+     ⚠️ 只动当前用户的数据：`ownerId` 由服务端盖，不接受客户端传。 */
+  if (path === '/api/places/bulk' && req.method === 'POST') {
+    try {
+      let body;
+      try {
+        body = await readJsonBody(req);
+      } catch (e) {
+        sendError(res, 400, 'INVALID_INPUT', '请求体解析失败：' + e.message);
+        return;
+      }
+
+      /* ⚠️ 只支持 replace —— 不认识的 mode 直接 400，别默默按某种语义执行 */
+      const mode = (body && body.mode) || 'replace';
+      if (mode !== 'replace') {
+        sendError(res, 400, 'INVALID_INPUT',
+          'mode 目前只支持 replace（整体替换），收到的是：' + mode);
+        return;
+      }
+
+      const incoming = (body && body.places);
+      if (!Array.isArray(incoming)) {
+        sendError(res, 400, 'INVALID_INPUT', 'places 必须是一个数组');
+        return;
+      }
+
+      /* ⭐ 条数上限：防止一次塞太多把函数跑超时。
+         ⚠️ 500 是"够用而且跑得完"的折中 —— 正常导入远小于它。 */
+      const MAX_BULK = 500;
+      if (incoming.length > MAX_BULK) {
+        sendError(res, 400, 'INVALID_INPUT',
+          '一次最多导入 ' + MAX_BULK + ' 条，收到的是：' + incoming.length);
+        return;
+      }
+
+      /* ⭐ 逐条校验必填。⚠️ **有一条不合法就整批拒绝**，不做"跳过坏数据" ——
+         因为这是 replace 语义，跳过坏数据会**静默丢掉**用户的东西。 */
+      for (let i = 0; i < incoming.length; i++) {
+        const checked = validateNewPlace(incoming[i]);
+        if (!checked.ok) {
+          sendError(res, 400, 'INVALID_INPUT',
+            '第 ' + (i + 1) + ' 条不合法：' + checked.message);
+          return;
+        }
+      }
+
+      const r = await placesRepo.replaceAllForOwner(userId, incoming);
+
+      /* ⭐ 余力加练的服务端日志（和新增那条一个风格）——
+         以后怀疑"导入到底写进去没"，去云函数「日志」里搜 [TripMemo] */
+      console.log('[TripMemo] 批量导入成功 count=' + r.count + ' owner=' + userId);
+
+      sendOk(res, { count: r.count });
+      return;
+    } catch (err) {
+      console.error('[TripMemo] POST /api/places/bulk 失败：', err);
+      sendError(res, 500, 'SERVER_ERROR', SERVER_ERROR_MESSAGE);
+      return;
+    }
+  }
+
+  /* ------------------------------------------------------------
      ⭐ GET /api/meta —— 读设置（契约 §四.6）
      ------------------------------------------------------------
      ⚠️ 契约特意写了：mainCity 允许是 null（用户还没设定主城市）——

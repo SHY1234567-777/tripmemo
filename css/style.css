@@ -1704,6 +1704,25 @@ body.is-landing .app-alert {
   transition: border-color var(--duration-normal), box-shadow var(--duration-normal), transform var(--duration-normal);
 }
 
+/* ⭐ 2026-10-14：「想去的地方」那一组换一套外观
+   ------------------------------------------------------------------
+   🔴 原来「想去」和「去过」混在同一套卡片里 —— 用户看到「拉萨 → 布达拉宫」
+      会以为去过拉萨，但布达拉宫其实只是「想去」（他 2026-10-14 指出）。
+   ✅ 现在它单独成组、永远排在最后，外观也区分开：
+      **虚线边框 + 去掉厚度阴影** ——
+      "虚线"在视觉语言里就是"还没落实"，不用读文字也能看出区别。
+   ⚠️ 只改能确定存在的东西（`border-style` / `box-shadow`），
+      不引入没把握的色值 token —— 免得在别的配色下变丑。 */
+.city-group.is-wishlist {
+  border-style: dashed;
+  box-shadow: none;
+}
+
+/* 照片区（色块 + 首字）淡一点 —— 视觉上呼应"还没去过" */
+.city-group.is-wishlist .city-head::before {
+  opacity: .55;
+}
+
 /* hover：像从桌上把这张照片**拿起来** —— 回正 + 上移 + 阴影加深 */
 .city-group:hover {
   border-color: rgba(91, 70, 54, 0.32);
